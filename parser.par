@@ -1,0 +1,519 @@
+
+/~ *** *** *** *** 
+ ~   Lexical Tokens
+ ~ *** *** *** *** ~/
+
+ /~ # Ignores # ~/
+    /~ There are two ways of handling whitespace. First using the
+     ~ whitespace defined here. Secondly using quby.main.PreParser.
+     ~ 
+     ~ All ignores are concatonated into a single regex,
+     ~ these are...
+     ~   Whitespace: ' |\t'
+     ~ 
+     ~ Doesn't include:
+     ~   Multi-Line Comment: (/\*((\*[^/])|[^\*])*\*/)
+     ~   One Line Comment: (//[^\n]*\n)
+     ~   ... they are handled in the pre-parser
+     ~/
+!   ' |\t'
+;
+
+<   ',(\n| )*'                  COMMA
+;
+/~ # Operators # ~/
+<   '=(\n| )*'                  ASSIGNMENT
+;
+<   ':|(=>)'                    MAP_ASSIGNMENT
+;
+<   "yield"                     YIELD
+;
+<   "or(\n| )*"                 OP_BOOL_OR_WORD
+;
+<   "and(\n| )*"                OP_BOOL_AND_WORD
+;
+<   '\|\|(\n| )*'               OP_BOOL_OR
+;
+<   "&&(\n| )*"                 OP_BOOL_AND
+;
+<   '\|(\n| )*'                 OP_BIT_OR
+;
+<   '&(\n| )*'                  OP_BIT_AND
+;
+<   '==(\n| )*'                 OP_EQUALITY
+    '!=(\n| )*'                 OP_NOT_EQUALITY
+;
+<   '<(\n| )*'                  OP_LESS_THAN
+    '>(\n| )*'                  OP_GREATER_THAN
+    '<=(\n| )*'                 OP_LESS_THAN_EQUAL
+    '>=(\n| )*'                 OP_GREATER_THAN_EQUAL
+;
+<   '<<(\n| )*'                 OP_SHIFT_LEFT
+    '>>(\n| )*'                 OP_SHIFT_RIGHT
+;
+<   '\+(\n| )*'                 OP_ADD
+    '\-(\n| )*'                 OP_SUB
+;
+<   '\*(\n| )*'                 OP_MULT
+    '/(\n| )*'                  OP_DIVIDE
+    
+    '%(\n| )*'                  OP_MOD
+;
+<   "not(\n| )*"                OP_NOT_WORD
+;
+<   '!(\n| )*'                  OP_NOT
+;
+<   '\*\*(\n| )*'               OP_POWER
+;
+<    '\.(\n| )*'                DOT
+;
+
+/~ # Brackets # ~/
+
+<   '\((\n| )*'                 LEFT_PARAN
+    '(\n| )*\)'                 RIGHT_PARAN
+    '\[(\n| )*'                 LEFT_SQUARE
+    '(\n| )*\]'                 RIGHT_SQUARE
+;
+
+    "if"                        IF
+    /~ 'elsif', 'elseif' and 'else if' ~/
+    "(elsif)|(else ?if)"        IF_ELSE_IF
+    "else"                      IF_ELSE
+    "then"                      IF_THEN
+;
+
+    "while"                     WHILE
+    "until"                     UNTIL
+;
+    "loop"                      LOOP
+;
+
+    "#def"                      ADMIN_METHOD_START
+    "def"                       FUNCTION_START
+    "module"                    MODULE_START
+    
+    "do"                        DO
+    '{'                         LEFT_BRACE
+;
+    '}'                         RIGHT_BRACE
+    "end"                       END
+;
+
+    "new"                       NEW     [*
+                                            %match = new quby.lexer.Sym( %offset, 'new' );
+                                         *]
+    "class"                     CLASS
+
+    "return"                    RETURN  [*
+                                            %match = new quby.lexer.Sym( %offset, 'return' );
+                                         *]
+    
+    '@'                         AT
+;
+    /~ single-line comments handled here ~/
+<   '( |\t)*(\n|;)( |\t)*'      END_LINE
+;
+
+/~ # Literals # ~/
+    "(0x([a-f0-9_]*[a-f0-9][a-f0-9_]*))|([0-9][0-9_]*)"     INT [*
+                    %match = %match.replace(/_+/g, '');
+                    %match = new quby.lexer.Sym( %offset, (%match | 0) );
+    *]
+    
+    '([0-9]([0-9_])*)?\.[0-9][0-9_]*'          FLOAT   [*
+                    %match = %match.replace(/_+/g, '');
+                    %match = new quby.lexer.Sym( %offset, parseFloat(%match) );
+    *]
+
+    "true"                      TRUE    [* %match = new quby.lexer.Sym( %offset, true  ); *]
+    "false"                     FALSE   [* %match = new quby.lexer.Sym( %offset, false ); *]
+
+    "null"                      NULL    [* %match = new quby.lexer.Sym( %offset, null  ); *]
+    
+    /~ single-quoted string ~/
+    '\'([^\']|(\\\'))*\''       STRING  [* %match = new quby.lexer.Sym( %offset, %match ); *]
+    /~ double-quoted string ~/
+    '\"([^\"]|(\\\"))*\"'       STRING  [* %match = new quby.lexer.Sym( %offset, %match );  *]
+
+/~ # Variables # ~/
+    "this"                      THIS    [* %match = new quby.lexer.Sym( %offset, null ); *]
+    '\$[a-zA-Z_0-9]*'           GLOBAL  [* %match = new quby.lexer.IdSym( %offset, %match ); *]
+    ':[a-zA-Z_0-9]+'            SYMBOL  [* %match = new quby.lexer.IdSym( %offset, %match.substring(1) ); *]
+    '[a-zA-Z_][a-zA-Z_0-9]*'    IDENTIFIER      [* %match = new quby.lexer.IdSym( %offset, %match ); *]
+;
+
+/~ # Admin # ~/
+    /~ Inline JavaScript block ~/
+    "#<pre#[^#]*#>#"            PRE_INLINE_BLOCK [*
+                                                    %match = new quby.lexer.Sym(
+                                                            %offset,
+                                                            %match.substring( 6, %match.length-3 )
+                                                    );
+                                                *]
+    '#<#[^#]*#>#'               INLINE_BLOCK    [*
+                                                    %match = new quby.lexer.Sym(
+                                                            %offset,
+                                                            %match.substring( 3, %match.length-3 )
+                                                    );
+                                                *]
+;
+
+/~ *** *** *** 
+ ~   Grammar
+ ~ *** *** *** ~/
+##
+
+Program:
+    Statements                          [*
+                                            %% = %1;
+                                            quby.main.currentParser().setProgram( %% );
+                                        *]
+;
+
+EndLines:
+    EndLines END_LINE
+  | END_LINE
+;
+
+OptionalEndLines:
+    OptionalEndLines END_LINE
+  | 
+;
+
+ClassDefinition:
+    CLASS ClassHeader Statements END    [* %% = new quby.syntax.ClassDefinition( %2, %3 ); *]
+;
+ClassHeader:
+    IDENTIFIER                          [* %% = new quby.syntax.ClassHeader( %1, null );*]
+  | IDENTIFIER OP_LESS_THAN IDENTIFIER  [* %% = new quby.syntax.ClassHeader( %1, %3   );*]
+;
+
+ConstructorDefinition:
+    FUNCTION_START NEW OptionalParametersDef Statements END [*
+                                            %% = new quby.syntax.Constructor( %2, %3, %4 );
+                                        *]
+;
+
+MethodDefinition:
+    FUNCTION_START IDENTIFIER OptionalParametersDef Statements END [*
+                                            %% = new quby.syntax.Function( %2, %3, %4 );
+                                        *]
+;
+AdminMethodDefinition:
+    ADMIN_METHOD_START IDENTIFIER OptionalParametersDef Statements END [*
+                                            %% = new quby.syntax.AdminMethod( %2, %3, %4 );
+                                        *]
+;
+
+FunctionDefinition:
+    FUNCTION_START IDENTIFIER OptionalParametersDef Statements END [*
+                                            %% = new quby.syntax.Function( %2, %3, %4 );
+                                        *]
+;
+
+OptionalParametersDef:
+    LEFT_PARAN OptionalEndLines ParametersDef OptionalEndLines RIGHT_PARAN [*
+                                            %% = %3;
+                                        *]
+  | LEFT_PARAN OptionalEndLines RIGHT_PARAN [*
+                                            %% = new quby.syntax.Parameters();
+                                        *]
+  |                                     [* %% = new quby.syntax.Parameters();                   *]
+;
+
+ParametersDef:
+    ParameterVariable                   [*
+                                            %% = new quby.syntax.Parameters();
+                                            %%.add( %1 );
+                                        *]
+  | ParametersDef OptionalEndLines COMMA ParameterVariable [*
+                                            %1.add( %4 );
+                                            %% = %1;
+                                        *]
+;
+ParameterVariable:
+    Variable                            [* %% = %1;                                             *]
+  | OP_BIT_AND IDENTIFIER               [* %% = new quby.syntax.ParameterBlockVariable(%2);     *]
+;
+
+ModuleDefinition:
+    MODULE_START IDENTIFIER Statements END [* %% = new quby.syntax.ModuleDefinition(%2, %3);    *]
+;
+
+/~ A Statement can exist at any level of scope, top level or depp within many ifs and loops. ~/
+
+Statements:
+    Statements END_LINE Statement       [*
+                                            if ( %3 != null ) {
+                                                %1.add( %3 );
+                                            }
+                                            %% = %1;
+                                        *]
+  | Statements END_LINE                 [* %% = %1 *]
+  | Statement                           [*
+                                            %% = new quby.syntax.Statements();
+                                            %%.add( %1 );
+                                        *]
+  |                                     [* %% = new quby.syntax.Statements(); *]
+;
+
+Statement:
+    FunctionDefinition
+  | LOOP LoopBody                       [* %% = %2;   *]
+  | ConstructorDefinition
+  | AdminMethodDefinition
+  | ClassDefinition
+  | ModuleDefinition
+  | Inline
+  | Assignment
+  | FunctionCall
+/~
+  | FunctionCallNoParens
+~/
+  | IfStmt
+  | WhileUntilStmt
+  | YieldStmt
+  | ReturnStmt
+;
+
+ReturnStmt:
+    RETURN              [* %% = new quby.syntax.ReturnStmt( new quby.syntax.Null(%1) ); *]
+  | RETURN Expr         [* %% = new quby.syntax.ReturnStmt( %2                       ); *]
+;
+
+IfStmt:
+    IfStart END                     [* %% = new quby.syntax.IfStmt( %1, null, null ); *]
+  | IfStart IfElse END              [* %% = new quby.syntax.IfStmt( %1, null, %2   ); *]
+  | IfStart IfElseIfs END           [* %% = new quby.syntax.IfStmt( %1, %2  , null ); *]
+  | IfStart IfElseIfs IfElse END    [* %% = new quby.syntax.IfStmt( %1, %2  , %3   ); *]
+;
+IfStart:
+    IF OptionalEndLines Expr Statements [* %% = new quby.syntax.IfBlock( %3, %4 );              *]
+  | IF OptionalEndLines Expr IF_THEN OptionalEndLines Statements [*
+                                                %% = new quby.syntax.IfBlock( %3, %6 );
+                                        *]
+;
+IfElseIfs:
+    IfElseIf                            [*
+                                            %% = new quby.syntax.IfElseIfs();
+                                            %%.add(%1);
+                                        *]
+  | IfElseIf IfElseIfs                  [* %% = %2; %%.unshift( %1 ); *]
+;
+
+IfElseIf:
+    IF_ELSE_IF OptionalEndLines Expr Statements    [*
+                                                %% = new quby.syntax.IfBlock( %3, %4 );
+                                        *]
+  | IF_ELSE_IF OptionalEndLines Expr IF_THEN OptionalEndLines Statements    [*
+                                                %% = new quby.syntax.IfBlock( %3, %6 );
+                                        *]
+;
+IfElse:
+    IF_ELSE Statements                  [* %% = %2; *]
+;
+
+LoopBody:
+    Statements END WHILE Expr END_LINE [* %% = new quby.syntax.LoopWhile( %4, %1 ); *]
+  | Statements END UNTIL Expr END_LINE [* %% = new quby.syntax.LoopUntil( %4, %1 ); *]
+;
+
+WhileUntilStmt:
+    WHILE Expr Statements END [* %% = new quby.syntax.WhileLoop( %2, %3 ); *]
+  | UNTIL Expr Statements END [* %% = new quby.syntax.UntilLoop( %2, %3 ); *]
+;
+
+YieldStmt:
+    YIELD OptionalExprs                 [* %% = new quby.syntax.YieldStmt( %2 ); *]
+;
+/~
+FunctionCallNoParens:
+    IDENTIFIER OptionalExprs OptionalBlock [*
+                                            if ( %1.lower == quby.runtime.SUPER_KEYWORD ) {
+                                                %% = new quby.syntax.SuperCall( %1, %2, %3 );
+                                            } else {
+                                                %% = new quby.syntax.FunctionCall( %1, %2, %3 );
+                                            }
+                                         *]
+  | Expr DOT IDENTIFIER OptionalExprs OptionalBlock [*
+                                           %% = new quby.syntax.MethodCall( %1, %3, %4, %5 );
+                                         *]
+;
+~/
+FunctionCall:
+    IDENTIFIER LEFT_PARAN OptionalEndLines OptionalExprs OptionalEndLines RIGHT_PARAN OptionalBlock [*
+                                            if ( %1.lower == quby.runtime.SUPER_KEYWORD ) {
+                                                %% = new quby.syntax.SuperCall( %1, %4, %7 );
+                                            } else {
+                                                %% = new quby.syntax.FunctionCall( %1, %4, %7 );
+                                            }
+                                         *]
+  | Expr DOT IDENTIFIER LEFT_PARAN OptionalEndLines OptionalExprs OptionalEndLines RIGHT_PARAN OptionalBlock [*
+                                           %% = new quby.syntax.MethodCall( %1, %3, %6, %9 );
+                                         *]
+;
+
+OptionalBlock:
+    BlockStart OptionalEndLines OptionalBlockParameters Statements BlockEnd [*
+                                            %% = new quby.syntax.FunctionBlock(%3, %4);
+                                         *]
+  |                                     [* %% = null; *]
+;
+BlockStart:
+    LEFT_BRACE
+  | DO
+;
+BlockEnd:
+    RIGHT_BRACE
+  | END
+;
+
+OptionalBlockParameters:
+    OP_BIT_OR OptionalEndLines ParametersDef OptionalEndLines OP_BIT_OR [* %% = %3; *]
+  | OP_BIT_OR OptionalEndLines OP_BIT_OR [* %% = new quby.syntax.Parameters(); *]
+  | OP_BOOL_OR                           [* %% = new quby.syntax.Parameters(); *]
+  |                                      [* %% = new quby.syntax.Parameters(); *]
+;
+
+OptionalMappings:
+    Mappings                            [* %% = %1 *]
+  |                                     [* %% = new quby.syntax.Mappings(); *]
+;
+
+Mappings:
+    Mappings COMMA Mapping              [*
+                                            %1.add( %3 );
+                                            %% = %1;
+                                        *]
+  | Mapping                             [*
+                                            %% = new quby.syntax.Mappings();
+                                            %%.add( %1 );
+                                        *]
+;
+
+Mapping:
+    Expr MAP_ASSIGNMENT Expr            [* %% = new quby.syntax.Mapping( %1, %3 );              *]
+;
+
+OptionalExprs:
+    Exprs                               [* %% = %1; *]
+  |                                     [* %% = new quby.syntax.Parameters(); *]
+;
+
+Exprs:
+    Exprs COMMA Expr                    [*
+                                            %1.add( %3 );
+                                            %% = %1;
+                                        *]
+  | Expr                                [*
+                                            %% = new quby.syntax.Parameters();
+                                            %%.add( %1 );
+                                        *]
+;
+
+Expr:
+    Inline
+  | OP_SUB Expr                     [* %% = new quby.syntax.SingleSub( %2 );    *]
+
+  | Expr OP_BOOL_AND Expr           [* %% = new quby.syntax.BoolAnd( %1, %3 );  *]
+  | Expr OP_BOOL_OR Expr            [* %% = new quby.syntax.BoolOr( %1, %3 );   *]
+  | Expr OP_BOOL_AND_WORD Expr      [* %% = new quby.syntax.BoolAnd( %1, %3 );  *]
+  | Expr OP_BOOL_OR_WORD Expr       [* %% = new quby.syntax.BoolOr( %1, %3 );   *]
+  | Expr OP_BIT_AND Expr            [* %% = new quby.syntax.BitAnd( %1, %3 );   *]
+  | Expr OP_BIT_OR Expr             [* %% = new quby.syntax.BitOr( %1, %3 );    *]
+  
+  | Expr OP_EQUALITY Expr           [* %% = new quby.syntax.Equality( %1, %3 );         *]
+  | Expr OP_LESS_THAN Expr          [* %% = new quby.syntax.LessThan( %1, %3 );         *]
+  | Expr OP_GREATER_THAN Expr       [* %% = new quby.syntax.GreaterThan( %1, %3 );      *]
+  | Expr OP_LESS_THAN_EQUAL Expr    [* %% = new quby.syntax.LessThanEqual( %1, %3 );    *]
+  | Expr OP_GREATER_THAN_EQUAL Expr [* %% = new quby.syntax.GreaterThanEqual( %1, %3 ); *]
+  | Expr OP_NOT_EQUALITY Expr       [* %% = new quby.syntax.NotEquality( %1, %3 );      *]
+    
+  | Expr OP_SHIFT_LEFT Expr         [* %% = new quby.syntax.ShiftLeft( %1, %3 );    *]
+  | Expr OP_SHIFT_RIGHT Expr        [* %% = new quby.syntax.ShiftRight( %1, %3 );   *]
+    
+  | Expr OP_SUB Expr                [* %% = new quby.syntax.Sub( %1, %3 );      *]
+  | Expr OP_ADD Expr                [* %% = new quby.syntax.Add( %1, %3 );      *]
+  | Expr OP_MULT Expr               [* %% = new quby.syntax.Mult( %1, %3 );     *]
+  | Expr OP_DIVIDE Expr             [* %% = new quby.syntax.Divide( %1, %3 );   *]
+  | Expr OP_MOD Expr                [* %% = new quby.syntax.Mod( %1, %3 );      *]
+  | Expr OP_POWER Expr              [* %% = new quby.syntax.Power( %1, %3 );    *]
+  
+  | OP_NOT Expr                     [* %% = new quby.syntax.Not( %2 ); *]
+  | OP_NOT_WORD Expr                [* %% = new quby.syntax.Not( %2 ); *]
+  
+  | LEFT_PARAN Expr RIGHT_PARAN     [* %% = %2; *]
+  | ArrayAccess
+  | ArrayDefinition
+  | HashDefinition
+  | FunctionCall
+  | Literal
+  | Variable
+  | YieldStmt
+  | NewInstance
+  | NewLambda
+;
+
+ArrayAccess:
+    Expr LEFT_SQUARE OptionalEndLines Expr OptionalEndLines RIGHT_SQUARE  [*
+            %% = new quby.syntax.ArrayAccess( %1, %4 );
+    *]
+;
+
+ArrayDefinition:
+    LEFT_SQUARE OptionalEndLines OptionalExprs OptionalEndLines RIGHT_SQUARE [*
+                                                %% = new quby.syntax.ArrayDefinition( %3 );
+                                        *]
+;
+
+HashDefinition:
+    LEFT_BRACE OptionalEndLines OptionalMappings OptionalEndLines RIGHT_BRACE [*
+                                                %% = new quby.syntax.HashDefinition( %3 );
+                                        *]
+;
+
+Assignment:
+    VariableAssignment ASSIGNMENT Expr  [* %% = new quby.syntax.Assignment( %1, %3 ); *]
+  | ArrayAccess ASSIGNMENT Expr         [* %% = new quby.syntax.ArrayAssignment( %1, %3 ); *]
+;
+
+VariableAssignment:
+    IDENTIFIER                          [* %% = new quby.syntax.VariableAssignment( %1 ); *]
+  | GLOBAL                              [* %% = new quby.syntax.GlobalVariableAssignment( %1 ); *]
+  | AT IDENTIFIER                       [* %% = new quby.syntax.FieldVariableAssignment( %2 ); *]
+;
+
+Variable:
+    IDENTIFIER                          [* %% = new quby.syntax.Variable( %1 );         *]
+  | GLOBAL                              [* %% = new quby.syntax.GlobalVariable( %1 );   *]
+  | THIS                                [* %% = new quby.syntax.ThisVariable( %1 );     *]
+  | AT IDENTIFIER                       [* %% = new quby.syntax.FieldVariable( %2 );    *]
+;
+
+Literal:
+    INT                                 [* %% = new quby.syntax.Int( %1 );      *]
+  | FLOAT                               [* %% = new quby.syntax.Float( %1 );    *]
+  | STRING                              [* %% = new quby.syntax.String( %1 );   *]
+  | SYMBOL                              [* %% = new quby.syntax.Symbol( %1 );   *]
+  | TRUE                                [* %% = new quby.syntax.Bool( %1 );     *]
+  | FALSE                               [* %% = new quby.syntax.Bool( %1 );     *]
+  | NULL                                [* %% = new quby.syntax.Null( %1 );     *]
+;
+
+Inline:
+    INLINE_BLOCK                        [* %% = new quby.syntax.Inline( %1 );    *]
+  | PRE_INLINE_BLOCK                    [* %% = new quby.syntax.PreInline( %1 ); *]
+;
+
+NewInstance:
+    NEW IDENTIFIER LEFT_PARAN OptionalEndLines OptionalExprs OptionalEndLines RIGHT_PARAN OptionalBlock [*
+                                                %% = new quby.syntax.NewInstance( %2, %5, %8 );
+                                        *]
+;
+
+NewLambda:
+    FUNCTION_START OptionalParametersDef Statements END [*
+            %% = new quby.syntax.Lambda( %2, %3 )
+    *]
+;

@@ -1,0 +1,52 @@
+
+$SPEED_X = 5
+$SPEED_Y = 3
+
+$SHIP_IMG = new Image("ship.png")
+$NUM_SHIPS = 20
+
+$ships = []
+$NUM_SHIPS.times() {
+    $ships.add( new Ship() )
+}
+
+def clear()
+end
+
+class Image
+    def new(src)
+    end
+end
+
+def mainloop()
+    clear();
+    
+    $ships.each() do |ship|
+        ship.update()
+        ship.draw()
+    end
+    
+end
+
+class Ship
+    def new()
+    end
+    
+    def update()
+        @x = this.move( @x, 3, true )
+    end
+
+    def move( position, speed, movePositive )
+        if movePositive
+            return position + speed
+        else
+            return position - speed
+        end
+    end
+
+    def draw()
+// todo
+    end
+end
+
+

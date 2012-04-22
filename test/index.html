@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Quby Test Rig</title>
+		<style type="text/css">
+		    html, body {
+		        padding-top: 0;
+		        margin-top: 0;
+		    }
+		    
+		    h1
+		    {
+		    	margin:     0;
+		    	padding:    0;
+		    	font-size:  18px;
+		    }
+		    
+			.lineNumbers, .codeBox {
+                font-size:  smaller;
+			}
+			
+			#sourceCode, #outputCode, .lineNumbers {
+				height:     520px;
+				width:      87%;
+			}
+			
+		    .lineNumbers 
+		    {
+		    	text-align: right;
+		    	width:      24px;
+		    	overflow:   hidden;
+		    }
+			
+			#left, #right 
+			{
+				width:      44%;
+				margin:     0 10px;
+			}
+			
+			#left 
+			{
+				float:      left;
+				clear:      left;
+			}
+			
+			#middle 
+			{
+				width:      5%;
+				float:      left;
+			}
+			
+			#right {
+				float:      right;
+				clear:      right;
+			}
+			
+			#footer 
+			{
+				padding-top:6px;
+				clear:      both;
+				width:      100%;
+			}
+			
+			#sourceCode 
+			{
+			}
+			
+			#outputCode 
+			{
+			}
+			
+			#outputError 
+			{
+				width:      100%;
+				height:     240px;
+			}
+		</style>
+	</head>
+	
+	<body>
+	    <script>
+            var addScripts = function( prefix, libs ) {
+                var time = new Date();
+                
+                for ( var i = 0; i < libs.length; i++ ) {
+                    var lib = libs[i];
+                    
+                    document.write([
+                            '<sc', 'ript src="',
+                                prefix + '/' + lib + '#' + time.getTime(),
+                            '">',
+                            '</', 'scr', 'ipt>'
+                    ].join(''));
+                }
+            }
+            
+            addScripts( './../src/lib', [
+                    'util.js',
+                    'parse.js'
+            ] );
+            
+            addScripts( './../src', [
+                    'compilation.js',
+                    'lexer.js',
+                    'main.js',
+                    'parser.js',
+                    'runtime.js',
+                    'syntax.js'
+            ] );
+	    </script>
+		
+		<script>//<![CDATA[
+		    var includeCore = false;
+		    var isAdmin = true;
+		    
+		    function switchIncludeCore() {
+		        includeCore = !includeCore;
+		    }
+		    
+		    function switchIsAdmin() {
+		        isAdmin = !isAdmin;
+		    }
+		    
+	        function setCheckbox( id, checked ) {
+	            document.getElementById( id ).checked = checked;
+	        }
+	        
+            function getSourceFile(url) {
+	            var xmlhttp = new XMLHttpRequest();
+                xmlhttp.overrideMimeType( 'text/plain' );
+	            xmlhttp.open("GET", url, false);
+	            xmlhttp.send();
+
+	            return xmlhttp.responseText;
+	        }
+		    
+            var _result = null;
+            
+		    function parseCode( callback ) {
+		        var sourceCode = document.getElementById("sourceCode");
+		        var outputCode = document.getElementById("outputCode");
+		        var outputError = document.getElementById("outputError");
+		        
+		        var parser = new quby.main.Parser();
+		        if ( includeCore ) {
+                    var core = getSourceFile("./core.qb");
+		            parser.parse( core, true );
+		        }
+		        parser.parse( sourceCode.value, isAdmin );
+                parser.finish( function(result) {
+                    outputCode.value = result.getCode();
+                    
+                    var strErr = "";
+                    var errors = result.errors;
+                    for (var i = 0; i < errors.length; i++) {
+                        strErr += errors[i] + "\r\n";
+                    }
+
+                    outputError.value = strErr;
+                    
+                    _result = result;
+                    
+                    if ( callback ) {
+                        callback();
+                    }
+                } );
+		    }
+
+		    function runCode() {
+                if ( _result == null ) {
+                    parseCode()
+                } else {
+                    _result.run();
+                }
+		    }
+		//]]></script>
+		
+        <div id="left">
+		    <h1>In Quby Code...</h1>
+            <textarea class="lineNumbers"></textarea>
+		    <textarea class="codeBox" id="sourceCode" name="sourceCode" type="text"></textarea>
+        </div>
+
+        <div id="middle">
+            <h1>Run</h1>
+            <div id="runCode">&nbsp;</div>
+            
+		    <input type="button" value="Parse" onclick="parseCode();" />
+		    <input type="button" value="Run" onclick="runCode();" />
+		    <form method="post" action="." onsubmit="return false;">
+		        <br />
+		        <lable>Include core.qb?</label>
+		        <input id="checkbox_include" type="checkbox" value="include" onclick="switchIncludeCore();" />
+		        
+		        <br />
+		        <br />
+		        <lable>Parse as admin?</label>
+		        <input id="checkbox_is_admin" type="checkbox" value="is_admin" onclick="switchIsAdmin();" />
+		    </form>
+		    
+		    <script>
+		        setCheckbox( 'checkbox_include', includeCore );
+		        setCheckbox( 'checkbox_is_admin', isAdmin );
+		    </script>
+        </div>
+        
+        <div id="right">
+		    <h1>Out JavaScript...</h1>
+            <textarea class="lineNumbers"></textarea>
+		    <textarea class="codeBox" id="outputCode" name="outputCode" type="text"></textarea>
+        </div>
+
+        <div id="footer">
+		    <h1>Errors...</h1>
+		    <textarea class="codeBox" id="outputError" name="outputError" type="text"></textarea>
+        </div>
+        
+        <!-- Clear error and code gen text areas -->
+        <script type="text/javascript">
+            document.getElementById('outputCode').value = '';
+	        document.getElementById('outputError').value = '';
+	    </script>
+        
+        <script id="example_code" type="quby">//<![CDATA[
+            a = - 1*2+3
+        //]]></script>
+        
+        <!-- Out example script code -->
+        <script id="example_code_2" type="quby">//<![CDATA[
+            f = new Foo() do
+                a = 3
+            end
+            
+            class Foo
+            end
+        //]]></script>
+        
+		<!-- Load example testing source-code -->
+		<script>//<![CDATA[
+            var code = document.getElementById("example_code").innerHTML;
+            
+            // remove the CDATA surround
+            code = code.
+                    replace(/^\/\/<!\[CDATA\[( *\n)?/, '').
+                    replace(/\/\/\]\]>$/, '');
+            
+            // remove all that extra whitespace at the beginning of each line
+            lines = code.split("\n");
+            if ( lines.length > 0 ) {
+                var line = lines[0];
+                
+                // count number of spaces at the beginning of the line
+                var i = 0;
+                while ( i < line.length && line.charAt(i) === " " ) {
+                    i++;
+                }
+                
+                if ( i > 0 ) {
+                    var strRegex = ["^"];
+                    
+                    for ( var j = 0; j < i; j++ ) {
+                        strRegex.push( '( ?)' );
+                    }
+                    
+                    var spaceRemoveRegex = new RegExp( strRegex.join('') );
+                    
+                    for ( var i = 0; i < lines.length; i++ ) {
+                        lines[i] = lines[i].replace( spaceRemoveRegex, '' );
+                    }
+                }
+            }
+            document.getElementById("sourceCode").value = lines.join("\n");
+                    ;
+		//]]></script>
+		
+		<!-- Area for inputting random bits of JavaScript testing -->
+		<p>
+			<script>
+			</script>
+		</p>
+
+        <!-- Add line numbers to the text bits -->
+        <script>
+            var numbers = '';
+            for (var i = 1; i < 50; i++) {
+                numbers += i + "\n";
+            }
+            var objs = document.getElementsByTagName( 'textarea' );
+            
+            for (i = 0; i < objs.length; i++) {
+                var obj = objs[i];
+                if (obj.className == 'lineNumbers') {
+                    obj.value = numbers;
+                }
+            }
+        </script>
+        
+        <script>
+            parseCode();
+        </script>
+	</body>
+</html>
