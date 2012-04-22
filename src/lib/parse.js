@@ -15,7 +15,7 @@
  * @license
  *
  * parse.js | A parser building framework
- * by Joseph Lenton, joe@studiofortress.com
+ * by Joseph Lenton
  *
  * All of Parse lives under the 'parse' variable.
  * It's a bit like jQuery, parse can be used as a function or
