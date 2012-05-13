@@ -891,35 +891,44 @@ function QubyObject() {
 * @param values Optionally takes an array of values, set as the default values for this array.
 */
 function QubyArray( values ) {
-    this.values = values || [];
+    if ( values === undefined ) {
+        this.values = [];
+    } else {
+        this.values = values;
+    }
 }
-if ( util.browser.isMozilla ) {
-    QubyArray.prototype.set = function (key, value) {
-        var index = key >> 0; // convert to int
-        
-        if ( index < 0 ) {
-            quby.runtime.runtimeError( "Negative value given as array index: " + key );
-        }
-        
-        while ( index > this.values.length ) {
-            this.values[this.values.length] = null;
-        }
-        this.values[ index ] = value;
-    };
-} else {
-    QubyArray.prototype.set = function (key, value) {
-        var index = key >> 0; // convert to int
-        
-        if ( index < 0 ) {
-            quby.runtime.runtimeError( "Negative value given as array index: " + key );
-        }
-        
-        while ( index > this.values.length ) {
-            this.values.push( null );
-        }
-        this.values[ index ] = value;
-    };
-}
+QubyArray.prototype.set = function (key, value) {
+    var index = key >> 0; // convert to int
+    
+    if ( index < 0 ) {
+        quby.runtime.runtimeError( "Negative value given as array index: " + key );
+    }
+
+    var values = this.values,
+        len = values.length;
+    
+    /* 
+     * We first insert the new value, into the array,
+     * at it's location. It's important to *not* pad
+     * before we do this, as JS will automatically
+     * allocate all the memory needed for that padding.
+     */
+    values[ index ] = value;
+
+    /*
+     * Then we convert the padded 'undefines' to 'null',
+     * by just iterating over them.
+     * 
+     * As we added the index already, these locations
+     * exist, so there are no allocation surprises for
+     * the runtime.
+     */
+    while ( index > len ) {
+        values[ --index ] = null;
+    }
+
+    return value;
+};
 QubyArray.prototype.get = function (key) {
     var index = key >> 0; // convert to int
     var len = this.values.length;

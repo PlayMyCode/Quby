@@ -261,6 +261,134 @@
 var parse = window['parse'] = (function( window, undefined ) {
     var Int32Array = window['Int32Array'];
 
+    /**
+     * ASCII codes for characters.
+     *
+     * @type {number}
+     * @const
+     */
+    var TAB     =  9, // \t
+        SLASH_N = 10, // \n
+        SLASH_R = 13, // \r
+
+        SPACE = 32,
+        EXCLAMATION = 33,
+        DOUBLE_QUOTE = 34,
+        HASH = 35,
+        DOLLAR = 36,
+        PERCENT = 37,
+        AMPERSAND = 38,
+        SINGLE_QUOTE = 39,
+        LEFT_PAREN = 40,
+        RIGHT_PAREN = 41,
+        STAR = 42, // *
+        PLUS = 43,
+        COMMA = 44,
+        MINUS = 45,
+        FULL_STOP = 46,
+        SLASH = 47,
+
+        ZERO = 48,
+        ONE = 49,
+        TWO = 50,
+        THREE = 51,
+        FOUR = 52,
+        FIVE = 53,
+        SIX = 54,
+        SEVEN = 55,
+        EIGHT = 56,
+        NINE = 57,
+
+        COLON = 58,
+        SEMI_COLON = 59,
+
+        LESS_THAN = 60,
+        EQUAL = 61,
+        GREATER_THAN = 62,
+        QUESTION_MARK = 63,
+        AT = 64,
+
+        UPPER_A = 65,
+        UPPER_F = 70,
+        UPPER_Z = 90,
+
+        LEFT_SQUARE = 91,
+        BACKSLASH = 92,
+        RIGHT_SQUARE = 93,
+        CARET = 94,
+        UNDERSCORE = 95,
+
+        LOWER_A = 97,
+        LOWER_B = 98,
+        LOWER_C = 99,
+        LOWER_D = 100,
+        LOWER_E = 101,
+        LOWER_F = 102,
+        LOWER_G = 103,
+        LOWER_H = 104,
+        LOWER_I = 105,
+        LOWER_J = 106,
+        LOWER_K = 107,
+        LOWER_L = 108,
+        LOWER_M = 109,
+        LOWER_N = 110,
+        LOWER_O = 111,
+        LOWER_P = 112,
+        LOWER_Q = 113,
+        LOWER_R = 114,
+        LOWER_S = 115,
+        LOWER_T = 116,
+        LOWER_U = 117,
+        LOWER_V = 118,
+        LOWER_W = 119,
+        LOWER_X = 120,
+        LOWER_Y = 121,
+        LOWER_Z = 122,
+
+        LEFT_BRACE = 123,
+        BAR = 124,
+        RIGHT_BRACE = 125,
+        TILDA = 126;
+
+    /**
+     * @nosideeffects
+     * @const
+     * @param {number} code
+     * @return {boolean}
+     */
+    var isHexCode = function(code) {
+        return (code >= ZERO && code <= NINE) || // a number
+               (code >= LOWER_A && code <= LOWER_F) || // lower a-z
+               (code >= UPPER_A && code <= UPPER_F);   // UPPER A-Z
+    };
+
+    var isAlphaNumericCode = function(code) {
+        return (
+                (code >=  LOWER_A && code <= LOWER_Z) || // lower case letter
+                (code >=  UPPER_A && code <= UPPER_Z) || // upper case letter
+                (code === UNDERSCORE) ||
+                (code >=  ZERO && code <= NINE)     // a number
+        );
+    };
+
+    var isAlphaCode = function(code) {
+        return (code >= LOWER_A && code <= LOWER_Z) ||
+               (code >= UPPER_A && code <= UPPER_Z) ;
+    };
+
+    /**
+     * @nosideeffects
+     * @const
+     * @param {number} code
+     * @return {boolean}
+     */
+    var isNumericCode = function(code) {
+        return (code >= ZERO && code <= NINE) ; // a number
+    };
+
+    /**
+     * @return True if f is a function object, and false if not.
+     */
     var isFunction = function(f) {
         return ( f instanceof Function ) || ( typeof f == 'function');
     };
@@ -2838,23 +2966,38 @@ var parse = window['parse'] = (function( window, undefined ) {
          * Sets to always ignore the terminal given.
          *
          * For example to always ignore spaces:
-         *  parse.alwaysIngore( parse.terminal(' ') )
-         *
+         *  parse.ignore( ' ' )
+         * 
+         * You can also just use one of the provided terminals,
+         * for example:
+         * 
+         *  Parse.ignore( Parse.WHITESPACE );
+         * 
+         * Multiple parameters can also be provided, for example:
+         * 
+         *  Parse.ignore( ' ', '\n', ';', '\t', '\r' );
+         * 
          * @param terminal The terminal to always be ignoring.
          * @return This Parse object, for method chaining.
          */
-        Parse['ignore'] = function( terminal ) {
-            if ( terminal instanceof String || terminal instanceof RegExp ) {
-                Parse['ignore']( Parse['terminal'](terminal) );
+        Parse['ignore'] = function() {
+            for ( var i = 0; i < arguments.length; i++ ) {
+                Parse.ignoreSingle( arguments[i] );
+            }
+
+            return this;
+        };
+
+        Parse.ignoreSingle = function( terminal ) {
+            if ( terminal instanceof String || isFunction(terminal) ) {
+                Parse.ignoreSingle( Parse['terminal'](terminal) );
             } else if ( terminal instanceof Terminal ) {
                 Parse.ingoreInner( terminal );
             } else {
                 for ( var k in terminal ) {
-                    Parse['ignore']( Parse['terminals'](terminal[k]) );
+                    Parse.ignoreSingle( Parse['terminals'](terminal[k]) );
                 }
             }
-
-            return this;
         };
 
         /**
@@ -2946,6 +3089,187 @@ var parse = window['parse'] = (function( window, undefined ) {
             rule.cyclicOr( arguments );
 
             return rule;
+        };
+
+        /**
+         * Code checking utility functions.
+         * 
+         * Each of these functions must be given the 'charCodeAt' value,
+         * from a string, to check. Hence why they are listed under 'code'.
+         */
+        Parse['code'] = {
+                'isNumeric'         : isNumericCode,
+                'isHex'             : isHexCode,
+                'isAlpha'           : isAlphaCode,
+                'isAlphaNumeric'    : isAlphaNumericCode
+        };
+
+        /*
+         * These are the terminals provided by Parse,
+         * which people can use to quickly build a language.
+         */
+
+        /**
+         * A terminal for capturing tabs and spaces. It does _not_ include
+         * end of lines.
+         * 
+         * For the end of line version, use Parse.WHITESPACE_AND_END_OF_LINE
+         */
+        Parse['WHITESPACE'] = function(src, i, code, len) {
+            while ( code === SPACE || code === TAB ) {
+                i++;
+                code = src.charCodeAt( i );
+            }
+
+            return i;
+        };
+
+        /**
+         * A terminal that matches: tabs, spaces, \n and \r characters.
+         */
+        Parse['WHITESPACE_AND_END_OF_LINE'] = function(src, i, code, len) {
+            while ( code === SPACE || code === TAB || code === SLASH_N || code === SLASH_R ) {
+                i++;
+                code = src.charCodeAt( i );
+            }
+
+            return i;
+        };
+        
+        /**
+         * A number terminal.
+         */
+        Parse['NUMBER'] = function(src, i, code, len) {
+            if ( ! isNumericCode(src.charCodeAt(i)) ) {
+                return;
+            // 0x hex number
+            } else if (
+                    code === ZERO &&
+                    src.charCodeAt(i+1) === LOWER_X
+            ) {
+                i += 1;
+
+                do {
+                    i++;
+                    code = src.charCodeAt( i );
+                } while (
+                        code === UNDERSCORE ||
+                        isHexCode( code )
+                );
+            // normal number
+            } else {
+                do {
+                    i++;
+                    code = src.charCodeAt( i );
+                } while (
+                        code === UNDERSCORE ||
+                        isNumericCode( code )
+                );
+
+                // Look for Decimal Number
+                if (
+                        src.charCodeAt(i+1) === FULL_STOP &&
+                        isNumericCode( src.charCodeAt(i+2) )
+                ) {
+                    var code;
+                    i += 2;
+
+                    do {
+                        i++;
+                        code = src.charCodeAt(i);
+                    } while (
+                            code === UNDERSCORE ||
+                            isNumericCode( code )
+                    );
+                }
+            }
+
+            return i;
+        };
+
+        /**
+         * A C-style single line comment terminal.
+         * 
+         * Matches everything from a // onwards.
+         */
+        Parse['C_SINGLE_LINE_COMMENT'] = function(src, i, code, len) {
+            if ( code === SLASH && src.charCodeAt(i+1) === SLASH ) {
+                i++;
+
+                do {
+                    i++;
+                    code = src.charCodeAt(i);
+                } while (
+                        i  <  len  &&
+                        code !== SEMI_COLON &&
+                        code !== SLASH_N
+                );
+
+                return i;
+            }
+        };
+
+        /**
+         * A C-like multi line comment, matches everything from '/ *' to a '* /', (without the spaces).
+         */
+        Parse['C_MULTI_LINE_COMMENT'] = function(src, i, code, len) {
+            if ( code === SLASH && src.charCodeAt(i+1) === STAR ) {
+                // this is so we end up skipping two characters,
+                // the / and the *, before we hit the next char to check
+                i++;
+
+                do {
+                    i++;
+
+                    // error!
+                    if ( i >= len ) {
+                        return;
+                    }
+                } while (
+                        src.charCodeAt(i  ) !== STAR &&
+                        src.charCodeAt(i+1) !== SLASH
+                );
+
+                // plus 2 to include the end of the comment
+                return i+2;
+            }
+        };
+
+        /**
+         * A terminal for a string, double or single quoted.
+         */
+        Parse['STRING'] = function(src, i, code, len) {
+            // double quote string
+            if ( code === DOUBLE_QUOTE ) {
+                do {
+                    i++;
+
+                    // error!
+                    if ( i >= len ) {
+                        return;
+                    }
+                } while (
+                        src.charCodeAt(i  ) !== DOUBLE_QUOTE &&
+                        src.charCodeAt(i-1) !== BACKSLASH
+                );
+
+                return i;
+            // single quote string
+            } else if ( code === SINGLE_QUOTE ) {
+                do {
+                    i++;
+
+                    // error!
+                    if ( i >= len ) {
+                        return;
+                    }
+                } while (
+                        src.charCodeAt(i  ) !== SINGLE_QUOTE &&
+                        src.charCodeAt(i-1) !== BACKSLASH
+                );
+
+                return i;
+            }
         };
 
         return Parse;

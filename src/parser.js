@@ -152,27 +152,6 @@ var quby = window['quby'] || {};
     /* Terminals */
 
     /**
-     * @nosideeffects
-     * @const
-     * @param {number} code
-     * @return {boolean}
-     */
-    var isHexCode = function(code) {
-        return (code >= ZERO && code <= NINE) || // a number
-               (code >= LOWER_A && code <= LOWER_F);   // a to f lower
-    };
-
-    /**
-     * @nosideeffects
-     * @const
-     * @param {number} code
-     * @return {boolean}
-     */
-    var isNumericCode = function(code) {
-        return (code >= ZERO && code <= NINE) ; // a number
-    };
-
-    /**
      * Makes minor changes to the source code to get it ready for parsing.
      *
      * This is primarily a cheap fix to a number of parser bugs where it expects an
@@ -430,16 +409,7 @@ var quby = window['quby'] || {};
         };
     })();
 
-    parse['ignore']({
-            whitespace: function(src, i, code, len) {
-                while ( code === SPACE || code === TAB ) {
-                    i++;
-                    code = src.charCodeAt( i );
-                }
-
-                return i;
-            }
-    });
+    parse['ignore']( Parse['WHITESPACE'] );
 
     /**
      * WARNING! The terminal names used here are also used for display purposes.
@@ -515,87 +485,8 @@ var quby = window['quby'] || {};
                     NULL        : 'null',
                     NIL         : 'nil',
 
-                    number: function(src, i, code, len) {
-                        if ( ! isNumericCode(src.charCodeAt(i)) ) {
-                            return;
-                        // 0x hex number
-                        } else if (
-                                code === ZERO &&
-                                src.charCodeAt(i+1) === LOWER_X
-                        ) {
-                            i += 1;
-
-                            do {
-                                i++;
-                                code = src.charCodeAt( i );
-                            } while (
-                                    code === UNDERSCORE ||
-                                    isHexCode( code )
-                            );
-                        // normal number
-                        } else {
-                            do {
-                                i++;
-                                code = src.charCodeAt( i );
-                            } while (
-                                    code === UNDERSCORE ||
-                                    isNumericCode( code )
-                            );
-
-                            // Look for Decimal Number
-                            if (
-                                    src.charCodeAt(i+1) === FULL_STOP &&
-                                    isNumericCode( src.charCodeAt(i+2) )
-                            ) {
-                                var code;
-                                i += 2;
-
-                                do {
-                                    i++;
-                                    code = src.charCodeAt(i);
-                                } while (
-                                        code === UNDERSCORE ||
-                                        isNumericCode( code )
-                                );
-                            }
-                        }
-
-                        return i;
-                    },
-
-                    string: function(src, i, code, len) {
-                        // double quote string
-                        if ( code === DOUBLE_QUOTE ) {
-                            do {
-                                i++;
-
-                                // error!
-                                if ( i >= len ) {
-                                    return;
-                                }
-                            } while (
-                                    src.charCodeAt(i  ) !== DOUBLE_QUOTE &&
-                                    src.charCodeAt(i-1) !== BACKSLASH
-                            );
-
-                            return i;
-                        // single quote string
-                        } else if ( code === SINGLE_QUOTE ) {
-                            do {
-                                i++;
-
-                                // error!
-                                if ( i >= len ) {
-                                    return;
-                                }
-                            } while (
-                                    src.charCodeAt(i  ) !== SINGLE_QUOTE &&
-                                    src.charCodeAt(i-1) !== BACKSLASH
-                            );
-
-                            return i;
-                        }
-                    }
+                    number: parse.terminal.NUMBER,
+                    string: parse.terminal.STRING
             },
 
             ops: {
