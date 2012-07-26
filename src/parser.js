@@ -409,7 +409,7 @@ var quby = window['quby'] || {};
         };
     })();
 
-    parse['ignore']( Parse['WHITESPACE'] );
+    parse['ignore']( parse['terminal']['WHITESPACE'] );
 
     /**
      * WARNING! The terminal names used here are also used for display purposes.
@@ -612,6 +612,7 @@ var quby = window['quby'] || {};
                         return len;
                     }
                 },
+
                 preInline: function(src, i, code, len) {
                     // if #<pre# javascript.code.here #>#
                     if (

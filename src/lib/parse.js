@@ -924,8 +924,13 @@ var parse = window['parse'] = (function( window, undefined ) {
                         }
                     }
                 };
+            // errors!
+            } else if ( match === undefined ) {
+                throw new Error( "undefined match given" );
+            } else if ( match === null ) {
+                throw new Error( "null match given" );
             } else {
-                throw new Error( "Don't know what to do with given match when building a terminal" );
+                throw new Error( "unknown match given" );
             }
         }
     };
@@ -1255,14 +1260,16 @@ var parse = window['parse'] = (function( window, undefined ) {
             nonLiteralTerms = [];
 
         for ( var k in terminals ) {
-            var term = terminals[k];
+            if ( terminals.hasOwnProperty(k) ) {
+                var term = terminals[k];
 
-            termIDToTerms[ term.id ] = term;
+                termIDToTerms[ term.id ] = term;
 
-            if ( term.isLiteral ) {
-                literalTerms.push( term )
-            } else {
-                nonLiteralTerms.push( term )
+                if ( term.isLiteral ) {
+                    literalTerms.push( term )
+                } else {
+                    nonLiteralTerms.push( term )
+                }
             }
         }
 
@@ -1677,7 +1684,9 @@ var parse = window['parse'] = (function( window, undefined ) {
         // ??? maybe an object of terminals?
         } else {
             for ( var k in obj ) {
-                this.helperAll( singleMethod, obj[k] );
+                if ( obj.hasOwnProperty(k) ) {
+                    this.helperAll( singleMethod, obj[k] );
+                }
             }
         }
 
@@ -2993,10 +3002,18 @@ var parse = window['parse'] = (function( window, undefined ) {
                 Parse.ignoreSingle( Parse['terminal'](terminal) );
             } else if ( terminal instanceof Terminal ) {
                 Parse.ingoreInner( terminal );
-            } else {
-                for ( var k in terminal ) {
-                    Parse.ignoreSingle( Parse['terminals'](terminal[k]) );
+            } else if ( terminal instanceof Array ) {
+                for ( var i = 0; i < terminal.length; i++ ) {
+                    Parse.ignoreSingle( Parse['terminals'](terminal[i]) );
                 }
+            } else if ( terminal instanceof Object ) {
+                for ( var k in terminal ) {
+                    if ( terminal.hasOwnProperty(k) ) {
+                        Parse.ignoreSingle( Parse['terminals'](terminal[k]) );
+                    }
+                }
+            } else {
+                throw new Error("unknown ignore terminal given");
             }
         };
 
@@ -3027,7 +3044,9 @@ var parse = window['parse'] = (function( window, undefined ) {
                 var terminals = {};
 
                 for ( var name in obj ) {
-                    terminals[name] = Parse['terminals']( obj[name] );
+                    if ( obj.hasOwnProperty(name) ) {
+                        terminals[name] = Parse['terminals']( obj[name] );
+                    }
                 }
 
                 return terminals;
@@ -3115,7 +3134,7 @@ var parse = window['parse'] = (function( window, undefined ) {
          * 
          * For the end of line version, use Parse.WHITESPACE_AND_END_OF_LINE
          */
-        Parse['WHITESPACE'] = function(src, i, code, len) {
+        Parse['terminal']['WHITESPACE'] = function(src, i, code, len) {
             while ( code === SPACE || code === TAB ) {
                 i++;
                 code = src.charCodeAt( i );
@@ -3127,7 +3146,7 @@ var parse = window['parse'] = (function( window, undefined ) {
         /**
          * A terminal that matches: tabs, spaces, \n and \r characters.
          */
-        Parse['WHITESPACE_AND_END_OF_LINE'] = function(src, i, code, len) {
+        Parse['terminal']['WHITESPACE_AND_END_OF_LINE'] = function(src, i, code, len) {
             while ( code === SPACE || code === TAB || code === SLASH_N || code === SLASH_R ) {
                 i++;
                 code = src.charCodeAt( i );
@@ -3139,7 +3158,7 @@ var parse = window['parse'] = (function( window, undefined ) {
         /**
          * A number terminal.
          */
-        Parse['NUMBER'] = function(src, i, code, len) {
+        Parse['terminal']['NUMBER'] = function(src, i, code, len) {
             if ( ! isNumericCode(src.charCodeAt(i)) ) {
                 return;
             // 0x hex number
@@ -3192,7 +3211,7 @@ var parse = window['parse'] = (function( window, undefined ) {
          * 
          * Matches everything from a // onwards.
          */
-        Parse['C_SINGLE_LINE_COMMENT'] = function(src, i, code, len) {
+        Parse['terminal']['C_SINGLE_LINE_COMMENT'] = function(src, i, code, len) {
             if ( code === SLASH && src.charCodeAt(i+1) === SLASH ) {
                 i++;
 
@@ -3212,7 +3231,7 @@ var parse = window['parse'] = (function( window, undefined ) {
         /**
          * A C-like multi line comment, matches everything from '/ *' to a '* /', (without the spaces).
          */
-        Parse['C_MULTI_LINE_COMMENT'] = function(src, i, code, len) {
+        Parse['terminal']['C_MULTI_LINE_COMMENT'] = function(src, i, code, len) {
             if ( code === SLASH && src.charCodeAt(i+1) === STAR ) {
                 // this is so we end up skipping two characters,
                 // the / and the *, before we hit the next char to check
@@ -3238,7 +3257,7 @@ var parse = window['parse'] = (function( window, undefined ) {
         /**
          * A terminal for a string, double or single quoted.
          */
-        Parse['STRING'] = function(src, i, code, len) {
+        Parse['terminal']['STRING'] = function(src, i, code, len) {
             // double quote string
             if ( code === DOUBLE_QUOTE ) {
                 do {
