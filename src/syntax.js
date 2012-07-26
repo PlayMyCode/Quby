@@ -1823,9 +1823,7 @@ var quby = window['quby'] || {};
         },
 
         Power: function (left, right) {
-            quby.syntax.Op.call(this, left, right, false, 2);
-console.log('kdkd');
-console.log( this.validate );
+            quby.syntax.Op.call(this, left, right, '**', false, 2);
 
             this.print = function (p) {
                 p.append('Math.pow(');
