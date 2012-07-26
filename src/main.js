@@ -496,7 +496,16 @@ var quby = window['quby'] || {};
 
             this.funs = {};
             this.usedFunsStack = [];
-            this.funNames = new quby.main.FunctionTable();
+
+            /**
+             * This is a list of every method name in existance,
+             * across all code.
+             * 
+             * This is for printing the empty method stubs,
+             * for when no methods are present for a class.
+             */
+            this.methodNames = new quby.main.FunctionTable();
+
             this.lateUsedFuns = new quby.main.LateFunctionBinder(this);
             this.errors = [];
 
@@ -754,10 +763,6 @@ var quby = window['quby'] || {};
             this.defineFun = function (func) {
                 var klass = this.currentClass;
 
-                if ( ! func.isConstructor ) {
-                    this.funNames.add( func.callName, func.name );
-                }
-
                 // Methods / Constructors
                 if (klass !== null) {
                     // Constructors
@@ -766,6 +771,7 @@ var quby = window['quby'] || {};
                         // Methods
                     } else {
                         klass.addFun( func );
+                        this.methodNames.add( func.callName, func.name );
                     }
                 // Functions
                 } else {
@@ -986,14 +992,17 @@ var quby = window['quby'] || {};
                     var rootKlass = this.getRootClass().getClass();
                     var callNames = [];
                     var extensionStr = [];
-                    var fs = this.funNames.getFuns();
+                    var ms = this.methodNames.getFuns();
 
                     p.append(quby.runtime.FUNCTION_DEFAULT_TABLE_NAME,'={');
 
                     var errFun = ":function(){quby_errFunStub(this,arguments);}";
                     var printComma = false;
-                    for (var callName in fs) {
-                        if ( rootKlass === null || !rootKlass.hasFunCallName(callName) ) {
+                    for ( var callName in ms ) {
+                        if (
+                                rootKlass === null ||
+                                !rootKlass.hasFunCallName(callName)
+                        ) {
                             // from second iteration onwards, this if is called
                             if ( printComma ) {
                                 p.append( ',', callName, ':function(){noSuchMethodError(this,"' + callName + '");}' );
@@ -1036,7 +1045,7 @@ var quby = window['quby'] || {};
             };
 
             this.generatePreCode = function (p) {
-                this.funNames.print(p);
+                this.methodNames.print(p);
                 this.symbols.print(p);
                 p.printArray( this.preInlines );
 
@@ -1153,7 +1162,7 @@ var quby = window['quby'] || {};
                     var searchFun = searchFuns[funIndex];
                     var searchName = searchFun.name.toLowerCase();
 
-                    if (searchName == name) {
+                    if (searchName === name) {
                         return searchFun;
                     } else if ( altFun === null ) {
                         for ( var i = 0; i < altNames.length; i++ ) {
