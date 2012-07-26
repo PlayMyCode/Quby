@@ -799,9 +799,10 @@ var quby = window['quby'] || {};
         expr = parse();
 
     var statements = parse.
+            optional( terminals.endOfStatement ).
             repeatSeperator( statement, terminals.endOfStatement ).
             optional( terminals.endOfStatement ).
-            onMatch( function(stmts, endEnd) {
+            onMatch( function(onStart, stmts, endEnd) {
                 if ( stmts === null ) {
                     return new quby.syntax.Statements();
                 } else {
