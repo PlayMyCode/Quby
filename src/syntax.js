@@ -1128,7 +1128,7 @@ var quby = window['quby'] || {};
             /**
              * This FunctionCall needs to declare it's self to the Validator,
              * so the Validator knows it exists. This is done in this call,
-             * so it's detached from validating paramters and blocks.
+             * so it's detached from validating parameters and blocks.
              *
              * In practice, this means you can put your call to validate this as a method,
              * a 'this.method', or something else, by changing this method.
@@ -1155,7 +1155,7 @@ var quby = window['quby'] || {};
 
                     return false;
                 } else {
-                    if ( this.paramters !== null ) {
+                    if ( this.parameters !== null ) {
                         this.parameters.validate(v);
                     }
 
