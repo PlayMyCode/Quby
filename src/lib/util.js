@@ -119,7 +119,7 @@ var util = window['util'] = {};
 
         addAll: function( dest, src ) {
             var destI = dest.length;
-            var newLen = (destI += src.length);
+            var newLen = (dest.length += src.length);
             var srcI = 0;
             
             for ( ; destI < newLen; destI++ ) {
