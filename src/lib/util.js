@@ -4,9 +4,9 @@ var util = window['util'] = {};
 
 (function( util ) {
     var calculateName = function() {
-        if ( navigator.appName == 'Opera' ) {
+        if ( navigator.appName === 'Opera' ) {
             return 'opera';
-        } else if ( navigator.appName == 'Microsoft Internet Explorer' ) {
+        } else if ( navigator.appName === 'Microsoft Internet Explorer' ) {
             return 'ie';
         } else {
             var agent = navigator.userAgent.toString();
@@ -15,7 +15,7 @@ var util = window['util'] = {};
                 return 'chrome';
             } else if ( agent.indexOf("Safari/") != -1 ) {
                 return 'safari';
-            } else if ( navigator.appName == 'Netscape' ) {
+            } else if ( navigator.appName === 'Netscape' ) {
                 return 'mozilla';
             } else {
                 return 'unknown';
@@ -26,11 +26,11 @@ var util = window['util'] = {};
     var browserName = calculateName();
 
     util.browser = {
-            isIE      : browserName == 'ie'     ,
-            isMozilla : browserName == 'mozilla',
-            isChrome  : browserName == 'chrome' ,
-            isOpera   : browserName == 'opera'  ,
-            isSafari  : browserName == 'safari'
+            isIE      : browserName === 'ie'     ,
+            isMozilla : browserName === 'mozilla',
+            isChrome  : browserName === 'chrome' ,
+            isOpera   : browserName === 'opera'  ,
+            isSafari  : browserName === 'safari'
     };
 
     /**
@@ -70,13 +70,38 @@ var util = window['util'] = {};
          * JavaScript Array and return it.
          *
          * @param args An 'arguments' object to convert.
+         * @param offset Optional, defaults to 0. Where in the array to start iteration.
          * @return An array containing all the values in the given 'arguments'.
          */
         /* Online blogs advise Array.slice, but most arguments are short (less then
          * 10 elements) and in those situations a brute force approach is actually
          * much faster!
          */
-        argumentsToArray: null,
+        argumentsToArray: function( args, i ) {
+            var len, arr;
+
+            // iterating from the start to the end
+            if ( i === undefined || i === 0 ) {
+                len = args.length;
+                arr = new Array( len );
+
+                for ( ; i < len; i++ ) {
+                    arr[i] = args[i];
+                }
+            // offset is past the end of the arguments array
+            } else if ( i >= args.length ) {
+                return [];
+            } else {
+                len = args.length - i;
+                arr = new Array( len );
+
+                for ( var j = 0; j < len; j++ ) {
+                    arr[j] = args[j+i];
+                }
+            }
+
+            return arr;
+        },
 
         contains: function (arr, val) {
             return (arr[val] ? true : false);
@@ -92,8 +117,15 @@ var util = window['util'] = {};
             arr.splice(arrayIndex, 1);
         },
 
-        // filled in at the end
-        addAll: null
+        addAll: function( dest, src ) {
+            var destI = dest.length;
+            var newLen = (destI += src.length);
+            var srcI = 0;
+            
+            for ( ; destI < newLen; destI++ ) {
+                dest[destI] = src[srcI++];
+            }
+        }
     };
 
     util.string = {
@@ -199,7 +231,7 @@ var util = window['util'] = {};
         interval: function( callback, element ) {
             var requestAnimFrame = util.future.getRequestAnimationFrame();
 
-            if ( requestAnimFrame ) {
+            if ( requestAnimFrame !== null ) {
                 var isRunningHolder = {isRunning: true};
 
                 var recursiveCallback = function() {
@@ -231,7 +263,7 @@ var util = window['util'] = {};
                     window.mozRequestAnimationFrame    ||
                     window.oRequestAnimationFrame      ||
                     window.msRequestAnimationFrame     ||
-                    null ; // null isn't actually needed, but at least you know that null is the fallback!
+                    null ;
         },
 
         once: function() {
@@ -240,7 +272,7 @@ var util = window['util'] = {};
             for ( var i = 0, len = arguments.length; i < len; i++ ) {
                 var fun = arguments[i];
 
-                if ( request ) {
+                if ( request !== null ) {
                     request( fun );
                 } else {
                     setTimeout( fun, util.future.DEFAULT_INTERVAL );
@@ -248,50 +280,4 @@ var util = window['util'] = {};
             }
         }
     };
-
-    // add browser specific implementations of these
-    if ( util.browser.isMozilla ) {
-        util.array.argumentsToArray = function(args) {
-            var arr = [];
-            for (
-                var
-                        i = (arguments.length > 1) ? arguments[1] : 0,
-                        len = args.length;
-                i < len;
-                i++
-            ) {
-                arr[arr.length] = args[i];
-            }
-
-            return arr;
-        };
-
-        util.array.addAll = function( dest, src ) {
-            for ( var i = 0, len = src.length; i < len; i++ ) {
-                dest[dest.length] = src[i];
-            }
-        };
-    } else {
-        util.array.argumentsToArray = function() {
-            var arr = [];
-            for (
-                var
-                        i = (arguments.length > 1) ? arguments[1] : 0,
-                        args = arguments[0],
-                        len = args.length;
-                i < len;
-                i++
-            ) {
-                arr.push( args[i] );
-            }
-
-            return arr;
-        };
-
-        util.array.addAll = function( dest, src ) {
-            for ( var i = 0, len = src.length; i < len; i++ ) {
-                dest.push( src[i] );
-            }
-        };
-    }
 })( util );
