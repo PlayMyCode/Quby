@@ -416,10 +416,43 @@ var quby = window['quby'] || {};
      *          So give them meaningful names!
      */
     var terminals = parse.terminals({
+            /**
+             * Matches an end of line,
+             * and also chomps on whitespace.
+             * 
+             * If it contains a semi-colon however,
+             * this will fail.
+             */
+            endOfLine: function( src, i, code, len ) {
+                if ( code === SLASH_N ) {
+                    do {
+                        i++;
+                        code = src.charCodeAt(i);
+                    } while (
+                            code === SLASH_N    ||
+                            code === SPACE      ||
+                            code === TAB
+                    );
+
+                    if ( src.charCodeAt(i) !== SEMI_COLON ) {
+                        return i;
+                    }
+                }
+            },
+
+            /**
+             * Matches the semi-colon, or end of line.
+             * 
+             * Due to the order of terminals, the end
+             * of line always has precedence.
+             * 
+             * Also chomps on whitespace and end of lines,
+             * both before and after the semi-colon.
+             */
             endOfStatement: function( src, i, code, len ) {
                 if (
-                        code === SLASH_N ||
-                        code === SEMI_COLON
+                        code === SEMI_COLON ||
+                        code === SLASH_N
                 ) {
                     do {
                         i++;
@@ -704,9 +737,9 @@ var quby = window['quby'] || {};
             ],
             function( src, i, code, len ) {
                 while (
+                        code === SPACE      ||
                         code === SLASH_N    ||
-                        code === SEMI_COLON ||
-                        code === SPACE
+                        code === TAB
                 ) {
                     i++;
                     code = src.charCodeAt(i);
@@ -795,13 +828,19 @@ var quby = window['quby'] || {};
 
     /* Parser Rules */
 
+    var statementSeperator = parse.
+            either(
+                    terminals.endOfLine,
+                    terminals.endOfStatement
+            );
+
     var statement = parse(),
         expr = parse();
 
     var statements = parse.
-            optional( terminals.endOfStatement ).
-            repeatSeperator( statement, terminals.endOfStatement ).
-            optional( terminals.endOfStatement ).
+            optional( statementSeperator ).
+            repeatSeperator( statement, statementSeperator ).
+            optional( statementSeperator ).
             onMatch( function(onStart, stmts, endEnd) {
                 if ( stmts === null ) {
                     return new quby.syntax.Statements();
@@ -872,10 +911,11 @@ var quby = window['quby'] || {};
             a(
                     expr,
                     terminals.symbols.leftSquare,
-                    expr,
-                    terminals.symbols.rightSquare
+                    expr
             ).
-            onMatch( function( arrayExpr, leftSquare, keyExpr, rightSquare) {
+            optional( terminals.endOfLine ).
+            then( terminals.symbols.rightSquare ).
+            onMatch( function( arrayExpr, leftSquare, keyExpr, endOfLine, rightSquare) {
                 return new quby.syntax.ArrayAccess( arrayExpr, keyExpr );
             });
 
@@ -981,9 +1021,9 @@ var quby = window['quby'] || {};
     var arrayDefinition = parse.
             a( terminals.symbols.leftSquare ).
             optional( exprs ).
-            optional( terminals.endOfStatement ).
+            optional( terminals.endOfLine ).
             then( terminals.symbols.rightSquare ).
-            onMatch( function(lSquare, exprs, end, rSquare) {
+            onMatch( function(lSquare, exprs, endOfLine, rSquare) {
                 if ( exprs !== null ) {
                     return new quby.syntax.ArrayDefinition( exprs );
                 } else {
@@ -1002,9 +1042,9 @@ var quby = window['quby'] || {};
     var hashDefinition = parse.
             a( terminals.symbols.leftBrace ).
             optionalSeperator( hashMapping, terminals.symbols.comma ).
-            optional( terminals.endOfStatement ).
+            optional( terminals.endOfLine ).
             then( terminals.symbols.rightBrace ).
-            onMatch( function(lBrace, mappings, end, rBrace) {
+            onMatch( function(lBrace, mappings, endOfLine, rBrace) {
                 if ( mappings !== null ) {
                     return new quby.syntax.HashDefinition(
                             new quby.syntax.Mappings( mappings )
@@ -1074,7 +1114,7 @@ var quby = window['quby'] || {};
     var parameterDefinition = parse.
             a( terminals.symbols.leftBracket ).
             optional( parameterFields ).
-            optional( terminals.endOfStatement ). // needed to allow an end of line before the closing bracket
+            optional( terminals.endOfLine ). // needed to allow an end of line before the closing bracket
             then( terminals.symbols.rightBracket ).
             onMatch( function(lParen, params, end, rParen) {
                 if ( params === null ) {
@@ -1097,7 +1137,7 @@ var quby = window['quby'] || {};
     var parameterExprs = parse.
             a( terminals.symbols.leftBracket ).
             optional( exprs ).
-            optional( terminals.endOfStatement ).
+            optional( terminals.endOfLine ).
             then( terminals.symbols.rightBracket ).
             onMatch( function(lParen, exprs, end, rParen) {
                 if ( exprs !== null ) {
@@ -1109,8 +1149,8 @@ var quby = window['quby'] || {};
 
     var blockParams = parse.
             a( terminals.ops.bitwiseOr ).
-            optionalSeperator( terminals.identifiers.variableName, terminals.endOfStatement ).
-            optional( terminals.endOfStatement ).
+            optionalSeperator( terminals.identifiers.variableName, terminals.symbols.comma ).
+            optional( terminals.endOfLine ).
             then( terminals.ops.bitwiseOr ).
             onMatch( function(lOr, params, end, rOr) {
                 if ( params !== null ) {
@@ -1193,8 +1233,9 @@ var quby = window['quby'] || {};
                     parse.
                             a( terminals.symbols.leftBracket ).
                             then( expr ).
+                            optional( terminals.endOfLine ).
                             then( terminals.symbols.rightBracket ).
-                            onMatch( function(left, expr, right) {
+                            onMatch( function(left, expr, endOfLine, right) {
                                 return new quby.syntax.ExprParenthesis( expr );
                             } ),
 
@@ -1264,20 +1305,18 @@ var quby = window['quby'] || {};
     var moduleDefinition = parse.
                 a( terminals.keywords.MODULE ).
                 then( terminals.identifiers.variableName ).
-                optional( terminals.endOfStatement ).
                 optional( statements ).
-                then( terminals.endOfStatement ).
-                onMatch( function(keyModule, name, end1, stmts, end2) {
+                then( terminals.keywords.END ).
+                onMatch( function(keyModule, name, stmts, end) {
                     return new quby.syntax.ModuleDefinition(name, stmts);
                 } );
 
     var classDefinition = parse.
                 a( terminals.keywords.CLASS ).
                 then( classHeader ).
-                optional( terminals.endOfStatement ).
                 optional( statements ).
                 then( terminals.keywords.END ).
-                onMatch( function(klass, header, end1, stmts, end2) {
+                onMatch( function(klass, header, stmts, end) {
                     return new quby.syntax.ClassDefinition( header, stmts );
                 } );
 
@@ -1285,10 +1324,9 @@ var quby = window['quby'] || {};
                 either( terminals.keywords.DEF, terminals.admin.hashDef ).
                 thenEither( terminals.keywords.NEW, terminals.identifiers.variableName ).
                 then( parameterDefinition ).
-                optional( terminals.endOfStatement ).
                 optional( statements ).
                 then( terminals.keywords.END ).
-                onMatch( function(def, name, params, end1, stmts, end2) {
+                onMatch( function(def, name, params, stmts, end) {
                     if ( def.symbol === terminals.keywords.DEF ) {
                         // 'new' method, class constructor
                         if ( name.symbol === terminals.keywords.NEW ) {
@@ -1315,9 +1353,8 @@ var quby = window['quby'] || {};
                 a( terminals.keywords.IF ).
                 then( expr ).
                 optional( terminals.keywords.THEN ).
-                optional( terminals.endOfStatement ).
                 then( statements ).
-                onMatch( function( IF, condition, THEN, end, stmts ) {
+                onMatch( function( IF, condition, THEN, stmts ) {
                     return new quby.syntax.IfBlock( condition, stmts );
                 } );
 
@@ -1329,9 +1366,8 @@ var quby = window['quby'] || {};
                 ).
                 a( expr ).
                 optional( terminals.keywords.THEN ).
-                optional( terminals.endOfStatement ).
                 a( statements ).
-                onMatch( function(elseIf, condition, then, end, stmts) {
+                onMatch( function(elseIf, condition, then, stmts) {
                     return new quby.syntax.IfBlock( condition, stmts );
                 } );
 
@@ -1374,11 +1410,10 @@ var quby = window['quby'] || {};
     var loopStatement = parse.
                 a( terminals.keywords.LOOP ).
                 then( statements ).
-                then( terminals.endOfStatement ).
-                either( terminals.keywords.WHILE ).or( terminals.keywords.UNTIL ).
+                then( terminals.keywords.END ).
+                either( terminals.keywords.WHILE, terminals.keywords.UNTIL ).
                 then( expr ).
-                then( terminals.endOfStatement ).
-                onMatch( function(lp, stmts, end, whileUntil, expr) {
+                onMatch( function(loop, stmts, end, whileUntil, expr) {
                     if ( whileUntil.symbol === terminals.keywords.WHILE ) {
                         return new quby.syntax.LoopWhile( expr, stmts );
                     } else {
