@@ -1503,7 +1503,7 @@ var quby = window['quby'] || {};
             parse : function( origSrc, onFinish ) {
                 var src = preParse( origSrc );
 
-if ( false ) {
+if ( true ) {
                 statements.symbolizeLowerCase( src,
                         function( symbols, errors ) {
                             for ( var i = 0; i < symbols.length; i++ ) {

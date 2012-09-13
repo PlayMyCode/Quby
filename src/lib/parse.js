@@ -3358,7 +3358,7 @@ var parse = window['parse'] = (function( window, undefined ) {
          * A number terminal.
          */
         Parse['terminal']['NUMBER'] = function(src, i, code, len) {
-            if ( ! isNumericCode(src.charCodeAt(i)) ) {
+            if ( code < ZERO || code > NINE ) {
                 return;
             // 0x hex number
             } else if (
@@ -3373,7 +3373,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                 } while (
                         code === UNDERSCORE ||
                         isHexCode( code )
-                );
+                )
             // normal number
             } else {
                 do {
@@ -3381,8 +3381,8 @@ var parse = window['parse'] = (function( window, undefined ) {
                     code = src.charCodeAt( i );
                 } while (
                         code === UNDERSCORE ||
-                        isNumericCode( code )
-                );
+                        ( code >= ZERO && code <= NINE )
+                )
 
                 // Look for Decimal Number
                 if (
@@ -3397,8 +3397,8 @@ var parse = window['parse'] = (function( window, undefined ) {
                         code = src.charCodeAt(i);
                     } while (
                             code === UNDERSCORE ||
-                            isNumericCode( code )
-                    );
+                            ( code >= ZERO && code <= NINE )
+                    )
                 }
             }
 
@@ -3443,10 +3443,10 @@ var parse = window['parse'] = (function( window, undefined ) {
                     if ( i >= len ) {
                         return;
                     }
-                } while (
-                        src.charCodeAt(i  ) !== STAR &&
-                        src.charCodeAt(i+1) !== SLASH
-                );
+                } while ( ! (
+                        src.charCodeAt(i  ) === STAR &&
+                        src.charCodeAt(i+1) === SLASH
+                ) );
 
                 // plus 2 to include the end of the comment
                 return i+2;
@@ -3466,10 +3466,10 @@ var parse = window['parse'] = (function( window, undefined ) {
                     if ( i >= len ) {
                         return;
                     }
-                } while (
-                        src.charCodeAt(i  ) !== DOUBLE_QUOTE &&
+                } while ( ! (
+                        src.charCodeAt(i  ) === DOUBLE_QUOTE &&
                         src.charCodeAt(i-1) !== BACKSLASH
-                );
+                ) )
 
                 return i;
             // single quote string
@@ -3481,10 +3481,10 @@ var parse = window['parse'] = (function( window, undefined ) {
                     if ( i >= len ) {
                         return;
                     }
-                } while (
-                        src.charCodeAt(i  ) !== SINGLE_QUOTE &&
+                } while ( ! (
+                        src.charCodeAt(i  ) === SINGLE_QUOTE &&
                         src.charCodeAt(i-1) !== BACKSLASH
-                );
+                ) )
 
                 return i;
             }
