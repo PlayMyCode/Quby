@@ -1489,6 +1489,10 @@ var quby = window['quby'] || {};
         return null;
     }
 
+    parse.debug( function(time) {
+        console.log( time );
+    });
+
     quby.parser = {
             /**
              * The entry point for the parser, and the only way to interact.
@@ -1499,7 +1503,7 @@ var quby = window['quby'] || {};
             parse : function( origSrc, onFinish ) {
                 var src = preParse( origSrc );
 
-if ( true ) {
+if ( false ) {
                 statements.symbolizeLowerCase( src,
                         function( symbols, errors ) {
                             for ( var i = 0; i < symbols.length; i++ ) {
@@ -1511,7 +1515,7 @@ if ( true ) {
 
                 var t = Date.now();
 
-console.log( src + '#' );
+//console.log( src + '#' );
                 statements.parse( origSrc, src, function(r, es) {
                     for ( var i = 0; i < es.length; i++ ) {
                         var e = es[i];

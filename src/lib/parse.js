@@ -259,8 +259,6 @@
  * but only one 'if' terminal, which is used to find them all.
  */
 var parse = window['parse'] = (function( window, undefined ) {
-    var Int32Array = window['Int32Array'];
-
     /**
      * ASCII codes for characters.
      *
@@ -792,6 +790,37 @@ var parse = window['parse'] = (function( window, undefined ) {
     var INVALID_TERMINAL = 0;
 
     /**
+     * The multiple types for a terminal.
+     */
+    var TYPE_FUNCTION       = 1,
+        TYPE_WORD_CODE      = 2,
+        TYPE_CODE           = 3,
+        TYPE_STRING         = 4,
+        TYPE_ARRAY          = 5;
+
+    /**
+     * Given a string, this turns it into an array of char codes,
+     * and returns the result.
+     *
+     * Note that it's 'character codes', not 'characters'.
+     * So that means the underlying ASCII/Unicode numbers,
+     * not the actual characters themselves.
+     *
+     * @param {string} str The string to convert to an array.
+     * @return An array of character codes for the string given.
+     */
+    var stringToCodes = function( str ) {
+        var len = str.length,
+            arr = new Array( len );
+
+        for ( var i = 0; i < len; i++ ) {
+            arr[i] = str.charCodeAt( i );
+        }
+
+        return arr;
+    }
+
+    /**
      * If given a string, it will match if it is
      * followed by a word boundary.
      *
@@ -818,30 +847,55 @@ var parse = window['parse'] = (function( window, undefined ) {
      */
     var Terminal = function( match ) {
         this.id = INVALID_TERMINAL;
-        this.match = match;
 
+        /**
+         * The type of this terminal.
+         *
+         * Default is zero, which is invalid.
+         */
+        this.type = 0;
+
+        /**
+         * A post match callback that can be run,
+         * when a match has been found.
+         *
+         * Optional.
+         */
         this.onMatchFun = null;
 
         /**
-         * The length of the literal this matches.
+         * The type of this terminal.
          *
-         * If it matches multiple literals, then this is the minimum length.
+         * This determines the algorithm used to match,
+         * or not match, bits against the source code
+         * when parsing symbols.
+         */
+        this.isLiteral = false;
+
+        /**
+         * If this is a literal, then this will give the length
+         * of that literal being searched for.
          *
-         * This should only be used if 'isLiteral' is true. Otherwise the value
-         * should be seen as irrelevant.
+         * For a string, this is the length of that string.
+         * For a number, this is 1.
+         *
+         * For non-literals, this is 0, but should not be used.
          */
         this.literalLength = 0;
 
         /**
-         * When true, this will return the actual text that
-         * was matched, as a substring.
+         * There are two ways to work out if a terminal matches
+         * or not.
          *
-         * It's set to false by default, to avoid lots of
-         * non-needed substrings.
+         * The first is by overriding the 'test' with it's own
+         * function.
          *
-         * @type {boolean}
+         * The other is to apply a special type, such as TYPE_CODE,
+         * and then place the data for it here.
+         *
+         * When it has no data, it is null.
          */
-        this.symbolMatchText = null;
+        this.testData = null;
 
         /**
          * An optional event to run after a symbol has been matched.
@@ -855,38 +909,61 @@ var parse = window['parse'] = (function( window, undefined ) {
             return match;
         } else if ( isFunction(match) ) {
             this.isLiteral = false;
-            this.test = match;
+            this.testData = match;
+            this.type = TYPE_FUNCTION;
         } else {
             this.isLiteral = true;
 
-            // a code character
-            if ( typeof match === 'number' ) {
-                this.literalLength = 1;
+            var matchType = typeof match ;
 
-                if ( isWordCode(match) ) {
-                    this.test = function(src, i, code, len) {
-                        if ( code === match && !isWordCode(src.charCodeAt(i+1)) ) {
-                            return i+1;
-                        }
-                    };
-                } else {
-                    this.test = function(src, i, code, len) {
-                        if ( code === match ) {
-                            return i+1;
-                        }
-                    };
+            /*
+             * A single character.
+             * - a character code (number)
+             * - a single character (1 length string)
+             */
+            if (
+                    matchType === 'number' ||
+                    (
+                            (matchType === 'string' || match instanceof String) &&
+                             match.length === 1
+                    )
+            ) {
+                if ( matchType === 'string' ) {
+                    match = match.charCodeAt( 0 );
                 }
-            // string primative or string object
-            } else if ( typeof match === 'string' || match instanceof String ) {
+
+                this.literalLength = 1;
+                this.isLiteral = true;
+
+                this.type = isWordCode(match) ?
+                        TYPE_WORD_CODE :
+                        TYPE_CODE ;
+
+                this.testData = match;
+
+            /*
+             * String primative, or string object.
+             *
+             * This is a string with a length longer than 1,
+             * a length of zero will raise an error,
+             * and 1 length is caught by the clause above.
+             */
+            } else if ( matchType === 'string' || match instanceof String ) {
                 this.literalLength = match.length;
+                this.isLiteral = true;
+                this.type = TYPE_STRING;
 
                 if ( match.length === 0 ) {
                     throw new Error( "Empty string given for Terminal" );
-                } else if ( match.length === 1 && !isWordCharAt(match, 0) ) {
-                    this.test = newCharacterMatch( match );
                 } else {
-                    this.test = newWordMatch( match );
+                    this.testData = stringToCodes( match );
                 }
+
+            /*
+             * An array of matches to match against.
+             * For example, multiple string keywords
+             * in an array.
+             */
             } else if ( match instanceof Array ) {
                 var mTerminals = [];
                 var isLiteral = true,
@@ -904,26 +981,10 @@ var parse = window['parse'] = (function( window, undefined ) {
                     mTerminals[i] = innerTerm;
                 }
 
+                this.type = TYPE_ARRAY ;
                 this.isLiteral = isLiteral;
                 this.literalLength = literalLength;
-
-                this.test = function(src, i, code, len) {
-                    for (
-                            var i = 0, len = match.length;
-                            i < len;
-                            i++
-                    ) {
-                        var r = mTerminals[i].test( src, i, code, len );
-
-                        if ( r !== undefined ) {
-                            if ( r === true ) {
-                                return i+1;
-                            } else if ( r > i ) {
-                                return i;
-                            }
-                        }
-                    }
-                };
+                this.testData = mTerminals;
             // errors!
             } else if ( match === undefined ) {
                 throw new Error( "undefined match given" );
@@ -933,21 +994,13 @@ var parse = window['parse'] = (function( window, undefined ) {
                 throw new Error( "unknown match given" );
             }
         }
-    };
-
-    Terminal.prototype.getSymbolText = function() {
-        return this.symbolMatchText;
-    };
+    }
 
     Terminal.prototype.setID = function( id ) {
         this.id = id;
 
         return this;
-    };
-
-    Terminal.prototype.test = function(src, i, code, len) {
-        throw new Error( "Terminal created with no 'test' function set. This is an bug, or you are doing something funky with the library." );
-    };
+    }
 
     /**
      * The 'symbolMatch' event allows you to run a callback straight after the
@@ -1118,12 +1171,12 @@ var parse = window['parse'] = (function( window, undefined ) {
         }
     };
 
-	/**
-	 * @return The current index for the current symbol ID.
-	 */
-	SymbolResult.prototype.idIndex = function() {
-		return this.i;
-	};
+    /**
+     * @return The current index for the current symbol ID.
+     */
+    SymbolResult.prototype.idIndex = function() {
+        return this.i;
+    };
 
     SymbolResult.prototype.hasErrors = function() {
         return this.errors.length > 0;
@@ -1256,32 +1309,46 @@ var parse = window['parse'] = (function( window, undefined ) {
          * As 'terminals' is a list of _all_ terminals,
          * then it is the complete list.
          */
-        var literalTerms = [],
+        var literalTerms    = [],
             nonLiteralTerms = [];
 
+        compressTerminalsInner( termIDToTerms, literalTerms, nonLiteralTerms, terminals );
+
+        literalTerms.sort( function(a, b) {
+            return b.literalLength - a.literalLength;
+        } );
+
+        return {
+                literals    : literalTerms,
+                terminals   : nonLiteralTerms,
+                idToTerms   : termIDToTerms
+        };
+    };
+
+    var compressTerminalsInner = function( termIDToTerms, literalTerms, nonLiteralTerms, terminals ) {
         for ( var k in terminals ) {
             if ( terminals.hasOwnProperty(k) ) {
                 var term = terminals[k];
 
-                termIDToTerms[ term.id ] = term;
-
-                if ( term.isLiteral ) {
-                    literalTerms.push( term )
+                if ( term.type === TYPE_ARRAY ) {
+                    compressTerminalsInner(
+                            termIDToTerms,
+                            literalTerms,
+                            nonLiteralTerms,
+                            term.testData
+                    )
                 } else {
-                    nonLiteralTerms.push( term )
+                    termIDToTerms[ term.id ] = term;
+
+                    if ( term.isLiteral ) {
+                        literalTerms.push( term )
+                    } else {
+                        nonLiteralTerms.push( term )
+                    }
                 }
             }
         }
-
-        literalTerms.sort( function(a, b) {
-            return b.literalLength - a.literalLength;
-        });
-
-        return {
-                terminals   : literalTerms.concat( nonLiteralTerms ),
-                idToTerms   : termIDToTerms
-        };
-    };
+    }
 
     /**
      * Used when searching for terminals to use for parsing,
@@ -1317,7 +1384,7 @@ var parse = window['parse'] = (function( window, undefined ) {
      *
      */
     /*
-     * = What is 'compiled_lookups' ? =
+     * = What is 'compiledLookups' ? =
      *
      * The grammar is built into a big tree. Technically it's not, because it
      * includes recursive rules, but lets just imagine recursion isn't present.
@@ -1331,7 +1398,7 @@ var parse = window['parse'] = (function( window, undefined ) {
      * class definitions, and so on. This is even though none of those could
      * possibly match.
      *
-     * So to cut down on all this searching, 'compiled_lookups' is a version of the
+     * So to cut down on all this searching, 'compiledLookups' is a version of the
      * 'rules' which maps symbolID to rules. That way a ParserRule can jump straight
      * to the branches which match; or return if none of them match.
      *
@@ -1350,7 +1417,7 @@ var parse = window['parse'] = (function( window, undefined ) {
          * null, it has.
          */
         this.compiled = null;
-        this.compiled_lookups = null;
+        this.compiledLookups = null;
 
         /**
          * The global parse instance this is working with.
@@ -1366,9 +1433,7 @@ var parse = window['parse'] = (function( window, undefined ) {
          */
         this.rules = [];
 
-        this.isOptional = Int32Array ?
-                new Int32Array( 10 ) :
-                [] ;
+        this.isOptional = [];
 
         /**
          * Choice parser rules can be built from multiple 'or' calls,
@@ -1388,9 +1453,9 @@ var parse = window['parse'] = (function( window, undefined ) {
 
         /**
          * A flag used to denote if this is being called recursively.
-		 * This is used in two places:
-		 *  = grabbingTerminals
-		 *  = when parsing symbols
+         * This is used in two places:
+         *  = grabbingTerminals
+         *  = when parsing symbols
          *
          * This to avoid calling it recursively, as we only
          * need to visit each ParserRule once.
@@ -1552,16 +1617,6 @@ var parse = window['parse'] = (function( window, undefined ) {
 
         if ( rulesLen === 0 ) {
             throw new Error("Item being marked as optional, when there are no rules.");
-        }
-
-        // resize if needed
-        if (
-                Int32Array !== undefined &&
-                this.isOptional.length < rulesLen
-        ) {
-            var temp = new Int32Array( (this.isOptional.length*4)/3 );
-            temp.set( this.isOptional );
-            this.isOptional = temp;
         }
 
         this.isOptional[ rulesLen-1 ] = isOptional ?
@@ -1825,7 +1880,7 @@ var parse = window['parse'] = (function( window, undefined ) {
     }
 
     ParserRule.prototype.terminalScan = function() {
-        if ( this.compiled_lookups === null ) {
+        if ( this.compiledLookups === null ) {
             var rules = this.rules,
                 len = rules.length,
                 lookups = new Array( len );
@@ -1871,7 +1926,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                 lookups[i] = ruleLookup;
             }
 
-            this.compiled_lookups = lookups;
+            this.compiledLookups = lookups;
         }
     };
 
@@ -2060,7 +2115,11 @@ var parse = window['parse'] = (function( window, undefined ) {
 
         window['util']['future']['run']( function() {
             callback(
-                    _this.parseSymbolsInner( input, parseInput )
+                    _this.parseSymbolsInner(
+                            input,
+                            parseInput,
+                            _this.parseParent.timeSymbolsFlag
+                    )
             );
         } );
     };
@@ -2288,7 +2347,7 @@ var parse = window['parse'] = (function( window, undefined ) {
     };
 
     ParserRule.prototype.ruleTestSeperator = function( symbols, inputSrc ) {
-        var lookups = this.compiled_lookups,
+        var lookups = this.compiledLookups,
             peekID  = symbols.peekID(),
             rules   = lookups[0],
             rule    = rules[peekID];
@@ -2476,7 +2535,7 @@ var parse = window['parse'] = (function( window, undefined ) {
             this.isRecursive    = startSymbolI;
         }
 
-        var lookups  = this.compiled_lookups,
+        var lookups  = this.compiledLookups,
             optional = this.isOptional,
             onFinish = null,
             args     = null;
@@ -2570,7 +2629,7 @@ var parse = window['parse'] = (function( window, undefined ) {
 
     ParserRule.prototype.ruleTestCyclic = function( symbols, inputSrc ) {
         var args = null,
-            lookups = this.compiled_lookups,
+            lookups = this.compiledLookups,
             len = lookups.length,
             onFinish = null;
 
@@ -2648,32 +2707,35 @@ var parse = window['parse'] = (function( window, undefined ) {
      *  strings: a substrings for each symbol, where the terminal stated to return a string
      */
     ParserRule.prototype.parseSymbolsInner = function( inputSrc, src ) {
-        var useIntArray = !! Int32Array;
+        var symbolI     = 0,
 
-        // initialized to a default size, which is hopefully 'big enough' for most text
-        // if not, it is resized during parsing.
-        var symbolSize = 64000,
-            symbolI = 0;
+            len         = src.length,
 
-        var len  = src.length,
-            code = src.charCodeAt(0),
-
-            symbols     = new Array(symbolSize),
-            symbolIDs   = useIntArray ? new Int32Array(symbolSize) : new Array(symbolSize),
+            symbols     = [],
+            symbolIDs   = [],
 
             ignores     = this.parseParent.getIgnores(),
+            literals    = this.compiled.literals,
             terminals   = this.compiled.terminals,
+
+            allTerms    = ignores.concat( literals, terminals ),
+
+            ignoresLen  = ignores.length,
+            literalsLen = ignoresLen + literals.length,
+            termsLen    = literalsLen + terminals.length,
+
+            ignoresTests = new Array( ignoresLen ),
+            literalsData = new Array( literalsLen ),
+            literalsType = new Array( literalsLen ),
+            termTests    = new Array( termsLen ),
 
             symbolIDToTerms = this.compiled.idToTerms,
 
-            allTerms    = ignores.concat( terminals ),
-            allLen      = allTerms.length,
+            postMatches = new Array( termsLen ),
 
-            postMatches = new Array( allLen ),
-
-            termTests   = new Array( allLen ),
-            termIDs     = (useIntArray ? new Int32Array( allLen ) : []),
-            termsOffset = ignores.length,
+            termTests   = new Array( termsLen ),
+            termIDs     = new Array( termsLen ),
+            multipleIgnores = ( ignores.length > 1 ),
 
             /**
              * An invalid index in the string, used to denote
@@ -2686,6 +2748,11 @@ var parse = window['parse'] = (function( window, undefined ) {
             errorStart = NO_ERROR,
             errors = [];
 
+        /*
+         * Debugging stuff.
+         */
+        var debugCallback = this.parseParent.symbolizeDebugCallback, 
+            start = Date.now();
 
         /*
          * Move the test, id and returnMathFlag so they are on
@@ -2697,17 +2764,21 @@ var parse = window['parse'] = (function( window, undefined ) {
          * the return flag is stored by shifting the id 16
          * places to the left when it is set.
          */
-        for ( var i = 0; i < allLen; i++ ) {
-            var term = allTerms[i];
+        for ( var i = 0; i < allTerms.length; i++ ) {
+            var term = allTerms[i],
+                test = term.testData,
+                id   = term.id;
 
-            termTests[i]   = term.test;
-            postMatches[i] = term.postMatch;
-
-            var id = term.id;
-            if ( ! term.isLiteral ) {
-                id <<= 16;
+            if ( i < ignoresLen ) {
+                ignoresTests[i] = test;
+            } else if ( i < literalsLen ) {
+                literalsData[i] = term.testData;
+                literalsType[i] = term.type;
+            } else {
+                termTests[i] = test;
             }
 
+            postMatches[i] = term.postMatch;
             termIDs[i] = id;
         }
 
@@ -2716,8 +2787,9 @@ var parse = window['parse'] = (function( window, undefined ) {
         } else {
             var i = 0;
 
+            scan:
             while ( i < len ) {
-                var j = 0;
+                var code = src.charCodeAt( i );
 
                 /*
                  * All terminals are put in one array,
@@ -2739,58 +2811,20 @@ var parse = window['parse'] = (function( window, undefined ) {
                  * 'whitespace', 'comment', etc.
                  */
 
-                while ( j < allLen ) {
-                    var r = termTests[j]( src, i, code, len );
+                var j = 0;
+                var r;
+
+                /*
+                 * Test the 'ignores', i.e. whitespace.
+                 */
+                
+                while ( j < ignoresLen ) {
+                    r = ignoresTests[j]( src, i, code, len );
 
                     if ( r !== undefined && r !== false && r > i ) {
-                        var postMatchEvent = postMatches[j];
-
-                        if ( j >= termsOffset ) {
-                            // increase size by 33%, if we need to
-                            if ( useIntArray && symbolI === symbolSize ) {
-                                symbolSize = ((symbolSize*4)/3) >> 0;
-
-                                var temp = new Int32Array( symbolSize );
-                                temp.set( symbolIDs, 0 );
-                                symbolIDs = temp;
-                            }
-
-                            var id = termIDs[j],
-                                str;
-                            if ( (id & 0xFFFF0000) !== 0) {
-                                symbolIDs[symbolI] = id >> 16;
-                                str = inputSrc.substring( i, r );
-                            } else {
-                                symbolIDs[symbolI] = id;
-                                str = null;
-                            }
-
-                            symbols[ symbolI++ ] = new Symbol( allTerms[j], i, str );
-
-                            // If we were in error mode,
-                            // report the error section.
-                            //
-                            // This is from the last terminal,
-                            // to this one, but ignores whitespace.
-                            if ( errorStart !== NO_ERROR ) {
-                                errors.push( new SymbolError(
-                                        errorStart,
-                                        inputSrc.substring( errorStart, i )
-                                ) );
-
-                                errorStart = NO_ERROR;
-                            }
-
-                            // go back to the beginning of the terminals
-                            j = 0;
-                        } else if ( termsOffset <= 1 ) {
-                            j = termsOffset;
-                        } else {
-                            j = 0;
-                        }
-
                         code = src.charCodeAt( r );
 
+                        var postMatchEvent = postMatches[j];
                         if ( postMatchEvent !== null ) {
                             var r2 = postMatchEvent( src, r, code, len );
 
@@ -2803,15 +2837,167 @@ var parse = window['parse'] = (function( window, undefined ) {
                         } else {
                             i = r;
                         }
+
+                        if ( multipleIgnores ) {
+                            j = 0;
+                        }
                     } else {
                         j++;
                     }
                 }
 
-                errorStart = i;
+                /*
+                 * Test 'literals', i.e. keywords like 'if'
+                 */
 
+                r = 0;
+                scan_literals:
+                while ( j < literalsLen ) {
+                    var type  = literalsType[j],
+                        match = literalsData[j];
+
+                    /*
+                     * A string,
+                     * but it is actually an array of code characters.
+                     */
+                    if ( type === TYPE_STRING ) {
+                        var testLen = match.length;
+
+                        for ( var testI = 0; testI < testLen; testI++ ) {
+                            if ( src.charCodeAt(i+testI) !== match[testI] ) {
+                                j++;
+                                continue scan_literals;
+                            }
+                        }
+
+                        if ( ! isWordCharAt(src, i+testI) ) {
+                            r = i+testI;
+                        } else {
+                            j++;
+                            continue scan_literals;
+                        }
+
+                    /*
+                     * Non-alphanumeric codes, such as '+'.
+                     */
+                    } else if ( type === TYPE_CODE ) {
+                        if ( code === match ) {
+                            r = i+1;
+                        } else {
+                            j++;
+                            continue scan_literals;
+                        }
+                        
+                    /*
+                     * Single alpha-numeric codes, such as 'a' or 'b'.
+                     *
+                     * I expect it is unpopular, which is why it is last.
+                     */
+                    } else if ( type === TYPE_WORD_CODE ) {
+                        if ( code === match && !isWordCode(src.charCodeAt(i+1)) ) {
+                            r = i+1;
+                        } else {
+                            j++;
+                            continue scan_literals;
+                        }
+                    } 
+
+                    if ( r > i ) {
+                        symbolIDs[symbolI] = termIDs[j];
+                        symbols[ symbolI++ ] = new Symbol( allTerms[j], i, null );
+
+                        // If we were in error mode,
+                        // report the error section.
+                        //
+                        // This is from the last terminal,
+                        // to this one, but ignores whitespace.
+                        if ( errorStart !== NO_ERROR ) {
+                            errors.push( new SymbolError(
+                                    errorStart,
+                                    inputSrc.substring( errorStart, i )
+                            ) );
+
+                            errorStart = NO_ERROR;
+                        }
+
+                        var postMatchEvent = postMatches[j];
+                        if ( postMatchEvent !== null ) {
+                            code = src.charCodeAt( r );
+
+                            var r2 = postMatchEvent( src, r, code, len );
+
+                            if ( r2 !== undefined && r2 > r ) {
+                                i = r2;
+                            } else {
+                                i = r;
+                            }
+                        } else {
+                            i = r;
+                        }
+
+                        continue scan;
+                    }
+
+                    j++;
+                }
+
+                /*
+                 * Test 'non-literals', i.e. variable.
+                 */
+
+                while ( j < termsLen ) {
+                    r = termTests[j]( src, i, code, len );
+
+                    if ( r !== undefined && r !== false && r > i ) {
+                        symbolIDs[symbolI] = termIDs[j];
+
+                        symbols[ symbolI++ ] = new Symbol(
+                                allTerms[j],
+                                i,
+                                inputSrc.substring( i, r )
+                        );
+
+                        // If we were in error mode,
+                        // report the error section.
+                        //
+                        // This is from the last terminal,
+                        // to this one, but ignores whitespace.
+                        if ( errorStart !== NO_ERROR ) {
+                            errors.push( new SymbolError(
+                                    errorStart,
+                                    inputSrc.substring( errorStart, i )
+                            ) );
+
+                            errorStart = NO_ERROR;
+                        }
+
+                        var postMatchEvent = postMatches[j];
+                        if ( postMatchEvent !== null ) {
+                            code = src.charCodeAt( r );
+
+                            var r2 = postMatchEvent( src, r, code, len );
+
+                            if ( r2 !== undefined && r2 > r ) {
+                                i = r2;
+                            } else {
+                                i = r;
+                            }
+                        } else {
+                            i = r;
+                        }
+
+                        continue scan;
+                    }
+
+                    j++;
+                }
+
+                /*
+                 * Deal with failure.
+                 */
+
+                errorStart = i;
                 i++;
-                code = src.charCodeAt( i );
             }
 
             if ( errorStart !== NO_ERROR && errorStart < len ) {
@@ -2819,6 +3005,10 @@ var parse = window['parse'] = (function( window, undefined ) {
                         errorStart,
                         inputSrc.substring( errorStart, i )
                 ) );
+            }
+
+            if ( debugCallback ) {
+                debugCallback( Date.now() - start );
             }
 
             return new SymbolResult(
@@ -2904,6 +3094,8 @@ var parse = window['parse'] = (function( window, undefined ) {
             }
         };
 
+        Parse.symbolizeDebugCallback = null;
+
         /**
          * A counting id used for easily and uniquely
          * identifying terminals.
@@ -2949,6 +3141,13 @@ var parse = window['parse'] = (function( window, undefined ) {
         Parse.getNumTerminals = function() {
             return this.terminalID;
         };
+
+        /**
+         * 
+         */
+        Parse['debug'] = function( callback ) {
+            Parse.symbolizeDebugCallback = callback;
+        }
 
         Parse['or'] = function() {
             return this.call( this ).orAll( arguments );
