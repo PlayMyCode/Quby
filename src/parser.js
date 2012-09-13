@@ -518,8 +518,8 @@ var quby = window['quby'] || {};
                     NULL        : 'null',
                     NIL         : 'nil',
 
-                    number: parse.terminal.NUMBER,
-                    string: parse.terminal.STRING
+                    number      : parse.terminal.NUMBER,
+                    string      : parse.terminal.STRING
             },
 
             ops: {

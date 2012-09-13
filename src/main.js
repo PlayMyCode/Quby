@@ -67,7 +67,7 @@ var quby = window['quby'] || {};
             this.parseSources = function (sources, adminMode, callback) {
                 var _this = this;
                 util.future.map( sources, function(source) {
-                    _this.parse(source, adminMode);
+                    _this.parse( source, adminMode );
                 } );
 
                 if ( callback != undefined ) {
@@ -224,12 +224,12 @@ var quby = window['quby'] || {};
                         strErr;
 
                     if ( error.isSymbol ) {
-                        strErr = "Unknown code found when parsing '" + error.match + "'";
+                        strErr = "error parsing '" + error.match + "'";
                     } else if ( error.isTerminal ) {
-                        if ( error.isLiteral ) {
-                            strErr = "Incorrect code found, unexpected " + error.terminalName;
+                        if ( error.isLiteral || util.string.trim(error.match) === '' ) {
+                            strErr = "error, unexpected '" + error.terminalName + "'";
                         } else {
-                            strErr = "Incorrect code found, unexpected " + error.terminalName + " '" + error.match + "'";
+                            strErr = "error, unexpected " + error.terminalName + " '" + error.match + "'";
                         }
                     } else {
                         throw new Error("Unknown parse.js error given to format");
@@ -811,7 +811,7 @@ var quby = window['quby'] || {};
             };
 
             this.parseErrorLine = function (line, msg) {
-                this.errors.push("on line: " + line + ", " + msg);
+                this.errors.push("on line " + line + ", " + msg);
             };
 
             this.getErrors = function () {
