@@ -1879,6 +1879,17 @@ var parse = window['parse'] = (function( window, undefined ) {
         }
     }
 
+    var callParseDebug = function( debugCallback, symbols, symbolTime, rulesTime ) {
+        if ( debugCallback ) {
+            var times = {};
+            times['symbols'] = symbolTime;
+            times['rules']   = rulesTime ;
+            times['total']   = symbolTime + rulesTime ;
+
+            debugCallback( symbols.getTerminals(), times );
+        }
+    }
+
     ParserRule.prototype.terminalScan = function() {
         if ( this.compiledLookups === null ) {
             var rules = this.rules,
@@ -2051,26 +2062,43 @@ var parse = window['parse'] = (function( window, undefined ) {
      * @param {string} displaySrc The text used when creating substrings, or for parsing.
      * @param {string} parseSrc optional, an alternative source code used for parsing.
      * @param callback A function to call when parsing is complete.
+     * @param debugCallback An optional debugging callback, which if provided, will be called with debugging info.
      */
-    ParserRule.prototype['parse'] = function( displaySrc, parseSrc, callback ) {
+    ParserRule.prototype['parse'] = function( displaySrc, parseSrc, callback, debugCallback ) {
         if ( callback === undefined ) {
             callback = parseSrc;
             parseSrc = displaySrc;
         }
 
-        this.parseInner( displaySrc, parseSrc, callback );
+        this.parseInner( displaySrc, parseSrc, callback, debugCallback );
     };
 
-    ParserRule.prototype.parseInner = function( input, parseInput, callback ) {
-        var _this = this;
+    ParserRule.prototype.parseInner = function( input, parseInput, callback, debugCallback ) {
+        if (
+                debugCallback !== undefined &&
+                debugCallback !== null &&
+                !isFunction(debugCallback)
+        ) {
+            throw new Error("Invalid debugCallback object given");
+        }
+
+        var self  = this,
+            symbolsStart = Date.now();
 
         this.parseSymbols( input, parseInput, function(symbols) {
+            var rulesStart = Date.now(),
+                symbolTime = rulesStart - symbolsStart,
+                rulesTime  = 0;
+
             if ( symbols.hasErrors() ) {
+                callParseDebug( debugCallback, symbols, symbolTime, rulesTime );
                 callback( [], symbols.getErrors() );
             } else {
-                var result = _this.parseRules( symbols, input, parseInput );
+                var result = self.parseRules( symbols, input, parseInput );
+                rulesTime = Date.now() - rulesStart;
 
                 window['util']['future']['run']( function() {
+                    callParseDebug( debugCallback, symbols, symbolTime, rulesTime );
                     callback( result.result, result.errors );
                 } );
             }
@@ -2749,12 +2777,6 @@ var parse = window['parse'] = (function( window, undefined ) {
             errors = [];
 
         /*
-         * Debugging stuff.
-         */
-        var debugCallback = this.parseParent.symbolizeDebugCallback, 
-            start = Date.now();
-
-        /*
          * Move the test, id and returnMathFlag so they are on
          * their own.
          *
@@ -3007,10 +3029,6 @@ var parse = window['parse'] = (function( window, undefined ) {
                 ) );
             }
 
-            if ( debugCallback ) {
-                debugCallback( Date.now() - start );
-            }
-
             return new SymbolResult(
                     errors,
 
@@ -3094,8 +3112,6 @@ var parse = window['parse'] = (function( window, undefined ) {
             }
         };
 
-        Parse.symbolizeDebugCallback = null;
-
         /**
          * A counting id used for easily and uniquely
          * identifying terminals.
@@ -3141,13 +3157,6 @@ var parse = window['parse'] = (function( window, undefined ) {
         Parse.getNumTerminals = function() {
             return this.terminalID;
         };
-
-        /**
-         * 
-         */
-        Parse['debug'] = function( callback ) {
-            Parse.symbolizeDebugCallback = callback;
-        }
 
         Parse['or'] = function() {
             return this.call( this ).orAll( arguments );

@@ -1489,48 +1489,52 @@ var quby = window['quby'] || {};
         return null;
     }
 
-    parse.debug( function(time) {
-        console.log( time );
-    });
-
     quby.parser = {
+            parseDebug: function( origSrc, onFinish, onDebug ) {
+                quby.parser.parse( origSrc, onFinish, onDebug );
+            },
+
             /**
              * The entry point for the parser, and the only way to interact.
              *
              * Call this, pass in the code, and a callback so your informed
              * about when it's done.
+             *
+             * @param src The source code to parse.
+             * @param onFinish The function to call when parsing has finished.
+             * @param onDebug An optional callback, for sending debug information into.
              */
-            parse : function( origSrc, onFinish ) {
-                var src = preParse( origSrc );
+            parse : function( src, onFinish, onDebug ) {
+                var debugCallback = null;
+                if ( onDebug ) {
+                    debugCallback = function(symbols, times) {
+                        for ( var i = 0; i < symbols.length; i++ ) {
+                            var symbol = symbols[i];
+                            symbol.displayName = identifyTerminal( symbol.id );
+                        }
 
-if ( true ) {
-                statements.symbolizeLowerCase( src,
-                        function( symbols, errors ) {
-                            for ( var i = 0; i < symbols.length; i++ ) {
-                                console.log( symbols[i].id + ', ' + identifyTerminal(symbols[i].id));
+                        onDebug( symbols, times );
+                    };
+                }
+
+                statements.parse(
+                        src,
+                        preParse( src ),
+                        function(r, es) {
+                            for ( var i = 0; i < es.length; i++ ) {
+                                var e = es[i];
+
+                                if ( e.isTerminal ) {
+                                    e.terminalName = formatTerminalName(
+                                            identifyTerminal( e.symbol.id )
+                                    );
+                                }
                             }
-                        }
+
+                            onFinish(r, es);
+                        },
+                        debugCallback
                 );
-}
-
-                var t = Date.now();
-
-//console.log( src + '#' );
-                statements.parse( origSrc, src, function(r, es) {
-                    for ( var i = 0; i < es.length; i++ ) {
-                        var e = es[i];
-
-                        if ( e.isTerminal ) {
-                            e.terminalName = formatTerminalName(
-                                    identifyTerminal( e.symbol.id )
-                            );
-                        }
-                    }
-                    
-                    log( Date.now() - t );
-
-                    onFinish(r, es);
-                } );
             }
     };
 })( quby, util, window )

@@ -1,84 +1,228 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<title>Quby Test Rig</title>
-		<style type="text/css">
-		    html, body {
-		        padding-top: 0;
-		        margin-top: 0;
-		    }
-		    
-		    h1
-		    {
-		    	margin:     0;
-		    	padding:    0;
-		    	font-size:  18px;
-		    }
-		    
-			.lineNumbers, .codeBox {
-                font-size:  smaller;
-			}
-			
-			#sourceCode, #outputCode, .lineNumbers {
-				height:     520px;
-				width:      87%;
-			}
-			
-		    .lineNumbers 
-		    {
-		    	text-align: right;
-		    	width:      24px;
-		    	overflow:   hidden;
-		    }
-			
-			#left, #right 
-			{
-				width:      44%;
-				margin:     0 10px;
-			}
-			
-			#left 
-			{
-				float:      left;
-				clear:      left;
-			}
-			
-			#middle 
-			{
-				width:      5%;
-				float:      left;
-			}
-			
-			#right {
-				float:      right;
-				clear:      right;
-			}
-			
-			#footer 
-			{
-				padding-top:6px;
-				clear:      both;
-				width:      100%;
-			}
-			
-			#sourceCode 
-			{
-			}
-			
-			#outputCode 
-			{
-			}
-			
-			#outputError 
-			{
-				width:      100%;
-				height:     240px;
-			}
-		</style>
-	</head>
-	
-	<body>
-	    <script>
+    <head>
+    	<title>Quby Test Rig</title>
+    	<style type="text/css">
+            h1, h2, h3, h4, h5, a, div,
+            input, html, body {
+                font-family: Segoe UI, Segoe WP, Helvetica Neue, Roboto, sans-serif; 
+                font-weight: 100;
+            }
+    	    html, body {
+                padding: 0;
+                margin : 0;
+    	    }
+            body {
+                background: #23232a;
+                color: #fff;
+
+                font-size: 21px;
+
+                padding: 0 18px;
+            }
+            .line-numbers,
+            textarea {
+                font-family: consolas;
+                font-size: 14px;
+
+                -moz-box-sizing: border-box;
+                box-sizing: border-box;
+            }
+            textarea {
+                width: 100%;
+
+                padding: 3px;
+
+                background: #1a1a1a;
+                color: #dee;
+                border: 1px solid #111;
+                border-radius: 2px;
+            }
+            h1 {
+                margin:     9px 0 6px 0;
+                padding:    0 0 0 3px;
+    	    	font-size:  50px;
+                font-weight: 100;
+            }
+    	    h2 {
+                margin:      9px 0 3px 0;
+                padding:     0 0 0 3px;
+    	    	font-size:   36px;
+                font-weight: 100;
+    	    }
+            .left .line-numbers,
+            .left .codeBox {
+                float: left;
+                clear: none;
+            }
+            .right .line-numbers,
+            .right .codeBox {
+                float: right;
+                clear: none;
+            }
+            .line-numbers,
+            .codeBox {
+                height:     520px;
+            }
+
+            #controls {
+                width: 100%;
+                float: left;
+                clear: both;
+
+                background: #ffffff; /* Old browsers */
+                background: -moz-linear-gradient(top,  #ffffff 0%, #ededed 100%); /* FF3.6+ */
+                background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffffff), color-stop(100%,#ededed)); /* Chrome,Safari4+ */
+                background: -webkit-linear-gradient(top,  #ffffff 0%,#ededed 100%); /* Chrome10+,Safari5.1+ */
+                background: -o-linear-gradient(top,  #ffffff 0%,#ededed 100%); /* Opera 11.10+ */
+                background: -ms-linear-gradient(top,  #ffffff 0%,#ededed 100%); /* IE10+ */
+                background: linear-gradient(to bottom,  #ffffff 0%,#ededed 100%); /* W3C */
+
+                border-bottom: 1px solid #aaa;
+
+                color: black;
+
+                -webkit-box-shadow: 0 8px 12px rgba( 0, 0, 0, 0.3 );
+                -moz-box-shadow: 0 8px 12px rgba( 0, 0, 0, 0.3 );
+                box-shadow: 0 8px 12px rgba( 0, 0, 0, 0.3 );
+
+                padding: 18px 18px;
+                margin-left: -18px;
+
+                position: relative;
+            }
+                .controls-button,
+                .controls-options {
+                    float: left;
+                }
+                .controls-button {
+                    border: none;
+                    background: #1BA1E2;
+                    color: #fff;
+
+                    text-align: center;
+                    font-size  : 32px;
+                    font-weight: 100;
+                    text-transform: lowercase;
+
+                    padding: 0 0 9px 0;
+                    margin-right: 12px;
+                    width : 120px;
+                    height: 90px;
+
+                    opacity: 0.75;
+
+                    cursor: pointer;
+                }
+                .controls-button:hover {
+                    opacity: 1;
+                }
+                .button-parse {
+                }
+                .controls-options {
+                    padding: 0 0 0 9px;
+                }
+                    .controls-options > label {
+                        font-size: 21px;
+                    }
+                .controls-time-info {
+                    float: right; 
+                    clear: right;
+                    text-align: right;
+                }
+    		
+    	    .line-numbers {
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                min-width: 40px;
+
+                padding: 4px 9px;
+
+    	    	text-align: right;
+                border: 1px solid transparent;
+
+    	    	overflow: hidden;
+
+                color: #555;
+    	    }
+            .code-wrap {
+                width: 100%;
+                position: relative;
+            }
+            .codeBox {
+                padding-left: 48px;
+
+                border-top-left-radius: 0;
+                border-bottom-left-radius: 0;
+                border-left: none;
+                width: 100%;
+            }
+    		.left,
+                .right,
+    		.left_70,
+                .right_30 {
+                    position: relative;
+
+                    -moz-box-sizing: border-box;
+                    box-sizing: border-box;
+    		}
+    		.left,
+                .right {
+                    width:   50%;
+                }
+                .left_70,
+    		.left {
+                    float:      left;
+                    clear:      left;
+                    padding-right: 5px;
+    		}
+                .right_30,
+    		.right {
+                    float:      right;
+                    clear:      right;
+                    padding-left: 5px;
+    		}
+                .left_70 {
+                    width: 70%;
+                }
+                .right_30 {
+                    width: 30%;
+                }
+    		
+    		#sourceCode {
+    		}
+    		
+    		#outputCode {
+    		}
+    		
+    		#outputError,
+    		#outputSymbols {
+                    height: 320px;
+
+                    font-size: 18px;
+                    font-weight: 100;
+
+                    padding: 6px 12px;
+                }
+    		#outputError {
+                    color: #c63;
+    		}
+            .footer {
+                width: 100%;
+                text-align: center;
+                color: #000;
+                float: left;
+                clear: both;
+                font-size: 18px;
+                margin: 32px 0 24px 0;
+            }
+        </style>
+    </head>
+    
+    <body>
+        <script>
             var addScripts = function( prefix, libs ) {
                 var time = new Date();
                 
@@ -107,56 +251,76 @@
                     'runtime.js',
                     'syntax.js'
             ] );
-	    </script>
-		
-		<script>//<![CDATA[
-		    var includeCore = false;
-		    var isAdmin = true;
-		    
-		    function switchIncludeCore() {
-		        includeCore = !includeCore;
-		    }
-		    
-		    function switchIsAdmin() {
-		        isAdmin = !isAdmin;
-		    }
-		    
-	        function setCheckbox( id, checked ) {
-	            document.getElementById( id ).checked = checked;
-	        }
-	        
-            function getSourceFile(url) {
-	            var xmlhttp = new XMLHttpRequest();
-                xmlhttp.overrideMimeType( 'text/plain' );
-	            xmlhttp.open("GET", url, false);
-	            xmlhttp.send();
-
-	            return xmlhttp.responseText;
-	        }
-		    
-            var _result = null;
+        </script>
+        <script>//<![CDATA[
+            var includeCore = false;
+            var isAdmin = true;
+            var debugMode = true;
             
-		    function parseCode( callback ) {
-		        var sourceCode = document.getElementById("sourceCode");
-		        var outputCode = document.getElementById("outputCode");
-		        var outputError = document.getElementById("outputError");
-		        
-		        var parser = new quby.main.Parser();
-		        if ( includeCore ) {
-                    var core = getSourceFile("./core.qb");
-		            parser.parse( core, true );
-		        }
-		        parser.parse( sourceCode.value, isAdmin );
-                parser.finish( function(result) {
-                    outputCode.value = result.getCode();
-                    
-                    var strErr = "";
-                    var errors = result.errors;
-                    for (var i = 0; i < errors.length; i++) {
-                        strErr += errors[i] + "\r\n";
-                    }
+            function switchDebugMode() {
+                debugMode = !debugMode;
+            }
 
-                    outputError.value = strErr;
+            function switchIncludeCore() {
+                includeCore = !includeCore;
+            }
+            
+            function switchIsAdmin() {
+                isAdmin = !isAdmin;
+            }
+                
+            function setCheckbox( id, checked ) {
+                document.getElementById( id ).checked = checked;
+            }
+            
+            function getSourceFile(url) {
+                var xmlhttp = new XMLHttpRequest();
+                xmlhttp.overrideMimeType( 'text/plain' );
+                xmlhttp.open("GET", url, false);
+                xmlhttp.send();
+
+                return xmlhttp.responseText;
+            }
+                
+            var _result = null;
+        
+            function parseCode( callback ) {
+                var sourceCode    = document.getElementById("sourceCode"),
+                    outputCode    = document.getElementById("outputCode"),
+                    outputError   = document.getElementById("outputError"),
+                    outputSymbols = document.getElementById("outputSymbols");
+
+                outputSymbols.value = '';
+
+                var parser = new quby.main.Parser();
+                if ( includeCore ) {
+                    var core = getSourceFile("./core.qb");
+                    parser.parse( core, true );
+                }
+
+                if ( debugMode ) {
+                    parser.parse( sourceCode.value, isAdmin, null, function(symbols, times) {
+                        var displaySymbols = new Array( symbols.length );
+
+                        for ( var i = 0; i < symbols.length; i++ ) {
+                            displaySymbols[i] = symbols[i].displayName;
+                        }
+
+                        outputSymbols.value = displaySymbols.join( "\n" );
+
+                        document.getElementsByClassName( 'controls-time-info' )[0].innerHTML =
+                                "symbols " + times.symbols + "ms<br/>" +
+                                "rules " + times.rules   + "ms" ;
+                    });
+                } else {
+                    parser.parse( sourceCode.value, isAdmin );
+                }
+
+                parser.finish( function(result) {
+                    outputCode.value  = result.getCode();
+                    outputError.value = result.hasErrors() ?
+                            result.errors.join("\r\n") + "\r\n" :
+                            '' ;
                     
                     _result = result;
                     
@@ -164,62 +328,81 @@
                         callback();
                     }
                 } );
-		    }
+            }
 
-		    function runCode() {
+            function runCode() {
                 if ( _result == null ) {
                     parseCode()
                 } else {
                     _result.run();
                 }
-		    }
-		//]]></script>
-		
-        <div id="left">
-		    <h1>In Quby Code...</h1>
-            <textarea class="lineNumbers"></textarea>
-		    <textarea class="codeBox" id="sourceCode" name="sourceCode" type="text"></textarea>
+            }
+        //]]></script>
+
+        <div id="controls">
+            <input class="controls-button button-parse" type="button" value="Parse" onclick="parseCode();" />
+            <input class="controls-button button-run" type="button" value="Run" onclick="runCode();" />
+
+            <form method="post" action="." onsubmit="return false;">
+                <div class="controls-options">
+                    <label>include core.qb</label>
+                    <input id="checkbox_include" type="checkbox" value="include" onclick="switchIncludeCore();" />
+
+                    <br />
+                    <label>debug mode</label>
+                    <input id="checkbox_debug" type="checkbox" value="include" onclick="switchDebugMode();" />
+                    
+                    <br />
+                    <label>parse as admin</label>
+                    <input id="checkbox_is_admin" type="checkbox" value="is_admin" onclick="switchIsAdmin();" />
+                </div>
+            </form>
+
+            <div class="controls-time-info"></div>
+            
+            <script>
+                setCheckbox( 'checkbox_include' , includeCore );
+                setCheckbox( 'checkbox_debug'   , debugMode   );
+                setCheckbox( 'checkbox_is_admin', isAdmin     );
+            </script>
         </div>
 
-        <div id="middle">
-            <h1>Run</h1>
-            <div id="runCode">&nbsp;</div>
-            
-		    <input type="button" value="Parse" onclick="parseCode();" />
-		    <input type="button" value="Run" onclick="runCode();" />
-		    <form method="post" action="." onsubmit="return false;">
-		        <br />
-		        <lable>Include core.qb?</label>
-		        <input id="checkbox_include" type="checkbox" value="include" onclick="switchIncludeCore();" />
-		        
-		        <br />
-		        <br />
-		        <lable>Parse as admin?</label>
-		        <input id="checkbox_is_admin" type="checkbox" value="is_admin" onclick="switchIsAdmin();" />
-		    </form>
-		    
-		    <script>
-		        setCheckbox( 'checkbox_include', includeCore );
-		        setCheckbox( 'checkbox_is_admin', isAdmin );
-		    </script>
+        <div class="left">
+            <h2>in Quby</h2>
+
+            <div class="code-wrap">
+                <div class="line-numbers"></div>
+                <textarea spellcheck="false" class="codeBox" id="sourceCode" name="sourceCode" type="text"></textarea>
+            </div>
         </div>
         
-        <div id="right">
-		    <h1>Out JavaScript...</h1>
-            <textarea class="lineNumbers"></textarea>
-		    <textarea class="codeBox" id="outputCode" name="outputCode" type="text"></textarea>
+        <div class="right">
+    	    <h2>out JavaScript</h2>
+
+            <div class="code-wrap">
+                <textarea spellcheck="false" class="codeBox" id="outputCode" name="outputCode" type="text"></textarea>
+                <div class="line-numbers"></div>
+            </div>
         </div>
 
-        <div id="footer">
-		    <h1>Errors...</h1>
-		    <textarea class="codeBox" id="outputError" name="outputError" type="text"></textarea>
+        <div class="left_70">
+            <h2>compilation errors</h2>
+            <textarea id="outputError" name="outputError" type="text"></textarea>
+        </div>
+        <div class="right_30">
+            <h2>symbols</h2>
+            <textarea spellcheck="false" id="outputSymbols" name="outputSymbols" type="text"></textarea>
+        </div>
+
+        <div class="footer">
+            Quby copyright PlayMyCode 2012
         </div>
         
         <!-- Clear error and code gen text areas -->
         <script type="text/javascript">
             document.getElementById('outputCode').value = '';
-	        document.getElementById('outputError').value = '';
-	    </script>
+            document.getElementById('outputError').value = '';
+        </script>
         
         <script id="example_code" type="quby">//<![CDATA[
             class Foo
@@ -240,8 +423,8 @@
             end
         //]]></script>
         
-		<!-- Load example testing source-code -->
-		<script>//<![CDATA[
+    	<!-- Load example testing source-code -->
+    	<script>//<![CDATA[
             var code = document.getElementById("example_code").innerHTML;
             
             // remove the CDATA surround
@@ -276,32 +459,25 @@
             }
             document.getElementById("sourceCode").value = lines.join("\n");
                     ;
-		//]]></script>
-		
-		<!-- Area for inputting random bits of JavaScript testing -->
-		<p>
-			<script>
-			</script>
-		</p>
+    	//]]></script>
 
         <!-- Add line numbers to the text bits -->
         <script>
             var numbers = '';
             for (var i = 1; i < 50; i++) {
-                numbers += i + "\n";
+                numbers += i + "<br/>";
             }
-            var objs = document.getElementsByTagName( 'textarea' );
+            var objs = document.getElementsByClassName( 'line-numbers' );
             
             for (i = 0; i < objs.length; i++) {
                 var obj = objs[i];
-                if (obj.className == 'lineNumbers') {
-                    obj.value = numbers;
-                }
+
+                obj.innerHTML = numbers;
             }
         </script>
         
         <script>
             parseCode();
         </script>
-	</body>
+    </body>
 </html>

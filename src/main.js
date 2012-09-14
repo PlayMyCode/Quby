@@ -19,29 +19,49 @@ var quby = window['quby'] || {};
         parserStack: [],
 
         /**
-        * Main parser engine running code.
-        */
+         * Main parser engine running code.
+         */
         currentParser: function () {
             return quby.main.parserStack[quby.main.parserStack.length - 1];
         },
 
         /**
-        *
-        */
+         *
+         */
         parse: function (source, adminMode, callback) {
             var factory = new quby.main.Parser();
+
             factory.parse(source, adminMode, function() {
                 factory.finish(callback);
             });
         },
 
         /**
-        * This is for using multiple parsers together, for parsing multiple files.
-        */
+         * This is for using multiple parsers together, for parsing multiple files.
+         *
+         * You can imagine a program is built from multiple files.
+         * This is how parsing is based; you call a method to provide
+         * a file until they are all provided. Then you call 'finish'
+         * to finish compilation and generate the actual JS application.
+         *
+         * Some of these files may have different permissions;
+         * core files with admin rights, and user files without these rights.
+         * The various methods allow you to state what can do what.
+         */
         Parser: function () {
             this.validator = new quby.main.Validator();
 
-            this.parse = function( source, adminMode, callback ) {
+            /**
+             * Parse a single file, adding it to the program being built.
+             *
+             * If a debugCallback is provided, then it will be called during
+             * the parsing process. This makes parsing a tad slower, but provides
+             * you with information on how it wen't (like the symbols generated
+             * and how long the different stages took).
+             *
+             * If no debugCallback is provided, then it is run normally.
+             */
+            this.parse = function( source, adminMode, callback, debugCallback ) {
                 this.validator.isAdminMode = adminMode;
                 var _this  = this,
                     parser = new quby.main.ParserInner( source );
@@ -55,10 +75,11 @@ var quby = window['quby'] || {};
                                         parser.validate( _this.validator );
                                         quby.main.parserStack.pop();
 
-                                        if ( callback !== undefined ) {
+                                        if ( callback !== undefined && callback !== null ) {
                                             util.future.runFun( callback );
                                         }
-                                    }
+                                    },
+                                    debugCallback
                             );
                         }
                 );
@@ -115,147 +136,164 @@ var quby = window['quby'] || {};
         },
 
         /**
-        * Result
-        *
-        * Handles creation and the structures for the object you get back from the parser.
-        *
-        * Essentially anything which crosses from the parser to the caller is stored and
-        * handled by the contents of this script.
-        */
-        Result: function (code, errors) {
-            this.program = code;
-            this.errors = errors;
+         * Result
+         *
+         * Handles creation and the structures for the object you get back from the parser.
+         *
+         * Essentially anything which crosses from the parser to the caller is stored and
+         * handled by the contents of this script.
+         */
+        Result: (function() {
+            var Result = function( code, errors ) {
+                this.program = code;
+                this.errors  = errors;
+            }
 
-            // default error behaviour
-            this.onError = function (ex) {
-                var errorMessage = ex.name + ': ' + ex.message;
-                if (ex.stack) {
-                    errorMessage += '\n\n' + ex.stack;
+            Result.prototype = {
+                // default error behaviour
+                onError: function( ex ) {
+                    var errorMessage = ex.name + ': ' + ex.message;
+
+                    if ( ex.stack ) {
+                        errorMessage += '\n\n' + ex.stack;
+                    }
+
+                    alert( errorMessage );
+                },
+
+                /**
+                 * Sets the function to run when this fails to run.
+                 * By default this is an alert message displaying the error that has
+                 * occurred.
+                 *
+                 * The function needs one parameter for taking an Error object that was
+                 * caught.
+                 *
+                 * @param fun The function to run when an error has occurred at runtime.
+                 */
+                setOnError: function( fun ) {
+                    this.onError = fun;
+                },
+
+                /**
+                 * @return Returns the Quby application in it's compiled JavaScript form.
+                 */
+                getCode: function() {
+                    return this.program;
+                },
+
+                /**
+                 * @return True if there were errors within the result, otherwise false if there are no errors.
+                 */
+                hasErrors: function() {
+                    return this.errors.length > 0;
+                },
+
+                /**
+                 * This is boiler plate to call quby.runtime.runCode for you using the
+                 * code stored in this Result object and the onError function set.
+                 */
+                run: function() {
+                    if (!this.hasErrors()) {
+                        quby.runtime.runCode(this.getCode(), this.onError);
+                    }
                 }
+            }
 
-                alert(errorMessage);
-            };
-
-            /**
-            * Sets the function to run when this fails to run.
-            * By default this is an alert message displaying the error that has
-            * occurred.
-            *
-            * The function needs one parameter for taking an Error object that was
-            * caught.
-            *
-            * @param fun The function to run when an error has occurred at runtime.
-            */
-            this.setOnError = function (fun) {
-                this.onError = fun;
-            };
-
-            /**
-            * @return Returns the Quby application in it's compiled JavaScript form.
-            */
-            this.getCode = function () {
-                return this.program;
-            };
-
-            /**
-            * @return True if there were errors within the result, otherwise false if there are no errors.
-            */
-            this.hasErrors = function () {
-                return this.errors.length > 0;
-            };
-
-            /**
-            * This is boiler plate to call quby.runtime.runCode for you using the
-            * code stored in this Result object and the onError function set.
-            */
-            this.run = function () {
-                if (!this.hasErrors()) {
-                    quby.runtime.runCode(this.getCode(), this.onError);
-                }
-            };
-        },
+            return Result;
+        })(),
 
         /**
          * For creating a new Parser object.
          *
          * @param source The source code to parse.
          */
-        ParserInner: function( source ) {
-            this.errors = null;
-            this.program = null;
-            this.source = new quby.main.SourceLines(source);
-            this.parseErr = null;
+        ParserInner: (function() {
+            var ParserInner = function( source ) {
+                this.errors   = null;
+                this.program  = null;
+                this.parseErr = null;
+                this.source   = new quby.main.SourceLines( source );
+            }
 
-            this.run = function( callback ) {
-                var _this = this;
+            ParserInner.prototype = {
+                run: function( callback, debugCallback ) {
+                    var _this = this;
 
-                quby.parser.parse( _this.source.getSource(), function(program, errors) {
-                    if ( errors.length > 0 ) {
-                        _this.errors = _this.formatErrors( _this.source, errors );
-                    }
+                    quby.parser.parse(
+                            _this.source.getSource(),
+                            function(program, errors) {
+                                if ( errors.length > 0 ) {
+                                    _this.errors = _this.formatErrors( _this.source, errors );
+                                }
 
-                    _this.program = program;
+                                _this.program = program;
 
-                    callback();
-                } );
-            };
+                                callback();
+                            },
+                            debugCallback
+                    );
+                },
 
-            /*
-             * TODO update this to use the new parser error format.
-             */
-            /**
-             * Turns the given errors into the output string
-             * that should be displayed for the user.
-             *
-             * You can imagine that this is the checkpoint
-             * between whatever internal format we use, and
-             * what the outside world is going to see.
-             *
-             * @param src The source code object used for finding the lines.
-             * @param errors The errors to parse.
-             * @return An array containing the information for each error to display.
-             */
-            this.formatErrors = function( src, errors ) {
-                var errs = [];
+                /*
+                 * TODO update this to use the new parser error format.
+                 */
+                /**
+                 * Turns the given errors into the output string
+                 * that should be displayed for the user.
+                 *
+                 * You can imagine that this is the checkpoint
+                 * between whatever internal format we use, and
+                 * what the outside world is going to see.
+                 *
+                 * @param src The source code object used for finding the lines.
+                 * @param errors The errors to parse.
+                 * @return An array containing the information for each error to display.
+                 */
+                formatErrors: function( src, errors ) {
+                    var errs = [];
 
-                for (var i = 0; i < errors.length; i++) {
-                    var error   = errors[i],
-                        errLine = src.getLine( error.offset ),
-                        strErr;
+                    for (var i = 0; i < errors.length; i++) {
+                        var error   = errors[i],
+                            errLine = src.getLine( error.offset ),
+                            strErr;
 
-                    if ( error.isSymbol ) {
-                        strErr = "error parsing '" + error.match + "'";
-                    } else if ( error.isTerminal ) {
-                        if ( error.isLiteral || util.string.trim(error.match) === '' ) {
-                            strErr = "error, unexpected '" + error.terminalName + "'";
+                        if ( error.isSymbol ) {
+                            strErr = "error parsing '" + error.match + "'";
+                        } else if ( error.isTerminal ) {
+                            if ( error.isLiteral || util.string.trim(error.match) === '' ) {
+                                strErr = "error, unexpected '" + error.terminalName + "'";
+                            } else {
+                                strErr = "error, unexpected " + error.terminalName + " '" + error.match + "'";
+                            }
                         } else {
-                            strErr = "error, unexpected " + error.terminalName + " '" + error.match + "'";
+                            throw new Error("Unknown parse.js error given to format");
                         }
+
+                        errs.push({
+                                line: errLine,
+                                msg : strErr
+                        });
+                    }
+
+                    return errs;
+                },
+
+                validate: function (validator) {
+                    var es = this.errors;
+
+                    if ( es === null ) {
+                        validator.addProgram( this.program );
                     } else {
-                        throw new Error("Unknown parse.js error given to format");
-                    }
-
-                    errs.push({
-                            line: errLine,
-                            msg : strErr
-                    });
-                }
-
-                return errs;
-            };
-
-            this.validate = function (validator) {
-                var es = this.errors;
-
-                if ( es === null ) {
-                    validator.addProgram( this.program );
-                } else {
-                    for (var i = 0; i < es.length; i++) {
-                        validator.parseErrorLine(es[i].line, es[i].msg);
+                        for (var i = 0; i < es.length; i++) {
+                            validator.parseErrorLine(es[i].line, es[i].msg);
+                        }
                     }
                 }
-            };
-        },
+            }
+
+            return ParserInner;
+        })(),
 
         /**
         * SourceLines deals with translations made to an original source code file.
