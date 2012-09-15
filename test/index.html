@@ -129,6 +129,8 @@
                     float: right; 
                     clear: right;
                     text-align: right;
+                    font-size : 18px;
+                    margin-top: -9px;
                 }
     		
     	    .line-numbers {
@@ -309,8 +311,10 @@
                         outputSymbols.value = displaySymbols.join( "\n" );
 
                         document.getElementsByClassName( 'controls-time-info' )[0].innerHTML =
+                                "compile " + times.compile + "ms<br/>" +
                                 "symbols " + times.symbols + "ms<br/>" +
-                                "rules " + times.rules   + "ms" ;
+                                "rules " + times.rules   + "ms<br/>" +
+                                "total " + times.total   + "ms" ;
                     });
                 } else {
                     parser.parse( sourceCode.value, isAdmin );

@@ -1420,6 +1420,11 @@ var parse = window['parse'] = (function( window, undefined ) {
         this.compiledLookups = null;
 
         /**
+         * Records how long the call to 'compile' takes to execute.
+         */
+        this.compileTime = 0;
+
+        /**
          * The global parse instance this is working with.
          *
          * @const
@@ -1817,7 +1822,9 @@ var parse = window['parse'] = (function( window, undefined ) {
      */
     ParserRule.prototype['compile'] = function() {
         if ( this.compiled === null ) {
+            var start = Date.now();
             this.compiled = this.optimize();
+            this.compileTime = Date.now() - start;
         } else {
             this.clearRecursionFlag();
         }
@@ -1879,12 +1886,13 @@ var parse = window['parse'] = (function( window, undefined ) {
         }
     }
 
-    var callParseDebug = function( debugCallback, symbols, symbolTime, rulesTime ) {
+    var callParseDebug = function( debugCallback, symbols, compileTime, symbolTime, rulesTime, totalTime ) {
         if ( debugCallback ) {
             var times = {};
+            times['compile'] = compileTime;
             times['symbols'] = symbolTime;
             times['rules']   = rulesTime ;
-            times['total']   = symbolTime + rulesTime ;
+            times['total']   = totalTime ;
 
             debugCallback( symbols.getTerminals(), times );
         }
@@ -2083,23 +2091,31 @@ var parse = window['parse'] = (function( window, undefined ) {
         }
 
         var self  = this,
-            symbolsStart = Date.now();
+            compileTime = this.compileTime,
+            start = Date.now();
 
-        this.parseSymbols( input, parseInput, function(symbols) {
-            var rulesStart = Date.now(),
-                symbolTime = rulesStart - symbolsStart,
-                rulesTime  = 0;
-
+        this.parseSymbols( input, parseInput, function(symbols, symbolsTime) {
             if ( symbols.hasErrors() ) {
-                callParseDebug( debugCallback, symbols, symbolTime, rulesTime );
                 callback( [], symbols.getErrors() );
+                callParseDebug( debugCallback, symbols,
+                        compileTime,
+                        symbolsTime,
+                        0,
+                        Date.now() - start
+                );
             } else {
+                var rulesStart = Date.now();
                 var result = self.parseRules( symbols, input, parseInput );
-                rulesTime = Date.now() - rulesStart;
+                var rulesTime = Date.now() - rulesStart;
 
                 window['util']['future']['run']( function() {
-                    callParseDebug( debugCallback, symbols, symbolTime, rulesTime );
                     callback( result.result, result.errors );
+                    callParseDebug( debugCallback, symbols,
+                            compileTime,
+                            symbolsTime,
+                            rulesTime,
+                            Date.now() - start
+                    );
                 } );
             }
         })
@@ -2142,13 +2158,15 @@ var parse = window['parse'] = (function( window, undefined ) {
         var _this = this;
 
         window['util']['future']['run']( function() {
-            callback(
-                    _this.parseSymbolsInner(
-                            input,
-                            parseInput,
-                            _this.parseParent.timeSymbolsFlag
-                    )
+            var start = Date.now();
+            var symbols = _this.parseSymbolsInner(
+                    input,
+                    parseInput,
+                    _this.parseParent.timeSymbolsFlag
             );
+            var time = Date.now() - start;
+
+            callback( symbols, time );
         } );
     };
 

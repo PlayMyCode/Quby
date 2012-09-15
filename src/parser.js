@@ -839,7 +839,9 @@ var quby = window['quby'] || {};
 
     var statements = parse.
             optional( statementSeperator ).
-            repeatSeperator( statement, statementSeperator ).
+            optional(
+                    parse.repeatSeperator( statement, statementSeperator )
+            ).
             optional( statementSeperator ).
             onMatch( function(onStart, stmts, endEnd) {
                 if ( stmts === null ) {
@@ -1445,6 +1447,7 @@ var quby = window['quby'] || {};
                     terminals.admin.inline,
                     terminals.admin.preInline
             );
+
     /**
      * Format the terminal name into a readable one, i.e.
      *     'ELSE_IF' => 'else if'
