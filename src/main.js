@@ -262,9 +262,9 @@ var quby = window['quby'] || {};
                             strErr = "error parsing '" + error.match + "'";
                         } else if ( error.isTerminal ) {
                             if ( error.isLiteral || util.string.trim(error.match) === '' ) {
-                                strErr = "error, unexpected '" + error.terminalName + "'";
+                                strErr = "syntax error near '" + error.terminalName + "'";
                             } else {
-                                strErr = "error, unexpected " + error.terminalName + " '" + error.match + "'";
+                                strErr = "syntax error near " + error.terminalName + " '" + error.match + "'";
                             }
                         } else {
                             throw new Error("Unknown parse.js error given to format");
@@ -849,7 +849,7 @@ var quby = window['quby'] || {};
             };
 
             this.parseErrorLine = function (line, msg) {
-                this.errors.push("on line " + line + ", " + msg);
+                this.errors.push("line " + line + ", " + msg);
             };
 
             this.getErrors = function () {
@@ -1547,93 +1547,120 @@ var quby = window['quby'] || {};
             };
         },
 
-        Printer: function (validator) {
+        Printer: (function() {
             var STATEMENT_END = ';\n';
 
-            this.validator = validator;
+            var Printer = function (validator) {
+                this.validator = validator;
 
-            this.tempVarCounter = 0;
+                this.tempVarCounter = 0;
 
-            this.isCode = true;
-            this.pre   = [];
-            this.stmts = [];
-            this.preOrStmts = this.stmts;
+                this.isCode = true;
+                this.pre   = [];
+                this.stmts = [];
+                this.preOrStmts = this.stmts;
 
-            this.currentPre = new quby.main.PrinterStatement();
-            this.currentStmt = new quby.main.PrinterStatement();
-            this.current = this.currentStmts;
+                this.currentPre  = new quby.main.PrinterStatement();
+                this.currentStmt = new quby.main.PrinterStatement();
+                this.current     = this.currentStmts;
 
-            this.getTempVariable = function() {
-                return quby.runtime.TEMP_VARIABLE + (this.tempVarCounter++);
-            };
+                Object.preventExtensions( this );
+            }
 
-            this.getValidator = function () {
-                return this.validator;
-            };
+            Printer.prototype = {
+                getTempVariable: function() {
+                    return quby.runtime.TEMP_VARIABLE + (this.tempVarCounter++);
+                },
 
-            this.setCodeMode = function (isCode) {
-                if ( isCode ) {
-                    this.current = this.currentStmt;
-                    this.preOrStmts = this.stmts;
-                } else {
-                    this.current = this.currentPre;
-                    this.preOrStmts = this.pre;
-                }
+                getValidator: function () {
+                    return this.validator;
+                },
 
-                this.isCode = isCode;
-            };
-
-            this.appendExtensionClassStmts = function (name, stmts) {
-                var stmtsStart = quby.runtime.translateClassName(name) + '.prototype.';
-
-                for (var key in stmts) {
-                    var fun = stmts[key];
-
-                    if ( fun.isConstructor ) {
-                        fun.print( this );
+                setCodeMode: function (isCode) {
+                    if ( isCode ) {
+                        this.current = this.currentStmt;
+                        this.preOrStmts = this.stmts;
                     } else {
-                        this.append(stmtsStart);
-                        fun.print(this);
+                        this.current = this.currentPre;
+                        this.preOrStmts = this.pre;
                     }
 
-                    this.endStatement();
-                }
-            };
+                    this.isCode = isCode;
+                },
 
-            this.printArray = function(arr) {
-                for (
-                        var i = 0, len = arr.length;
-                        i < len;
-                        i++
-                ) {
-                    arr[i].print( this );
-                    this.endStatement();
-                }
-            };
+                appendExtensionClassStmts: function (name, stmts) {
+                    var stmtsStart = quby.runtime.translateClassName(name) + '.prototype.';
 
-            this.addStatement = function () {
-                this.stmts.push(arguments.join(''));
-            };
+                    for (var key in stmts) {
+                        var fun = stmts[key];
+
+                        if ( fun.isConstructor ) {
+                            fun.print( this );
+                        } else {
+                            this.append(stmtsStart);
+                            fun.print( this );
+                        }
+
+                        this.endStatement();
+                    }
+                },
+
+                printArray: function(arr) {
+                    for (
+                            var i = 0, len = arr.length;
+                            i < len;
+                            i++
+                    ) {
+                        arr[i].print( this );
+                        this.endStatement();
+                    }
+                },
+
+                addStatement: function() {
+                    this.stmts.push( arguments.join('') );
+                },
+
+                flush: function() {
+                    this.current.flush( this.preOrStmts );
+
+                    return this;
+                },
+
+                endStatement: function () {
+                    this.append( STATEMENT_END );
+
+                    return this.flush();
+                },
+
+                toString: function () {
+                    // concat everything into this.pre ...
+                    this.currentPre.flush( this.pre );
+                    util.array.addAll( this.pre, this.stmts );
+                    this.currentStmt.flush( this.pre ); // yes, pass in pre!
+
+                    return this.pre.join('');
+                }
+            }
 
             // Chrome is much faster at iterating over the arguments array,
             // maybe I'm hitting an optimization???
             // see: http://jsperf.com/skip-arguments-check
             if ( util.browser.isChrome ) {
-                this.appendPre = function () {
+                Printer.prototype.appendPre = function () {
                     for ( var i = 0; i < arguments.length; i++ ) {
                         this.current.appendPre(arguments[i]);
                     }
 
                     return this;
                 };
-                this.append = function () {
+                Printer.prototype.append = function () {
                     for ( var i = 0; i < arguments.length; i++ ) {
                         this.current.appendNow(arguments[i]);
                     }
 
                     return this;
                 };
-                this.appendPost = function () {
+                Printer.prototype.appendPost = function () {
                     for ( var i = 0; i < arguments.length; i++ ) {
                         this.current.appendPost(arguments[i]);
                     }
@@ -1641,7 +1668,7 @@ var quby = window['quby'] || {};
                     return this;
                 };
             } else {
-                this.appendPre = function (a) {
+                Printer.prototype.appendPre = function (a) {
                     if ( arguments.length === 1 ) {
                         this.current.appendPre( a );
                     } else {
@@ -1652,7 +1679,7 @@ var quby = window['quby'] || {};
 
                     return this;
                 };
-                this.append = function (a) {
+                Printer.prototype.append = function (a) {
                     if ( arguments.length === 1 ) {
                         this.current.appendNow( a );
                     } else {
@@ -1663,7 +1690,7 @@ var quby = window['quby'] || {};
 
                     return this;
                 };
-                this.appendPost = function (a) {
+                Printer.prototype.appendPost = function (a) {
                     if ( arguments.length === 1 ) {
                         this.current.appendPost( a );
                     } else {
@@ -1676,113 +1703,109 @@ var quby = window['quby'] || {};
                 };
             }
 
-            this.flush = function() {
-                this.current.flush( this.preOrStmts );
+            return Printer;
+        })(),
 
-                return this;
-            };
-
-            this.endStatement = function () {
-                this.append( STATEMENT_END );
-                return this.flush();
-            };
-
-            this.toString = function () {
-                // concat everything into this.pre ...
-                this.currentPre.flush( this.pre );
-                util.array.addAll( this.pre, this.stmts );
-                this.currentStmt.flush( this.pre ); // yes, pass in pre!
-
-                return this.pre.join('');
-            };
-        },
-
-        PrinterStatement: function () {
-            this.preStatement = null;
-            this.currentStatement = null;
-            this.postStatement = null;
-
-            this.appendPre = function (e) {
-                if (this.preStatement == null) {
-                    this.preStatement = [e];
-                } else {
-                    this.preStatement.push( e );
-                }
-            };
-            this.appendNow = function (e) {
-                if (this.currentStatement == null) {
-                    this.currentStatement = [e];
-                } else {
-                    this.currentStatement.push( e );
-                }
-            };
-            this.appendPost = function (e) {
-                if (this.postStatement == null) {
-                    this.postStatement = [e];
-                } else {
-                    this.postStatement.push( e );
-                }
-            };
-
-            this.endAppend = function( dest, src ) {
-                for (
-                        var i = 0, len = src.length;
-                        i < len;
-                        i++
-                ) {
-                    dest[ dest.length ] = src[i];
-                }
-            };
-
-            this.flush = function ( stmts ) {
-                if (this.preStatement != null) {
-                    if (this.currentStatement != null) {
-                        if (this.postStatement != null) {
-                            this.endAppend( stmts, this.preStatement );
-                            this.endAppend( stmts, this.currentStatement );
-                            this.endAppend( stmts, this.postStatement );
-                        } else {
-                            this.endAppend( stmts, this.preStatement );
-                            this.endAppend( stmts, this.currentStatement );
-                        }
-                    } else if (this.postStatement != null) {
-                        this.endAppend( stmts, this.preStatement );
-                        this.endAppend( stmts, this.postStatement );
-                    } else {
-                        this.endAppend( stmts, this.preStatement );
-                    }
-
-                    this.clear();
-                } else if (this.currentStatement != null) {
-                    if (this.postStatement != null) {
-                        this.endAppend( stmts, this.currentStatement );
-                        this.endAppend( stmts, this.postStatement );
-                    } else {
-                        this.endAppend( stmts, this.currentStatement );
-                    }
-
-                    this.clear();
-                } else if ( this.postStatement != null ) {
-                    this.endAppend( stmts, this.postStatement );
-
-                    this.clear();
-                }
-            };
-
-            this.clear = function () {
+        PrinterStatement: (function() {
+            var PrinterStatement = function () {
                 this.preStatement     = null;
                 this.currentStatement = null;
                 this.postStatement    = null;
-            };
-        },
 
-        LineInfo: function (offset, source) {
-            this.offset = offset;
-            this.source = source;
+                Object.preventExtensions( this );
+            }
 
-            this.getLine = function () {
+            PrinterStatement.prototype = {
+                appendPre: function (e) {
+                    if (this.preStatement === null) {
+                        this.preStatement = [e];
+                    } else {
+                        this.preStatement.push( e );
+                    }
+                },
+                appendNow: function (e) {
+                    if (this.currentStatement === null) {
+                        this.currentStatement = [e];
+                    } else {
+                        this.currentStatement.push( e );
+                    }
+                },
+                appendPost: function (e) {
+                    if (this.postStatement === null) {
+                        this.postStatement = [e];
+                    } else {
+                        this.postStatement.push( e );
+                    }
+                },
+
+                endAppend: function( dest, src ) {
+                    for (
+                            var i = 0, len = src.length;
+                            i < len;
+                            i++
+                    ) {
+                        dest[ dest.length ] = src[i];
+                    }
+                },
+
+                flush: function ( stmts ) {
+                    if (this.preStatement !== null) {
+                        if (this.currentStatement !== null) {
+                            if (this.postStatement !== null) {
+                                this.endAppend( stmts, this.preStatement );
+                                this.endAppend( stmts, this.currentStatement );
+                                this.endAppend( stmts, this.postStatement );
+                            } else {
+                                this.endAppend( stmts, this.preStatement );
+                                this.endAppend( stmts, this.currentStatement );
+                            }
+                        } else if (this.postStatement !== null) {
+                            this.endAppend( stmts, this.preStatement );
+                            this.endAppend( stmts, this.postStatement );
+                        } else {
+                            this.endAppend( stmts, this.preStatement );
+                        }
+
+                        this.clear();
+                    } else if (this.currentStatement !== null) {
+                        if (this.postStatement !== null) {
+                            this.endAppend( stmts, this.currentStatement );
+                            this.endAppend( stmts, this.postStatement );
+                        } else {
+                            this.endAppend( stmts, this.currentStatement );
+                        }
+
+                        this.clear();
+                    } else if ( this.postStatement !== null ) {
+                        this.endAppend( stmts, this.postStatement );
+
+                        this.clear();
+                    }
+                },
+
+                clear: function () {
+                    this.preStatement     = null;
+                    this.currentStatement = null;
+                    this.postStatement    = null;
+                }
+            }
+
+            return PrinterStatement;
+        })(),
+
+        LineInfo: (function() {
+            var LineInfo = function (offset, source) {
+                this.offset = offset;
+                this.source = source;
+
+                Object.preventExtensions( this );
+            }
+
+            LineInfo.prototype.getLine = function () {
                 return this.source.getLine(this.offset);
-            };
-        }
+            }
+
+            return LineInfo;
+        })()
     };
 })( quby, util );

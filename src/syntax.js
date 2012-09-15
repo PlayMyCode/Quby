@@ -53,9 +53,9 @@ var quby = window['quby'] || {};
          * Do not extend this! Extend the Syntax one instead.
          */
         EmptyStub: function( offset ) {
-            this.offst = offset;
+            this.offst    = offset;
             this.validate = function(v){};
-            this.print = function(p){};
+            this.print    = function(p){};
         },
 
         /*

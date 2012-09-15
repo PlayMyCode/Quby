@@ -1190,7 +1190,7 @@ var quby = window['quby'] || {};
                 return new quby.syntax.Lambda( params, stmts );
             });
 
-    var functionalCall = parse.
+    var functionCall = parse.
             a( terminals.identifiers.variableName ).
             then( parameterExprs ).
             optional( block ).
@@ -1246,7 +1246,7 @@ var quby = window['quby'] || {};
 
                     newInstance,
 
-                    functionalCall,
+                    functionCall,
                     methodCall,
 
                     variables,
@@ -1279,13 +1279,18 @@ var quby = window['quby'] || {};
             } );
 
     var arrayAssignment = parse.
-            a( arrayAccess, terminals.ops.assignment, expr ).
+            a( arrayAccess ).
+            then( terminals.ops.assignment ).
+            then( expr ).
             onMatch( function( array, equal, value ) {
                 return new quby.syntax.ArrayAssignment( array, value );
             });
 
     var assignment = parse.
-            either( variableAssignment, arrayAssignment );
+            either(
+                    arrayAssignment,
+                    variableAssignment
+            );
 
     /*
      * Definitions
@@ -1423,12 +1428,11 @@ var quby = window['quby'] || {};
                     }
                 } );
 
-    statement = statement.either(
+window.foo = arrayAssignment;
+    statement.either(
                     functionDefinition,
                     classDefinition,
                     moduleDefinition,
-
-                    assignment,
 
                     ifStatement,
                     whileUntilStatement,
@@ -1437,8 +1441,13 @@ var quby = window['quby'] || {};
                     yieldStatement,
                     returnStatement,
 
-                    functionalCall,
+                    functionCall,
+
+                    arrayAssignment,
                     methodCall,
+
+                    variableAssignment,
+
 
 /*
                     moduleDef,

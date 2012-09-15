@@ -16,19 +16,19 @@ function noSuchMethodError(_this, callName) {
 };
 
 /**
-* This is the yield function. If a block is given then it is called using the
-* arguments given. If a negative object is given instead (such as false,
-* undefined or null) then a 'missingBlockError' will be thrown.
-* 
-* The intention is that inlined JavaScript can just pass their blocks along
-* to this function, and it'll call it the same as it would in normal
-* translated Quby code.
-* 
-* Any arguments for the block can be passed in after the first parameter.
-* 
-* @param block The block function to call with this function.
-* @return The result from calling the given block.
-*/
+ * This is the yield function. If a block is given then it is called using the
+ * arguments given. If a negative object is given instead (such as false,
+ * undefined or null) then a 'missingBlockError' will be thrown.
+ * 
+ * The intention is that inlined JavaScript can just pass their blocks along
+ * to this function, and it'll call it the same as it would in normal
+ * translated Quby code.
+ * 
+ * Any arguments for the block can be passed in after the first parameter.
+ * 
+ * @param block The block function to call with this function.
+ * @return The result from calling the given block.
+ */
 function quby_callBlock(block, args) {
     if (!block) {
         quby.runtime.missingBlockError();
@@ -57,15 +57,15 @@ function quby_ensureBlock(block, numArgs) {
 }
 
 /**
-* Checks if the value given exists, and if it does then it is returned.
-* If it doesn't then an exception is thrown. This is primarily for use with globals.
-* 
-* The given name is for debugging, the name of the variable to show in the error if it doesn't exist.
-* 
-* @param global The global variable to check for existance.
-* @param name The name of the global variable given, for debugging purposes.
-* @return The global given.
-*/
+ * Checks if the value given exists, and if it does then it is returned.
+ * If it doesn't then an exception is thrown. This is primarily for use with globals.
+ * 
+ * The given name is for debugging, the name of the variable to show in the error if it doesn't exist.
+ * 
+ * @param global The global variable to check for existance.
+ * @param name The name of the global variable given, for debugging purposes.
+ * @return The global given.
+ */
 function quby_checkGlobal(global, name) {
     if (global === undefined) {
         quby.runtime.runtimeError("Global variable accessed before being assigned to: '" + name + "'.");
@@ -75,19 +75,19 @@ function quby_checkGlobal(global, name) {
 }
 
 /**
-* Checks if the field given exists. It exists if it is not undefined. The field should be a name of
-* a field to access and the name is the fields name when shown in a thrown error.
-* 
-* An error will be thrown if a field of the given field name (the field parameter)
-* does not exist within the object given.
-* 
-* If the field does exist then it's value is returned.
-* 
-* @param fieldVal The value of the field to check if it exists or not.
-* @param obj The object you are retrieving the field from.
-* @param name The name to show in an error for the name of the field (if an error is thrown).
-* @return The value stored under the field named in the object given.
-*/
+ * Checks if the field given exists. It exists if it is not undefined. The field should be a name of
+ * a field to access and the name is the fields name when shown in a thrown error.
+ * 
+ * An error will be thrown if a field of the given field name (the field parameter)
+ * does not exist within the object given.
+ * 
+ * If the field does exist then it's value is returned.
+ * 
+ * @param fieldVal The value of the field to check if it exists or not.
+ * @param obj The object you are retrieving the field from.
+ * @param name The name to show in an error for the name of the field (if an error is thrown).
+ * @return The value stored under the field named in the object given.
+ */
 function quby_getField(fieldVal, obj, name) {
     if (fieldVal === undefined) {
         quby.runtime.fieldNotFoundError(obj, name);
@@ -97,19 +97,19 @@ function quby_getField(fieldVal, obj, name) {
 }
 
 /**
-* Sets a value to an array given using the given key and value.
-* If the array given is not a QubyArray then an exception is thrown.
-* If the collection given has a 'set' method, then it is considered
-* to be a collection.
-* 
-* This is the standard function used by compiled Quby code for
-* setting values to an collection.
-* 
-* @param collection An collection to test for being a collection.
-* @param key The key for where to store the value given.
-* @param value The value to store under the given key.
-* @return The result of setting the value.
-*/
+ * Sets a value to an array given using the given key and value.
+ * If the array given is not a QubyArray then an exception is thrown.
+ * If the collection given has a 'set' method, then it is considered
+ * to be a collection.
+ * 
+ * This is the standard function used by compiled Quby code for
+ * setting values to an collection.
+ * 
+ * @param collection An collection to test for being a collection.
+ * @param key The key for where to store the value given.
+ * @param value The value to store under the given key.
+ * @return The result of setting the value.
+ */
 function quby_setCollection(collection, key, value) {
     if ( collection === null ) {
         quby.runtime.runtimeError( "Collection is null when setting a value" );
@@ -123,17 +123,17 @@ function quby_setCollection(collection, key, value) {
 }
 
 /**
-* Gets a value from the given collection using the key given.
-* If the collection given has a 'get' method, then it is considered
-* to be a collection.
-* 
-* This is the standard function used in compiled Quby code for
-* accessing an array.
-* 
-* @param collection An collection to test for being a collection.
-* @param key The key for the element to fetch.
-* @return The value stored under the given key in the given collection.
-*/
+ * Gets a value from the given collection using the key given.
+ * If the collection given has a 'get' method, then it is considered
+ * to be a collection.
+ * 
+ * This is the standard function used in compiled Quby code for
+ * accessing an array.
+ * 
+ * @param collection An collection to test for being a collection.
+ * @param key The key for the element to fetch.
+ * @return The value stored under the given key in the given collection.
+ */
 function quby_getCollection(collection, key) {
     if ( collection === null ) {
         quby.runtime.runtimeError( "Collection is null when getting a value" );
@@ -148,21 +148,21 @@ function quby_getCollection(collection, key) {
 
 (function( quby, util ) {
     /**
-    * Runtime
-    * 
-    * Functions and objects which may be used at runtime (i.e.
-    * inside inlined JavaScript) are defined here. This includes
-    * functions for uniquely formatting variables and functions.
-    * 
-    * All compiled Quby code should run perfectly with only this
-    * class. Everything outside of this class is not needed for
-    * compiled code to be run.
-    */
+     * Runtime
+     * 
+     * Functions and objects which may be used at runtime (i.e.
+     * inside inlined JavaScript) are defined here. This includes
+     * functions for uniquely formatting variables and functions.
+     * 
+     * All compiled Quby code should run perfectly with only this
+     * class. Everything outside of this class is not needed for
+     * compiled code to be run.
+     */
     /*
-    * Note there are constants defined at the end of this file,
-    * this is due to limitations in using JSON objects for
-    * namespaces.
-    */
+     * Note there are constants defined at the end of this file,
+     * this is due to limitations in using JSON objects for
+     * namespaces.
+     */
     quby.runtime = {
         FUNCTION_DEFAULT_TABLE_NAME: '_q_no_funs',
         
@@ -253,11 +253,15 @@ function quby_getCollection(collection, key) {
             return name;
         },
 
-        // These are the core JavaScript prototypes that can be extended.
-        // If a JavaScript prototype is not mentioned here (like Image) then
-        // Quby will make a new class instead of using it.
-        // If it is mentioned here then Quby will add to that classes Prototype.
-        // (note that Object/QubyObject isn't here because it's not prototype extended).
+        /**
+         * These are the core JavaScript prototypes that can be extended.
+         *
+         * If a JavaScript prototype is not mentioned here (like Image) then
+         * Quby will make a new class instead of using it.
+         *
+         * If it is mentioned here then Quby will add to that classes Prototype.
+         * (note that Object/QubyObject isn't here because it's not prototype extended).
+         */
         CORE_CLASSES: [
                 'Number',
                 'Boolean',
@@ -366,16 +370,16 @@ function quby_getCollection(collection, key) {
         },
 
         /** 
-        * Runs the code given in the browser, within the current document. If an
-        * onError function is provided then this will be called if an error occurres.
-        * The error object will be passed into the onError function given.
-        * 
-        * If one is not provided then the error will not be caught and nothing will
-        * happen.
-        * 
-        * @param code The JavaScript code to run.
-        * @param onError the function to be called if an error occurres.
-        */
+         * Runs the code given in the browser, within the current document. If an
+         * onError function is provided then this will be called if an error occurres.
+         * The error object will be passed into the onError function given.
+         * 
+         * If one is not provided then the error will not be caught and nothing will
+         * happen.
+         * 
+         * @param code The JavaScript code to run.
+         * @param onError the function to be called if an error occurres.
+         */
         runCode: function (code, onError) {
             if (onError) {
                 if (typeof (onError) != 'function') {
@@ -392,11 +396,11 @@ function quby_getCollection(collection, key) {
         },
         
         /**
-        * If there is an onError error handler then the error is passed to this.
-        * If there isn't then it is thrown upwards.
-        * 
-        * The onError must return true to stop the error from being thrown up!
-        */
+         * If there is an onError error handler then the error is passed to this.
+         * If there isn't then it is thrown upwards.
+         * 
+         * The onError must return true to stop the error from being thrown up!
+         */
         handleError: function (err) {
             if ( ! err.isQuby ) {
                 err.quby_message = quby.runtime.unformatString( err.message );
@@ -453,11 +457,11 @@ function quby_getCollection(collection, key) {
         },
 
         /**
-        * Checks if the given object is one of the Quby inbuilt collections (such as QubyArray and QubyHash), and if not then an exception is thrown.
-        * 
-        * @param collection An collection to test for being a collection.
-        * @return The collection given.
-        */
+         * Checks if the given object is one of the Quby inbuilt collections (such as QubyArray and QubyHash), and if not then an exception is thrown.
+         * 
+         * @param collection An collection to test for being a collection.
+         * @return The collection given.
+         */
         checkArray: function (collection, op) {
             if (collection instanceof QubyArray || collection instanceof QubyHash) {
                 return collection;
@@ -467,14 +471,14 @@ function quby_getCollection(collection, key) {
         },
 
         /**
-        * Creates a new Error object with the given name and message.
-        * It is then thrown straight away. This method will not
-        * return (since an exception is thrown within it).
-        * 
-        * @param name The name for the Error object to throw.
-        * @param msg The message contained within the Error object thrown.
-        * @return This should never return.
-        */
+         * Creates a new Error object with the given name and message.
+         * It is then thrown straight away. This method will not
+         * return (since an exception is thrown within it).
+         * 
+         * @param name The name for the Error object to throw.
+         * @param msg The message contained within the Error object thrown.
+         * @return This should never return.
+         */
         error: function (name, msg) {
             var errObj = new Error(msg);
             
@@ -485,21 +489,21 @@ function quby_getCollection(collection, key) {
         },
 
         /**
-        * Throws a standard Quby runtime error from within this function.
-        * This method will not return as it will thrown an exception.
-        * 
-        * @param msg The message contained within the error thrown.
-        * @return This should never return.
-        */
+         * Throws a standard Quby runtime error from within this function.
+         * This method will not return as it will thrown an exception.
+         * 
+         * @param msg The message contained within the error thrown.
+         * @return This should never return.
+         */
         runtimeError: function (msg) {
             quby.runtime.error(quby.runtime.EXCEPTION_NAME_RUNTIME, msg);
         },
 
         /**
-        * Throws the standard eror for when a stated field is not found.
-        * 
-        * @param name The name of the field that was not found.
-        */
+         * Throws the standard eror for when a stated field is not found.
+         * 
+         * @param name The name of the field that was not found.
+         */
         fieldNotFoundError: function (obj, name) {
             var msg;
             var thisClass = quby.runtime.identifyObject( obj );
@@ -532,14 +536,14 @@ function quby_getCollection(collection, key) {
         },
 
         /**
-        * Throws an error designed specifically for when a block is expected,
-        * but was not present. It is defined here so that it can be called
-        * manually by users from within their inlined JavaScript code.
-        * 
-        * This method will not return since it throws an exception.
-        * 
-        * @return This should never return.
-        */
+         * Throws an error designed specifically for when a block is expected,
+         * but was not present. It is defined here so that it can be called
+         * manually by users from within their inlined JavaScript code.
+         * 
+         * This method will not return since it throws an exception.
+         * 
+         * @return This should never return.
+         */
         missingBlockError: function () {
             this.runtimeError("Yield with no block present");
         },
@@ -556,17 +560,17 @@ function quby_getCollection(collection, key) {
         },
         
         /**
-        * Throws an error stating that there are not enough parameters for yielding
-        * to something. The something is stated by the 'type' parameter (i.e. "block",
-        * "function" or "method"). It is stated by the user.
-        * 
-        * The 'expected' and 'got' refer to the number of parameters the type expects
-        * and actually got when it was called.
-        * 
-        * @param expected The number of parameters expected by the caller.
-        * @param got The number of parameters actually received when the call was attempted.
-        * @param type A name for whatever was being called.
-        */
+         * Throws an error stating that there are not enough parameters for yielding
+         * to something. The something is stated by the 'type' parameter (i.e. "block",
+         * "function" or "method"). It is stated by the user.
+         * 
+         * The 'expected' and 'got' refer to the number of parameters the type expects
+         * and actually got when it was called.
+         * 
+         * @param expected The number of parameters expected by the caller.
+         * @param got The number of parameters actually received when the call was attempted.
+         * @param type A name for whatever was being called.
+         */
         notEnoughBlockParametersError: function (expected, got, type) {
             quby.runtime.runtimeError("Not enough parameters given for a " + type + ", was given: " + got + " but expected: " + expected);
         },
@@ -594,11 +598,11 @@ function quby_getCollection(collection, key) {
         },
 
         /**
-        * This is a callback called when an unknown method is called at runtime.
-        * 
-        * @param methodName The name of hte method being called.
-        * @param args The arguments for the method being called.
-        */
+         * This is a callback called when an unknown method is called at runtime.
+         * 
+         * @param methodName The name of hte method being called.
+         * @param args The arguments for the method being called.
+         */
         onMethodMissing: function (methodName, args) {
             quby.runtime.methodMissingError(this, methodName, args);
         },
@@ -790,30 +794,30 @@ function quby_getCollection(collection, key) {
         },
 
         /**
-        * Helper functions to be called from within inlined JavaScript and the parser
-        * for getting access to stuff inside the scriptin language.
-        * 
-        * Variables should be accessed in the format: '_var_<name>' where <name> is the
-        * name of the variable. All names are in lowercase.
-        * 
-        * For example: _var_foo, _var_bar, _var_foo_bar
-        */
+         * Helper functions to be called from within inlined JavaScript and the parser
+         * for getting access to stuff inside the scriptin language.
+         * 
+         * Variables should be accessed in the format: '_var_<name>' where <name> is the
+         * name of the variable. All names are in lowercase.
+         * 
+         * For example: _var_foo, _var_bar, _var_foo_bar
+         */
         formatVar: function (strVar) {
             return quby.runtime.VARIABLE_PREFIX + strVar.toLowerCase();
         },
 
         /**
-        * @param strVar The variable name to format into the internal global callname.
-        * @return The callname to use for the given variable in the outputted javascript.
-        */
+         * @param strVar The variable name to format into the internal global callname.
+         * @return The callname to use for the given variable in the outputted javascript.
+         */
         formatGlobal: function (strVar) {
             return quby.runtime.GLOBAL_PREFIX + strVar.replace(/\$/g, '').toLowerCase();
         },
 
         /**
-        * @param strClass The class name to format into the internal class callname.
-        * @return The callname to use for the given class in the outputted javascript.
-        */
+         * @param strClass The class name to format into the internal class callname.
+         * @return The callname to use for the given class in the outputted javascript.
+         */
         formatClass: function (strClass) {
             strClass = strClass.toLowerCase();
             var newName = quby.runtime.TRANSLATE_CLASSES[strClass];
@@ -826,36 +830,36 @@ function quby_getCollection(collection, key) {
         },
 
         /**
-        * @param strClass The class name for the field to format.
-        * @param strVar The name of the field that is being formatted.
-        * @return The callname to use for the given field.
-        */
+         * @param strClass The class name for the field to format.
+         * @param strVar The name of the field that is being formatted.
+         * @return The callname to use for the given field.
+         */
         formatField: function (strClass, strVar) {
             return quby.runtime.FIELD_PREFIX + quby.runtime.formatClass(strClass) + quby.runtime.FIELD_PREFIX + strVar.toLowerCase();
         },
 
         /**
-        * A function for correctly formatting function names.
-        * 
-        * All function names are in lowercase. The correct format for a function name is:
-        * '_fun_<name>_<numParameters>' where <name> is the name of the function and
-        * <numParameters> is the number of parameters the function has.
-        * 
-        * For example: _fun_for_1, _fun_print_1, _fun_hasblock_0
-        */
+         * A function for correctly formatting function names.
+         * 
+         * All function names are in lowercase. The correct format for a function name is:
+         * '_fun_<name>_<numParameters>' where <name> is the name of the function and
+         * <numParameters> is the number of parameters the function has.
+         * 
+         * For example: _fun_for_1, _fun_print_1, _fun_hasblock_0
+         */
         formatFun: function (strFun, numParameters) {
             return quby.runtime.FUNCTION_PREFIX + strFun.toLowerCase() + '_' + numParameters;
         },
 
         /**
-        * Formats a constructor name using the class name given and the stated
-        * number of parameters. The class name should be the proper (pretty) class
-        * name, not a formatted class name.
-        * 
-        * @param strKlass The class name of the constructor being formatted.
-        * @param numParameters The number of parameters in the constructor.
-        * @return The name for a constructor of the given class with the given number of parameters.
-        */
+         * Formats a constructor name using the class name given and the stated
+         * number of parameters. The class name should be the proper (pretty) class
+         * name, not a formatted class name.
+         * 
+         * @param strKlass The class name of the constructor being formatted.
+         * @param numParameters The number of parameters in the constructor.
+         * @return The name for a constructor of the given class with the given number of parameters.
+         */
         formatNew: function (strKlass, numParameters) {
             return quby.runtime.formatClass(strKlass) + quby.runtime.NEW_PREFIX + numParameters;
         },
@@ -876,20 +880,20 @@ function QubyObject() {
 };
 
 /**
-* Arrays are not used in Quby, instead it uses it's own Array object.
-* 
-* These wrap a JavaScript array to avoid the issues with extending the
-* Array prototype.
-* 
-* Note that the values given are used internally. So do not
-* mutate it externally to this function!
-* 
-* If you are copying, copy the values first, then create a new
-* QubyArray with the values passed in.
-* 
-* @constructor
-* @param values Optionally takes an array of values, set as the default values for this array.
-*/
+ * Arrays are not used in Quby, instead it uses it's own Array object.
+ * 
+ * These wrap a JavaScript array to avoid the issues with extending the
+ * Array prototype.
+ * 
+ * Note that the values given are used internally. So do not
+ * mutate it externally to this function!
+ * 
+ * If you are copying, copy the values first, then create a new
+ * QubyArray with the values passed in.
+ * 
+ * @constructor
+ * @param values Optionally takes an array of values, set as the default values for this array.
+ */
 function QubyArray( values ) {
     if ( values === undefined ) {
         this.values = [];
@@ -947,21 +951,21 @@ QubyArray.prototype.get = function (key) {
 };
 
 /**
-* 
-* 
-* @constructor
-*/
+ * 
+ * 
+ * @constructor
+ */
 function QubyHash() {
-	this.values = [];
+    this.values = [];
     
-	for ( var i = 0, argsLen = arguments.length; i < argsLen; i += 2 ) {
+    for ( var i = 0, argsLen = arguments.length; i < argsLen; i += 2 ) {
         var key   = arguments[ i   ];
         var value = arguments[ i+1 ];
         
-		this.set( key, value );
-	}
+        this.set( key, value );
+    }
 	
-	return this;
+    return this;
 }
 QubyHash.prototype.hash = function(val) {
     if ( val == null ) {
@@ -1018,6 +1022,7 @@ QubyHash.prototype.clone = function() {
 
     for (var hash in this.values) {
         var keys = this.values[ hash ];
+
         copy.values[ hash ] = this.cloneKeys( keys );
     }
     
@@ -1029,6 +1034,7 @@ QubyHash.prototype.cloneKeys = function( keys ) {
     
     for ( var i = 0; i < keysLen; i++ ) {
         var node = keys[i];
+
         newKeys.push( {
                 key   : node.key,
                 value : node.value

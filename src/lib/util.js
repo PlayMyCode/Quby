@@ -2,6 +2,28 @@
 
 var util = window['util'] = {};
 
+(function(Date) {
+    if ( Date['now'] === undefined ) {
+        Date['now'] = function() {
+            return (new Date()).getTime();
+        }
+    }
+})(window['Date']);
+
+(function(Object) {
+    if ( Object['preventExtensions'] === undefined ) {
+        /**
+         * AFAIK Object.preventExtensions cannot be faked,
+         * so we just add an empty stub,
+         * so we can still call it where it's not supported.
+         *
+         * Personally I don't really care if it's not always
+         * supported, as long as it works when I am developing.
+         */
+        Object['preventExtensions'] = function() { /* do nothing */ }
+    }
+})(window['Object']);
+
 (function( util ) {
     var calculateName = function() {
         if ( navigator.appName === 'Opera' ) {

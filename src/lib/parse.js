@@ -2105,8 +2105,8 @@ var parse = window['parse'] = (function( window, undefined ) {
                 );
             } else {
                 var rulesStart = Date.now();
-                var result = self.parseRules( symbols, input, parseInput );
-                var rulesTime = Date.now() - rulesStart;
+                var result     = self.parseRules( symbols, input, parseInput );
+                var rulesTime  = Date.now() - rulesStart;
 
                 window['util']['future']['run']( function() {
                     callback( result.result, result.errors );
