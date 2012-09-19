@@ -259,6 +259,17 @@
  * but only one 'if' terminal, which is used to find them all.
  */
 var parse = window['parse'] = (function( window, undefined ) {
+    var tabLog = function( indents ) {
+        var str = '';
+        for ( var i = 0; i < indents; i++ ) {
+            str += '    ';
+        }
+
+        arguments[0] = str;
+        console.log.apply( console, arguments );
+    };
+
+
     /**
      * ASCII codes for characters.
      *
@@ -821,6 +832,25 @@ var parse = window['parse'] = (function( window, undefined ) {
     }
 
     /**
+     * Format the terminal name into a readable one, i.e.
+     *     'ELSE_IF' => 'else if'
+     *      'leftBracket' => 'left bracket'
+     */
+    var formatTerminalName = function(str) {
+        /*
+         * - reaplce camelCase in the middle to end of the string,
+         * - lowerCase anything left (start of string)
+         * - turn underscores into spaces
+         * - uppercase the first letter of each word
+         */
+        return str.
+                replace( /([^A-Z])([A-Z]+)/g, function(t,a,b) { return a + ' ' + b; } ).
+                replace( '_', ' ' ).
+                toLowerCase().
+                replace( /\b([a-z])/g, function(t, letter) { return letter.toUpperCase(); } );
+    }
+
+    /**
      * If given a string, it will match if it is
      * followed by a word boundary.
      *
@@ -847,6 +877,26 @@ var parse = window['parse'] = (function( window, undefined ) {
      */
     var Terminal = function( match ) {
         this.id = INVALID_TERMINAL;
+
+        /**
+         * A name for this terminal.
+         *
+         * Used for error reporting, so you can have something readable,
+         * rather then things like 'E_SOMETHING_END_BLAH_TERMINAL'.
+         */
+        this.termName = "<Anonymous Terminal>";
+
+        /**
+         * When true, this has been explicitely named.
+         * 
+         * When false, this has been named as a result
+         * of this constructor.
+         *
+         * It's a flag that exists so other code knows
+         * if it should, or shouldn't, override the name
+         * automatically.
+         */
+        this.isExplicitelyNamed = false;
 
         /**
          * The type of this terminal.
@@ -928,6 +978,8 @@ var parse = window['parse'] = (function( window, undefined ) {
                              match.length === 1
                     )
             ) {
+                this.termName = "<Terminal '" + match + "'>";
+
                 if ( matchType === 'string' ) {
                     match = match.charCodeAt( 0 );
                 }
@@ -957,6 +1009,12 @@ var parse = window['parse'] = (function( window, undefined ) {
                     throw new Error( "Empty string given for Terminal" );
                 } else {
                     this.testData = stringToCodes( match );
+
+                    if ( match > 20 ) {
+                        this.termName = "<Terminal '" + match.substring( 0, 20 ) + "...'>";
+                    } else {
+                        this.termName = "<Terminal '" + match + "'>";
+                    }
                 }
 
             /*
@@ -994,6 +1052,21 @@ var parse = window['parse'] = (function( window, undefined ) {
                 throw new Error( "unknown match given" );
             }
         }
+
+        Object.preventExtensions( this );
+    }
+
+    Terminal.prototype['name'] = function( name ) {
+        if ( arguments.length === 0 ) {
+            return this.termName;
+        } else {
+            this.termName = name;
+            return this;
+        }
+    }
+
+    Terminal.prototype['setName'] = function( name ) {
+        this.name = name;
     }
 
     Terminal.prototype.setID = function( id ) {
@@ -1081,13 +1154,14 @@ var parse = window['parse'] = (function( window, undefined ) {
          this['match']  = str;
      };
 
-     var TerminalError = function( i, symbol, match ) {
-         this['isTerminal'] = true;
+     var TerminalError = function( i, terminal, match ) {
+         this['isTerminal']     = true;
 
-         this['offset']     = i;
-         this['symbol']     = symbol;
-         this['match']      = match;
-         this['isLiteral']  = symbol.isLiteral;
+         this['offset']         = i;
+         this['terminal']       = terminal;
+         this['terminalName']   = terminal.termName;
+         this['match']          = match;
+         this['isLiteral']      = terminal.isLiteral;
      };
 
      /**
@@ -1095,10 +1169,10 @@ var parse = window['parse'] = (function( window, undefined ) {
       *
       * It's essentially a struct like object.
       */
-     var Symbol = function( symbol, offset, str ) {
-         this['symbol']     = symbol;
-         this['offset']     = offset;
-         this['match']      = str   ;
+     var Symbol = function( terminal, offset, str ) {
+         this['terminal']       = terminal;
+         this['offset']         = offset  ;
+         this['match']          = str     ;
      };
 
      /**
@@ -1108,7 +1182,7 @@ var parse = window['parse'] = (function( window, undefined ) {
       * If there is a callback, then it is run, and the result is returned.
       */
      Symbol.prototype.onFinish = function() {
-         var onMatch = this.symbol.onMatchFun;
+         var onMatch = this.terminal.onMatchFun;
 
          if ( onMatch !== null ) {
              return onMatch( this['match'], this['offset'] );
@@ -1169,6 +1243,8 @@ var parse = window['parse'] = (function( window, undefined ) {
         if ( symbolLength > 0 ) {
             this.currentID = this.symbolIDs[0];
         }
+
+        Object.preventExtensions( this );
     };
 
     /**
@@ -1186,7 +1262,7 @@ var parse = window['parse'] = (function( window, undefined ) {
         var symbols = [];
 
         for ( var i = 0; i < this.length; i++ ) {
-            symbols[i] = this.symbols[i].symbol;
+            symbols[i] = this.symbols[i].terminal;
         }
 
         return symbols;
@@ -1371,14 +1447,28 @@ var parse = window['parse'] = (function( window, undefined ) {
     /**
      * @const
      * @private
+     * @type {number}
      */
     var NO_RECURSION = 0;
 
     /**
      * @const
      * @private
+     * @type {number}
      */
     var RECURSION = 1;
+
+    /**
+     * Used to denote when no internal compileID has been set.
+     *
+     * As this is a positive number, a negative number is used
+     * to denote when no compilation has taken place.
+     *
+     * @const
+     * @private
+     * @type {number}
+     */
+    var NO_COMPILE_ID = -1;
 
     /**
      *
@@ -1423,6 +1513,7 @@ var parse = window['parse'] = (function( window, undefined ) {
          * Records how long the call to 'compile' takes to execute.
          */
         this.compileTime = 0;
+        this.compiledId  = NO_COMPILE_ID;
 
         /**
          * The global parse instance this is working with.
@@ -1477,11 +1568,28 @@ var parse = window['parse'] = (function( window, undefined ) {
         /**
          * Used to count how many times we have re-entered the parseInner whilst
          * parsing.
+         * 
+         * However this is cleared when the number of symbol position is changed.
+         * This way recursion is allowed, as we chomp symbols.
          */
         this.recursiveCount = 0;
 
+        /**
+         * A true recursive counter.
+         *
+         * This states how many times we are currently inside of this parser.
+         * Unlike 'recursiveCount', this never lies.
+         *
+         * It exists so we can clear some items when we _first_ enter a rule.
+         */
+        this.internalCount = 0;
+
         this.isCyclic = false;
         this.isSeperator = false;
+
+        this.hasBeenUsed = false;
+
+        Object.preventExtensions( this );
     };
 
     ParserRule.prototype.cyclicOr = function( rules ) {
@@ -1544,6 +1652,30 @@ var parse = window['parse'] = (function( window, undefined ) {
         this.isSeperator = true;
 
         return this;
+    };
+
+    ParserRule.prototype.errorIfInLeftBranch = function( rule ) {
+        if ( this.rules.length !== 0 ) {
+            var left = this.rules[0];
+
+            if ( left instanceof Array ) {
+                for ( var i = 0; i < left.length; i++ ) {
+                    var leftRule = left[i];
+
+                    if ( leftRule === rule ) {
+                        throw new Error( "First sub-rule given leads to a recursive definition (infinite loop at runtime)" );
+                    } else if ( leftRule instanceof ParserRule ) {
+                        leftRule.errorIfInLeftBranch( rule );
+                    }
+                }
+            } else {
+                if ( left === rule ) {
+                    throw new Error( "First sub-rule given leads to a recursive definition (infinite loop at runtime)" );
+                } else if ( left instanceof ParserRule ) {
+                    left.errorIfInLeftBranch( rule );
+                }
+            }
+        }
     };
 
     /**
@@ -1676,18 +1808,34 @@ var parse = window['parse'] = (function( window, undefined ) {
     };
 
     ParserRule.prototype.endCurrentOr = function() {
+        var currentOr = this.currentOr;
+
         if ( this.orThisFlag ) {
-            if ( this.currentOr === null ) {
+            if ( currentOr === null ) {
                 throw new Error("infinite recursive parse rule, this given as 'or/either' condition, with no alternatives.");
             } else {
-                this.currentOr.push( this );
+                currentOr.push( this );
             }
 
             this.orThisFlag = false;
         }
 
-        if ( this.currentOr !== null ) {
-            this.rules.push( this.currentOr );
+        if ( currentOr !== null ) {
+            /*
+             * If still building the left branch,
+             * check if we are cyclic.
+             */
+            if ( this.rules.length === 0 ) {
+                for ( var j = 0; j < currentOr.length; j++ ) {
+                    var or = currentOr[j];
+
+                    if ( or instanceof ParserRule ) {
+                        or.errorIfInLeftBranch( this );
+                    }
+                }
+            }
+
+            this.rules.push( currentOr );
             this.markOptional( false );
 
             this.currentOr = null;
@@ -1783,6 +1931,10 @@ var parse = window['parse'] = (function( window, undefined ) {
         if ( rule === this && this.rules.length === 0 ) {
             throw new Error( "infinite recursive parse rule, 'this' given as 'then' parse rule." );
         } else {
+            if ( this.rules.length === 0 && rule instanceof ParserRule ) {
+                rule.errorIfInLeftBranch( this );
+            }
+
             this.rules.push( rule );
             this.markOptional( false );
         }
@@ -1825,16 +1977,14 @@ var parse = window['parse'] = (function( window, undefined ) {
             var start = Date.now();
             this.compiled = this.optimize();
             this.compileTime = Date.now() - start;
-        } else {
-            this.clearRecursionFlag();
         }
 
         return this;
     };
 
     var bruteScan = function( parserRule, seenRules, idsFound ) {
-        if ( seenRules[parserRule.compiled_id] !== true ) {
-            seenRules[parserRule.compiled_id] = true;
+        if ( seenRules[parserRule.compiledId] !== true ) {
+            seenRules[parserRule.compiledId] = true;
 
             var rules      = parserRule.rules,
                 isOptional = parserRule.isOptional;
@@ -1889,6 +2039,7 @@ var parse = window['parse'] = (function( window, undefined ) {
     var callParseDebug = function( debugCallback, symbols, compileTime, symbolTime, rulesTime, totalTime ) {
         if ( debugCallback ) {
             var times = {};
+
             times['compile'] = compileTime;
             times['symbols'] = symbolTime;
             times['rules']   = rulesTime ;
@@ -1980,8 +2131,8 @@ var parse = window['parse'] = (function( window, undefined ) {
      */
     ParserRule.prototype.optimizeScan = function(terminals, id, allRules) {
         if ( this.isRecursive === NO_RECURSION ) {
-            if ( this.compiled_id === undefined ) {
-                this.compiled_id = id;
+            if ( this.compiledId === NO_COMPILE_ID ) {
+                this.compiledId = id;
                 allRules[id] = this;
 
                 id++;
@@ -2155,6 +2306,11 @@ var parse = window['parse'] = (function( window, undefined ) {
 
         this['compile']();
 
+        if ( this.hasBeenUsed ) {
+            this.clearRecursionFlag();
+            this.hasBeenUsed = false;
+        }
+
         var _this = this;
 
         window['util']['future']['run']( function() {
@@ -2170,6 +2326,12 @@ var parse = window['parse'] = (function( window, undefined ) {
         } );
     };
 
+    /**
+     * Resets the internal recursion flags.
+     *
+     * The flags are used to ensure the parser cannot run away,
+     * but can be left in a strange state between use.
+     */
     ParserRule.prototype.clearRecursionFlag = function() {
         if ( ! this.isClearingRecursion ) {
             this.isClearingRecursion = true;
@@ -2198,6 +2360,8 @@ var parse = window['parse'] = (function( window, undefined ) {
     };
 
     ParserRule.prototype.parseRules = function( symbols, inputSrc, src ) {
+        this.hasBeenUsed = true;
+
         /*
          * Iterate through all symbols found, then going
          * through the grammar rules in order.
@@ -2229,7 +2393,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                 if ( hasError !== null ) {
                     errors.push( new TerminalError(
                             hasError.offset,
-                            hasError.symbol,
+                            hasError.terminal,
                             hasError.match
                     ) );
                 }
@@ -2250,7 +2414,7 @@ var parse = window['parse'] = (function( window, undefined ) {
         if ( hasError !== null ) {
             errors.push( new TerminalError(
                     hasError.offset,
-                    hasError.symbol,
+                    hasError.terminal,
                     hasError.match
             ) );
         }
@@ -2395,6 +2559,7 @@ var parse = window['parse'] = (function( window, undefined ) {
     ParserRule.prototype.ruleTestSeperator = function( symbols, inputSrc ) {
         var lookups = this.compiledLookups,
             peekID  = symbols.peekID(),
+            onFinish = null,
             rules   = lookups[0],
             rule    = rules[peekID];
 
@@ -2416,10 +2581,14 @@ var parse = window['parse'] = (function( window, undefined ) {
             }
 
             if ( rule instanceof ParserRule ) {
-                var onFinish = rule.ruleTest( symbols, inputSrc );
+                onFinish = rule.ruleTest( symbols, inputSrc );
 
                 if ( onFinish === null ) {
                     this.isRecursive = symbolI;
+                    if ( this.recursiveCount > 0 ) {
+                        this.recursiveCount--;
+                    }
+
                     return null;
                 } else {
                     args = [ onFinish ];
@@ -2445,6 +2614,10 @@ var parse = window['parse'] = (function( window, undefined ) {
             } else if ( rule.id === peekID ) {
                 args = [ symbols.next() ];
             } else {
+                if ( this.recursiveCount > 0 ) {
+                    this.recursiveCount--;
+                }
+
                 return null;
             }
 
@@ -2494,7 +2667,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                         symbols.back( symbols.idIndex()-symbolI );
                         break;
                     } else if ( rule instanceof ParserRule ) {
-                        var onFinish = rule.ruleTest( symbols, inputSrc );
+                        onFinish = rule.ruleTest( symbols, inputSrc );
 
                         if ( onFinish === null ) {
                             symbols.back( symbols.idIndex()-symbolI );
@@ -2542,6 +2715,10 @@ var parse = window['parse'] = (function( window, undefined ) {
             if ( args === null ) {
                 // needs to remember it's recursive position when we leave
                 this.isRecursive = symbolI;
+                if ( this.recursiveCount > 0 ) {
+                    this.recursiveCount--;
+                }
+
                 return null;
             } else {
                 this.isRecursive = NO_RECURSION;
@@ -2570,13 +2747,38 @@ var parse = window['parse'] = (function( window, undefined ) {
         var startSymbolI = symbols.idIndex(),
             peekID = symbols.peekID();
 
+if ( window._.expr === this ) {
+    tabLog( window._.exprC, '### expr ###', this.isRecursive);
+    window._.exprC = ( window._.exprC === undefined ) ? 0 : window._.exprC + 1 ;
+
+    if ( window._.exprC > 9 ) {
+        throw new Error('STOP!');
+    }
+}
+        if ( this.internalCount === 0 ) {
+            tabLog( window._.exprC, 'first entered', this.isRecursive);
+            this.recursiveCount = 0;
+        }
+
+        this.internalCount++;
+
         if ( this.isRecursive === startSymbolI ) {
             if ( this.recursiveCount > 2 ) {
+                if ( window._.expr === this ) {
+                    tabLog( window._.exprC, 'resursive stop');
+                    window._.exprC--;
+                }
+
+                this.internalCount--;
                 return null;
             } else {
                 this.recursiveCount++;
             }
         } else {
+            if ( window._.expr === this ) {
+                tabLog( window._.exprC, 'clear expr', startSymbolI);
+            }
+
             this.recursiveCount = 0;
             this.isRecursive    = startSymbolI;
         }
@@ -2604,6 +2806,7 @@ var parse = window['parse'] = (function( window, undefined ) {
              * after.
              */
             var rule = lookups[i][peekID];
+
             if ( rule === undefined ) {
                 if ( optional[i] === 0 ) {
                     if ( i !== 0 ) {
@@ -2612,7 +2815,12 @@ var parse = window['parse'] = (function( window, undefined ) {
 
                     // needs to remember it's recursive position when we leave
                     this.isRecursive = startSymbolI;
-                    return null;
+                    if ( this.recursiveCount > 0 ) {
+                        this.recursiveCount--;
+                    }
+
+                    args = null;
+                    break;
                 } else {
                     if ( args === null ) {
                         args = [ null ];
@@ -2655,7 +2863,9 @@ var parse = window['parse'] = (function( window, undefined ) {
 
                     // needs to remember it's recursive position when we leave
                     this.isRecursive = startSymbolI;
-                    return null;
+
+                    args = null;
+                    break;
                 } else {
                     if ( args === null ) {
                         args = [ onFinish ];
@@ -2670,6 +2880,15 @@ var parse = window['parse'] = (function( window, undefined ) {
             }
         }
 
+        if ( this.recursiveCount > 0 ) {
+            this.recursiveCount--;
+        }
+
+if ( window._.expr === this ) {
+    tabLog( window._.exprC, 'leave');
+    window._.exprC--;
+}
+        this.internalCount--;
         return args;
     };
 
@@ -3230,12 +3449,12 @@ var parse = window['parse'] = (function( window, undefined ) {
                 Parse.ingoreInner( terminal );
             } else if ( terminal instanceof Array ) {
                 for ( var i = 0; i < terminal.length; i++ ) {
-                    Parse.ignoreSingle( Parse['terminals'](terminal[i]) );
+                    Parse.ignoreSingle( Parse.terminalsInner(terminal[i], null) );
                 }
             } else if ( terminal instanceof Object ) {
                 for ( var k in terminal ) {
                     if ( terminal.hasOwnProperty(k) ) {
-                        Parse.ignoreSingle( Parse['terminals'](terminal[k]) );
+                        Parse.ignoreSingle( Parse.terminalsInner(terminal[k], k) );
                     }
                 }
             } else {
@@ -3266,20 +3485,26 @@ var parse = window['parse'] = (function( window, undefined ) {
          * matches is turned into terminals.
          */
         Parse['terminals'] = function( obj ) {
+            return Parse.terminalsInner( obj, null );
+        };
+
+        Parse.terminalsInner = function( obj, termName ) {
             if ( obj instanceof Object && !isFunction(obj) && !(obj instanceof Array) ) {
                 var terminals = {};
 
                 for ( var name in obj ) {
                     if ( obj.hasOwnProperty(name) ) {
-                        terminals[name] = Parse['terminals']( obj[name] );
+                        terminals[name] = Parse.terminalsInner( obj[name], name );
                     }
                 }
 
                 return terminals;
+            } else if ( termName !== null ) {
+                return Parse['terminal']( obj )['name']( formatTerminalName(termName) );
             } else {
                 return Parse['terminal']( obj );
             }
-        };
+        }
 
         /**
          * Turns the given item into a single terminal.
@@ -3516,6 +3741,8 @@ var parse = window['parse'] = (function( window, undefined ) {
                 return i;
             }
         };
+
+        Object.preventExtensions( Parse );
 
         return Parse;
     };

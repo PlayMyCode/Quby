@@ -863,7 +863,7 @@ var quby = window['quby'] || {};
 
     var variables = parse.either( terminals.identifiers, terminals.keywords.THIS ).
             onMatch( function(identifier) {
-                switch ( identifier.symbol ) {
+                switch ( identifier.terminal ) {
                     case terminals.identifiers.variableName:
                         return new quby.syntax.Variable( identifier );
                     case terminals.identifiers.global:
@@ -890,7 +890,7 @@ var quby = window['quby'] || {};
 
     var variableAssignments = parse.either( terminals.identifiers ).
             onMatch( function(identifier) {
-                switch ( identifier.symbol ) {
+                switch ( identifier.terminal ) {
                     case terminals.identifiers.variableName:
                         return new quby.syntax.VariableAssignment( identifier );
                     case terminals.identifiers.global:
@@ -940,7 +940,7 @@ var quby = window['quby'] || {};
             ).
             then( expr ).
             onMatch( function( op, expr ) {
-                switch ( op.symbol ) {
+                switch ( op.terminal ) {
                     case ops.not:
                         return new quby.syntax.Not( expr );
                     case terminals.ops.subtract:
@@ -1160,6 +1160,21 @@ var quby = window['quby'] || {};
                 return new quby.syntax.NewInstance( klass, exprs, block );
             } );
 
+    var exprInParenthesis = parse.
+            a( terminals.symbols.leftBracket ).
+            then( expr ).
+            optional( terminals.endOfLine ).
+            then( terminals.symbols.rightBracket ).
+            onMatch( function(left, expr, endOfLine, right) {
+                return new quby.syntax.ExprParenthesis( expr );
+            } );
+
+    var symbol = parse.
+            a( terminals.ops.colon, terminals.identifiers.variableName ).
+            onMatch( function(colon, identifier) {
+                return new quby.syntax.Symbol( identifier );
+            });
+
     /**
      * These add operations on to the end of an expr.
      *
@@ -1203,7 +1218,7 @@ var quby = window['quby'] || {};
                             ).
                             then( expr ).
                             onMatch( function(op, right) {
-                                switch( op.symbol ) {
+                                switch( op.terminal ) {
                                     case ops.plus:
                                         return new quby.syntax.Add( null, right );
                                     case ops.subtract:
@@ -1252,40 +1267,26 @@ var quby = window['quby'] || {};
                             })
             );
 
+window._ = {};
+window._.arrayAssignment = arrayAssignment;
+window._.arrayAccess = arrayAccess;
+window._.expr = expr;
     expr.
             either(
                     singleOpExpr,
-
                     arrayDefinition,
-
                     hashDefinition,
-
                     yieldStatement,
-
-                    parse.
-                            a( terminals.symbols.leftBracket ).
-                            then( expr ).
-                            optional( terminals.endOfLine ).
-                            then( terminals.symbols.rightBracket ).
-                            onMatch( function(left, expr, endOfLine, right) {
-                                return new quby.syntax.ExprParenthesis( expr );
-                            } ),
-
-
+                    exprInParenthesis,
                     newInstance,
-
                     functionCall,
 
                     variables,
 
                     lambda,
 
-                    // symbol
-                    parse.a( terminals.ops.colon, terminals.identifiers.variableName ).
-                            onMatch( function(colon, identifier) {
-                                return new quby.syntax.Symbol( identifier );
-                            }),
-
+                    // literals
+                    symbol,
                     terminals.literals,
 
                     // admin bits
@@ -1372,9 +1373,9 @@ var quby = window['quby'] || {};
                 optional( statements ).
                 then( terminals.keywords.END ).
                 onMatch( function(def, name, params, stmts, end) {
-                    if ( def.symbol === terminals.keywords.DEF ) {
+                    if ( def.terminal === terminals.keywords.DEF ) {
                         // 'new' method, class constructor
-                        if ( name.symbol === terminals.keywords.NEW ) {
+                        if ( name.terminal === terminals.keywords.NEW ) {
                             return new quby.syntax.Constructor(
                                     new quby.lexer.Sym( name.offset, 'new' ),
                                     params,
@@ -1445,7 +1446,7 @@ var quby = window['quby'] || {};
                 then( expr, statements ).
                 then( terminals.keywords.END ).
                 onMatch( function( whileUntil, expr, stmts, end ) {
-                    if ( whileUntil.symbol === terminals.keywords.WHILE ) {
+                    if ( whileUntil.terminal === terminals.keywords.WHILE ) {
                         return new quby.syntax.WhileLoop( expr, stmts );
                     } else {
                         return new quby.syntax.UntilLoop( expr, stmts );
@@ -1459,7 +1460,7 @@ var quby = window['quby'] || {};
                 either( terminals.keywords.WHILE, terminals.keywords.UNTIL ).
                 then( expr ).
                 onMatch( function(loop, stmts, end, whileUntil, expr) {
-                    if ( whileUntil.symbol === terminals.keywords.WHILE ) {
+                    if ( whileUntil.terminal === terminals.keywords.WHILE ) {
                         return new quby.syntax.LoopWhile( expr, stmts );
                     } else {
                         return new quby.syntax.LoopUntil( expr, stmts );
@@ -1485,7 +1486,6 @@ var quby = window['quby'] || {};
 
                     variableAssignment,
 
-
 /*
                     moduleDef,
 */
@@ -1493,51 +1493,7 @@ var quby = window['quby'] || {};
                     terminals.admin.inline,
                     terminals.admin.preInline
             );
-
-    /**
-     * Format the terminal name into a readable one, i.e.
-     *     'ELSE_IF' => 'else if'
-     *      'leftBracket' => 'left bracket'
-     */
-    var formatTerminalName = function(str) {
-        /*
-         * - reaplce camelCase in the middle to end of the string,
-         * - lowerCase anything left (start of string)
-         * - turn underscores into spaces
-         */
-        return str.
-                replace( /([^A-Z])([A-Z]+)/g, function(t,a,b) { return a + ' ' + b.toLowerCase(); } ).
-                toLowerCase().
-                replace( /((^[A-Z]+))/, function(t,a,b) { return b.toLowerCase(); } ).
-                replace( '_', ' ' );
-    }
-
-    var identifyTerminal = function( id, obj ) {
-        if ( obj === undefined ) {
-            obj = terminals;
-        }
-
-        if ( obj.id === undefined ) {
-            for ( var k in obj ) {
-                var check = obj[k];
-
-                if ( check.id !== undefined ) {
-                    if ( check && check.id == id ) {
-                        return k;
-                    }
-                } else {
-                    var r = identifyTerminal( id, check );
-
-                    if ( r !== null ) {
-                        return r;
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
+    
     quby.parser = {
             parseDebug: function( origSrc, onFinish, onDebug ) {
                 quby.parser.parse( origSrc, onFinish, onDebug );
@@ -1554,35 +1510,11 @@ var quby = window['quby'] || {};
              * @param onDebug An optional callback, for sending debug information into.
              */
             parse : function( src, onFinish, onDebug ) {
-                var debugCallback = null;
-                if ( onDebug ) {
-                    debugCallback = function(symbols, times) {
-                        for ( var i = 0; i < symbols.length; i++ ) {
-                            var symbol = symbols[i];
-                            symbol.displayName = identifyTerminal( symbol.id );
-                        }
-
-                        onDebug( symbols, times );
-                    };
-                }
-
                 statements.parse(
                         src,
                         preParse( src ),
-                        function(r, es) {
-                            for ( var i = 0; i < es.length; i++ ) {
-                                var e = es[i];
-
-                                if ( e.isTerminal ) {
-                                    e.terminalName = formatTerminalName(
-                                            identifyTerminal( e.symbol.id )
-                                    );
-                                }
-                            }
-
-                            onFinish(r, es);
-                        },
-                        debugCallback
+                        onFinish,
+                        onDebug || null
                 );
             }
     };

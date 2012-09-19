@@ -305,7 +305,7 @@
                         var displaySymbols = new Array( symbols.length );
 
                         for ( var i = 0; i < symbols.length; i++ ) {
-                            displaySymbols[i] = symbols[i].displayName;
+                            displaySymbols[i] = symbols[i].name();
                         }
 
                         outputSymbols.value = displaySymbols.join( "\n" );
@@ -409,11 +409,7 @@
         </script>
         
         <script id="example_code" type="quby">//<![CDATA[
-            a = []
             a[3] = 3
-
-            m = []
-            m.foo()
         //]]></script>
 
         <script id="example_code_1" type="quby">//<![CDATA[
