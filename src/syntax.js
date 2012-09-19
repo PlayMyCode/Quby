@@ -129,6 +129,7 @@ var quby = window['quby'] || {};
 
         Syntax: function (offset) {
             this.offset = offset;
+
             this.print = function (printer) {
                 quby.runtime.error("Internal", "Error, print has not been overridden");
             };
@@ -151,6 +152,10 @@ var quby = window['quby'] || {};
 
             this.validate = function (v) {
                 quby.runtime.error("Internal", "Error, validate has not been overridden");
+            };
+
+            this.setOffset = function(offset) {
+                this.offset = offset;
             };
         },
 
@@ -1215,6 +1220,11 @@ var quby = window['quby'] || {};
                 this.expr.validate(v);
                 old_validate.call(this, v);
             };
+
+            this.setLeft = function( expr ) {
+                this.expr = expr;
+                return this;
+            };
         },
 
         SuperCall: function (name, parameters, block) {
@@ -1602,14 +1612,15 @@ var quby = window['quby'] || {};
          * @param precedence Lower is higher, must be a number.
          */
         Op: function (left, right, strOp, isResultBool, precedence) {
-            quby.syntax.BalancingExpr.call( this, left.offset, isResultBool );
+            var offset = left ? left.offset : null;
+            quby.syntax.BalancingExpr.call( this, offset, isResultBool );
 
             if ( precedence === undefined ) {
                 throw new Error("undefined precedence given.");
             }
             this.precedence = precedence;
 
-            this.left = left;
+            this.left  = left;
             this.right = right;
             
             this.print = function (p) {
@@ -1639,8 +1650,8 @@ var quby = window['quby'] || {};
             };
             this.validate = function (v) {
                 if ( this.isBalanced(v) ) {
-                    right.validate(v);
-                    left.validate(v);
+                    this.right.validate(v);
+                    this.left.validate(v);
                 }
             };
 
@@ -1679,6 +1690,7 @@ var quby = window['quby'] || {};
                     if ( leftP <= precedence ) {
                         oldLeft = this.left;
                         this.left = newLeft;
+
                         return oldLeft;
                     } else {
                         return this.left.performBalanceSwap( newLeft, precedence );
@@ -1686,11 +1698,20 @@ var quby = window['quby'] || {};
                 } else {
                     oldLeft = this.left;
                     this.left = newLeft;
+
                     return oldLeft;
                 }
 
                 return null;
             };
+
+            this.setLeft = function( left ) {
+                this.left = left;
+                
+                if ( left ) {
+                    this.setOffset( left.offset );
+                }
+            }
         },
 
         /*
@@ -2049,7 +2070,10 @@ var quby = window['quby'] || {};
 
         /* ### Arrays ### */
         ArrayAccess: function (array, index) {
-            quby.syntax.Syntax.call(this, array.offset);
+            quby.syntax.Syntax.call(
+                    this,
+                    (array !== null ? array.offset : null)
+            )
 
             this.array = array;
             this.index = index;
@@ -2063,6 +2087,14 @@ var quby = window['quby'] || {};
             this.validate = function (v) {
                 this.array.validate(v);
                 this.index.validate(v);
+            };
+
+            this.setLeft = function( array ) {
+                this.array = array;
+
+                if ( array ) {
+                    this.setOffset( array.offset );
+                }
             };
         },
         ArrayDefinition: function (parameters) {

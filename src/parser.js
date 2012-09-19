@@ -837,11 +837,14 @@ var quby = window['quby'] || {};
     var statement = parse(),
         expr = parse();
 
+    var repeatStatement = parse.repeatSeperator(
+            statement,
+            statementSeperator
+    );
+
     var statements = parse.
             optional( statementSeperator ).
-            optional(
-                    parse.repeatSeperator( statement, statementSeperator )
-            ).
+            optional( repeatStatement    ).
             optional( statementSeperator ).
             onMatch( function(onStart, stmts, endEnd) {
                 if ( stmts === null ) {
@@ -909,17 +912,25 @@ var quby = window['quby'] || {};
                 }
             });
 
-    var arrayAccess = parse.
+    var arrayAccessExtension = parse.
             a(
-                    expr,
                     terminals.symbols.leftSquare,
                     expr
             ).
             optional( terminals.endOfLine ).
             then( terminals.symbols.rightSquare ).
-            onMatch( function( arrayExpr, leftSquare, keyExpr, endOfLine, rightSquare) {
-                return new quby.syntax.ArrayAccess( arrayExpr, keyExpr );
+            onMatch( function( leftSquare, keyExpr, endOfLine, rightSquare) {
+                return new quby.syntax.ArrayAccess( null, keyExpr );
             });
+
+    var arrayAccess = parse.
+            a(
+                    expr,
+                    arrayAccessExtension
+            ).
+            onMatch( function(expr, extension) {
+                return extension.setLeft( expr );
+            } );
 
     var singleOpExpr = parse.
             either(
@@ -941,84 +952,6 @@ var quby = window['quby'] || {};
                         throw new Error("Unknown singleOpExpr match");
                 }
             } );
-
-    var doubleOpExpr = parse.
-            a( expr ).
-            thenEither(
-                    ops.plus,
-                    ops.subtract,
-                    ops.divide,
-                    ops.multiply,
-
-                    ops.logicalAnd,
-                    ops.logicalOr,
-
-                    ops.equality,
-
-                    ops.modulus,
-
-                    ops.lessThan,
-                    ops.greaterThan,
-                    ops.lessThanEqual,
-                    ops.greaterThanEqual,
-
-                    ops.shiftLeft,
-                    ops.shiftRight,
-
-                    ops.bitwiseAnd,
-                    ops.bitwiseOr,
-
-                    ops.power
-            ).
-            then( expr ).
-            onMatch( function(left, op, right) {
-                switch( op.symbol ) {
-                    case ops.plus:
-                        return new quby.syntax.Add( left, right );
-                    case ops.subtract:
-                        return new quby.syntax.Sub( left, right );
-                    case ops.divide:
-                        return new quby.syntax.Divide( left, right );
-                    case ops.multiply:
-                        return new quby.syntax.Mult( left, right );
-
-                    case ops.logicalAnd:
-                        return new quby.syntax.BoolAnd( left, right );
-                    case ops.logicalOr:
-                        return new quby.syntax.BoolOr( left, right );
-
-                    case ops.equality:
-                        return new quby.syntax.Equality( left, right );
-
-                    case ops.modulus:
-                        return new quby.syntax.Mod( left, right );
-
-                    case ops.lessThan:
-                        return new quby.syntax.LessThan( left, right );
-                    case ops.greaterThan:
-                        return new quby.syntax.GreaterThan( left, right );
-                    case ops.lessThanEqual:
-                        return new quby.syntax.LessThanEqual( left, right );
-                    case ops.greaterThanEqual:
-                        return new quby.syntax.GreaterThanEqual( left, right );
-
-                    case ops.shiftLeft:
-                        return new quby.syntax.ShiftLeft( left, right );
-                    case ops.shiftRight:
-                        return new quby.syntax.ShiftRight( left, right );
-
-                    case ops.bitwiseAnd:
-                        return new quby.syntax.BitAnd( left, right );
-                    case ops.bitwiseOr:
-                        return new quby.syntax.BitOr( left, right );
-
-                    case ops.power:
-                        return new quby.syntax.Power( left, right );
-
-                    default:
-                        throw Error("Unknown op given: " + op);
-                }
-            });
 
     var arrayDefinition = parse.
             a( terminals.symbols.leftSquare ).
@@ -1202,14 +1135,20 @@ var quby = window['quby'] || {};
                 }
             } );
 
-    var methodCall = parse.
-            a( expr ).
-            then( terminals.ops.dot ).
+    var methodCallExtension = parse.
+            a( terminals.ops.dot ).
             then( terminals.identifiers.variableName ).
             then( parameterExprs ).
             optional( block ).
-            onMatch( function(expr, dot, name, exprs, block) {
-                return new quby.syntax.MethodCall( expr, name, exprs, block );
+            onMatch( function(dot, name, exprs, block) {
+                return new quby.syntax.MethodCall( null, name, exprs, block );
+            } );
+
+    var methodCallStatement = parse.
+            a( expr ).
+            then( methodCallExtension ).
+            onMatch( function( expr, extension ) {
+                return extension.setLeft( expr );
             } );
 
     var newInstance = parse.
@@ -1221,9 +1160,100 @@ var quby = window['quby'] || {};
                 return new quby.syntax.NewInstance( klass, exprs, block );
             } );
 
+    /**
+     * These add operations on to the end of an expr.
+     *
+     * For example take the code: '3 + 5'. This would
+     * make up the rules for the '+ 5' bit, which is
+     * tacked on after '3'.
+     *
+     * That is then rebalanced later in the AST.
+     */
+    var exprExtension = parse.
+            either(
+                    methodCallExtension,
+                    arrayAccessExtension,
+
+                    parse.
+                            either(
+                                    ops.plus,
+                                    ops.subtract,
+                                    ops.divide,
+                                    ops.multiply,
+
+                                    ops.logicalAnd,
+                                    ops.logicalOr,
+
+                                    ops.equality,
+
+                                    ops.modulus,
+
+                                    ops.lessThan,
+                                    ops.greaterThan,
+                                    ops.lessThanEqual,
+                                    ops.greaterThanEqual,
+
+                                    ops.shiftLeft,
+                                    ops.shiftRight,
+
+                                    ops.bitwiseAnd,
+                                    ops.bitwiseOr,
+
+                                    ops.power
+                            ).
+                            then( expr ).
+                            onMatch( function(op, right) {
+                                switch( op.symbol ) {
+                                    case ops.plus:
+                                        return new quby.syntax.Add( null, right );
+                                    case ops.subtract:
+                                        return new quby.syntax.Sub( null, right );
+                                    case ops.divide:
+                                        return new quby.syntax.Divide( null, right );
+                                    case ops.multiply:
+                                        return new quby.syntax.Mult( null, right );
+
+                                    case ops.logicalAnd:
+                                        return new quby.syntax.BoolAnd( null, right );
+                                    case ops.logicalOr:
+                                        return new quby.syntax.BoolOr( null, right );
+
+                                    case ops.equality:
+                                        return new quby.syntax.Equality( null, right );
+
+                                    case ops.modulus:
+                                        return new quby.syntax.Mod( null, right );
+
+                                    case ops.lessThan:
+                                        return new quby.syntax.LessThan( null, right );
+                                    case ops.greaterThan:
+                                        return new quby.syntax.GreaterThan( null, right );
+                                    case ops.lessThanEqual:
+                                        return new quby.syntax.LessThanEqual( null, right );
+                                    case ops.greaterThanEqual:
+                                        return new quby.syntax.GreaterThanEqual( null, right );
+
+                                    case ops.shiftLeft:
+                                        return new quby.syntax.ShiftLeft( null, right );
+                                    case ops.shiftRight:
+                                        return new quby.syntax.ShiftRight( null, right );
+
+                                    case ops.bitwiseAnd:
+                                        return new quby.syntax.BitAnd( null, right );
+                                    case ops.bitwiseOr:
+                                        return new quby.syntax.BitOr( null, right );
+
+                                    case ops.power:
+                                        return new quby.syntax.Power( null, right );
+
+                                    default:
+                                        throw Error("Unknown op given: " + op);
+                                }
+                            })
+            );
+
     expr.
             either(
-                    doubleOpExpr,
                     singleOpExpr,
 
                     arrayDefinition,
@@ -1242,12 +1272,9 @@ var quby = window['quby'] || {};
                             } ),
 
 
-                    arrayAccess,
-
                     newInstance,
 
                     functionCall,
-                    methodCall,
 
                     variables,
 
@@ -1258,12 +1285,23 @@ var quby = window['quby'] || {};
                             onMatch( function(colon, identifier) {
                                 return new quby.syntax.Symbol( identifier );
                             }),
+
                     terminals.literals,
 
                     // admin bits
                     terminals.admin.inline,
                     terminals.admin.preInline
-            );
+            ).
+            optional( exprExtension ).
+            onMatch( function(expr, rest) {
+                if ( rest !== null ) {
+                    rest.setLeft( expr );
+
+                    return rest;
+                } else {
+                    return expr;
+                }
+            } );
 
     /*
      * Assignments
@@ -1428,7 +1466,6 @@ var quby = window['quby'] || {};
                     }
                 } );
 
-window.foo = arrayAssignment;
     statement.either(
                     functionDefinition,
                     classDefinition,
@@ -1443,8 +1480,8 @@ window.foo = arrayAssignment;
 
                     functionCall,
 
+                    methodCallStatement,
                     arrayAssignment,
-                    methodCall,
 
                     variableAssignment,
 
