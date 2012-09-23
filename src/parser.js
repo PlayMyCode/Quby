@@ -772,7 +772,7 @@ var quby = window['quby'] || {};
 
     terminals.identifiers.variableName.onMatch( function(match, offset) {
         var sym = new quby.lexer.IdSym( offset, match );
-        sym.symbol = terminals.identifiers.variableName;
+        sym.terminal = terminals.identifiers.variableName;
         return sym;
     } );
 
@@ -908,7 +908,8 @@ var quby = window['quby'] || {};
                                 )
                         );
                     default:
-                        throw new Error("Unknown terminal met for variables: " + identifier);
+                        console.log( identifier );
+                        throw new Error("Unknown terminal for variables: " + identifier);
                 }
             });
 
@@ -922,15 +923,6 @@ var quby = window['quby'] || {};
             onMatch( function( leftSquare, keyExpr, endOfLine, rightSquare) {
                 return new quby.syntax.ArrayAccess( null, keyExpr );
             });
-
-    var arrayAccess = parse.
-            a(
-                    expr,
-                    arrayAccessExtension
-            ).
-            onMatch( function(expr, extension) {
-                return extension.setLeft( expr );
-            } );
 
     var singleOpExpr = parse.
             either(
@@ -989,7 +981,7 @@ var quby = window['quby'] || {};
                 }
             } );
 
-    var yieldStatement = parse.
+    var yieldExpr = parse.
             a( terminals.keywords.YIELD ).
             optional( exprs ).
             onMatch( function(yld, exprs) {
@@ -1144,13 +1136,6 @@ var quby = window['quby'] || {};
                 return new quby.syntax.MethodCall( null, name, exprs, block );
             } );
 
-    var methodCallStatement = parse.
-            a( expr ).
-            then( methodCallExtension ).
-            onMatch( function( expr, extension ) {
-                return extension.setLeft( expr );
-            } );
-
     var newInstance = parse.
             a( terminals.keywords.NEW ).
             then( terminals.identifiers.variableName ).
@@ -1184,10 +1169,22 @@ var quby = window['quby'] || {};
      *
      * That is then rebalanced later in the AST.
      */
-    var exprExtension = parse.
-            either(
-                    methodCallExtension,
-                    arrayAccessExtension,
+    var exprExtension = parse();
+    exprExtension.either(
+                    parse.
+                            either(
+                                    methodCallExtension,
+                                    arrayAccessExtension
+                            ).
+                            optional( exprExtension ).
+                            onMatch( function(left, ext) {
+                                if ( ext === null ) {
+                                    return left;
+                                } else {
+                                    ext.appendLeft( left );
+                                    return ext;
+                                }
+                            } ),
 
                     parse.
                             either(
@@ -1214,11 +1211,15 @@ var quby = window['quby'] || {};
                                     ops.bitwiseAnd,
                                     ops.bitwiseOr,
 
-                                    ops.power
+                                    ops.power,
+
+                                    ops.assignment
                             ).
                             then( expr ).
                             onMatch( function(op, right) {
                                 switch( op.terminal ) {
+                                    case ops.assignment:
+                                        return new quby.syntax.Assignment( null, right );
                                     case ops.plus:
                                         return new quby.syntax.Add( null, right );
                                     case ops.subtract:
@@ -1268,15 +1269,13 @@ var quby = window['quby'] || {};
             );
 
 window._ = {};
-window._.arrayAssignment = arrayAssignment;
-window._.arrayAccess = arrayAccess;
 window._.expr = expr;
     expr.
             either(
                     singleOpExpr,
                     arrayDefinition,
                     hashDefinition,
-                    yieldStatement,
+                    yieldExpr,
                     exprInParenthesis,
                     newInstance,
                     functionCall,
@@ -1296,40 +1295,14 @@ window._.expr = expr;
             optional( exprExtension ).
             onMatch( function(expr, rest) {
                 if ( rest !== null ) {
-                    rest.setLeft( expr );
+                    console.log( expr, rest );
+                    rest.appendLeft( expr );
 
                     return rest;
                 } else {
                     return expr;
                 }
             } );
-
-    /*
-     * Assignments
-     */
-
-    var variableAssignment = parse(
-                    variableAssignments,
-                    terminals.ops.assignment,
-                    expr
-            ).
-            onMatch( function(variable, equal, expr) {
-                return new quby.syntax.Assignment( variable, expr );
-            } );
-
-    var arrayAssignment = parse.
-            a( arrayAccess ).
-            then( terminals.ops.assignment ).
-            then( expr ).
-            onMatch( function( array, equal, value ) {
-                return new quby.syntax.ArrayAssignment( array, value );
-            });
-
-    var assignment = parse.
-            either(
-                    arrayAssignment,
-                    variableAssignment
-            );
 
     /*
      * Definitions
@@ -1476,19 +1449,12 @@ window._.expr = expr;
                     whileUntilStatement,
                     loopStatement,
 
-                    yieldStatement,
                     returnStatement,
-
-                    functionCall,
-
-                    methodCallStatement,
-                    arrayAssignment,
-
-                    variableAssignment,
 
 /*
                     moduleDef,
 */
+                    expr,
 
                     terminals.admin.inline,
                     terminals.admin.preInline

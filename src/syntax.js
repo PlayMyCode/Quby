@@ -1221,8 +1221,13 @@ var quby = window['quby'] || {};
                 old_validate.call(this, v);
             };
 
-            this.setLeft = function( expr ) {
-                this.expr = expr;
+            this.appendLeft = function( expr ) {
+                if ( this.expr !== null ) {
+                    this.expr.appendLeft( expr );
+                } else {
+                    this.expr = expr;
+                }
+
                 return this;
             };
         },
@@ -1705,12 +1710,15 @@ var quby = window['quby'] || {};
                 return null;
             };
 
-            this.setLeft = function( left ) {
-                this.left = left;
-                
-                if ( left ) {
+            this.appendLeft = function( left ) {
+                if ( this.left !== null ) {
+                    this.left.appendLeft( left );
+                } else if ( left ) {
                     this.setOffset( left.offset );
+                    this.left = left;
                 }
+
+                return this;
             }
         },
 
@@ -1963,16 +1971,16 @@ var quby = window['quby'] || {};
             quby.syntax.Identifier.call(this, identifier, quby.runtime.formatVar(identifier.value));
 
             this.validate = function (v) {
-                if (v.isInsideParameters()) {
+                if ( v.isInsideParameters() ) {
                     // it presumes scope has already been pushed by the function it's within
-                    if (v.containsLocalVar(this)) {
-                        v.parseError(this.offset, "Parameter variable name used multiple times, var: '" + this.identifier + "'.");
+                    if ( v.containsLocalVar(this) ) {
+                        v.parseError( this.offset, "Parameter variable name used multiple times, var: '" + this.identifier + "'." );
                     }
 
                     v.assignVar(this);
                 } else {
-                    if (!v.containsVar(this)) {
-                        v.parseError(this.offset, "Variable used before it's assigned to, var: " + this.identifier);
+                    if ( ! v.containsVar(this) ) {
+                        v.parseError( this.offset, "Variable used before it's assigned to, var: " + this.identifier );
                     }
                 }
             };
@@ -2089,12 +2097,15 @@ var quby = window['quby'] || {};
                 this.index.validate(v);
             };
 
-            this.setLeft = function( array ) {
-                this.array = array;
-
-                if ( array ) {
+            this.appendLeft = function( array ) {
+                if ( this.array !== null ) {
+                    this.array.appendLeft( array );
+                } else if ( array ) {
                     this.setOffset( array.offset );
+                    this.array = array;
                 }
+
+                return this;
             };
         },
         ArrayDefinition: function (parameters) {

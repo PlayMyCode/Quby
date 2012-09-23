@@ -2747,16 +2747,7 @@ var parse = window['parse'] = (function( window, undefined ) {
         var startSymbolI = symbols.idIndex(),
             peekID = symbols.peekID();
 
-if ( window._.expr === this ) {
-    tabLog( window._.exprC, '### expr ###', this.isRecursive);
-    window._.exprC = ( window._.exprC === undefined ) ? 0 : window._.exprC + 1 ;
-
-    if ( window._.exprC > 9 ) {
-        throw new Error('STOP!');
-    }
-}
         if ( this.internalCount === 0 ) {
-            tabLog( window._.exprC, 'first entered', this.isRecursive);
             this.recursiveCount = 0;
         }
 
@@ -2764,21 +2755,13 @@ if ( window._.expr === this ) {
 
         if ( this.isRecursive === startSymbolI ) {
             if ( this.recursiveCount > 2 ) {
-                if ( window._.expr === this ) {
-                    tabLog( window._.exprC, 'resursive stop');
-                    window._.exprC--;
-                }
-
                 this.internalCount--;
+
                 return null;
             } else {
                 this.recursiveCount++;
             }
         } else {
-            if ( window._.expr === this ) {
-                tabLog( window._.exprC, 'clear expr', startSymbolI);
-            }
-
             this.recursiveCount = 0;
             this.isRecursive    = startSymbolI;
         }
@@ -2884,10 +2867,6 @@ if ( window._.expr === this ) {
             this.recursiveCount--;
         }
 
-if ( window._.expr === this ) {
-    tabLog( window._.exprC, 'leave');
-    window._.exprC--;
-}
         this.internalCount--;
         return args;
     };
