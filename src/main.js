@@ -1269,7 +1269,7 @@ var quby = window['quby'] || {};
                 if (this.rootClass == null) {
                     return [];
                 } else {
-                    return this.rootClass.klass.statements.stmts;
+                    return this.rootClass.klass.statements.getStmts();
                 }
             };
         },

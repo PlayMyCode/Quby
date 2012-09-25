@@ -908,7 +908,6 @@ var quby = window['quby'] || {};
                                 )
                         );
                     default:
-                        console.log( identifier );
                         throw new Error("Unknown terminal for variables: " + identifier);
                 }
             });
@@ -1295,7 +1294,6 @@ window._.expr = expr;
             optional( exprExtension ).
             onMatch( function(expr, rest) {
                 if ( rest !== null ) {
-                    console.log( expr, rest );
                     rest.appendLeft( expr );
 
                     return rest;

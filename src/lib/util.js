@@ -47,6 +47,26 @@ var util = window['util'] = {};
 
     var browserName = calculateName();
 
+    util.klass = function( constructor ) {
+        var proto = constructor.prototype;
+
+        for ( var i = 1; i < arguments.length; i++ ) {
+            var funs = arguments[i];
+
+            if ( typeof funs === 'function' || funs instanceof Function ) {
+                funs = funs.prototype;
+            }
+
+            for ( var k in funs ) {
+                if ( funs.hasOwnProperty(k) ) {
+                    proto[k] = funs[k];
+                }
+            }
+        }
+
+        return constructor;
+    }
+
     util.browser = {
             isIE      : browserName === 'ie'     ,
             isMozilla : browserName === 'mozilla',
