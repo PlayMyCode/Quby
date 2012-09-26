@@ -518,6 +518,26 @@ var quby = window['quby'] || {};
                     NULL        : 'null',
                     NIL         : 'nil',
 
+                    symbol      : function(src, i, code, len) {
+                        if ( code === COLON ) {
+                            code = src.charCodeAt( i+1 );
+
+                            if (
+                                    // is a lower case letter, or underscore
+                                    (code >= 97 && code <= 122) ||
+                                    (code === UNDERSCORE)
+                            ) {
+                                i += 2;
+
+                                while ( isAlphaNumericCode(src.charCodeAt(i)) ) {
+                                    i++;
+                                }
+
+                                return i;
+                            }
+                        }
+                    },
+
                     number      : parse.terminal.NUMBER,
                     string      : parse.terminal.STRING
             },
@@ -531,7 +551,20 @@ var quby = window['quby'] || {};
                     subtract            : '-',
                     modulus             : '%',
 
-                    colon               : ':',
+                    colon               : function(src, i, code, len) {
+                        if ( code === COLON ) {
+                            code = src.charCodeAt( i+1 );
+
+                            if (
+                                    // is a lower case letter, or underscore
+                                    (code < 97 || code > 122) &&
+                                    (code !== UNDERSCORE)
+                            ) {
+                                return i+1;
+                            }
+                        }
+                    },
+
                     mapArrow            : '=>',
 
                     equal               : '==',
@@ -779,32 +812,37 @@ var quby = window['quby'] || {};
 
     terminals.literals.TRUE.onMatch( function(match, offset) {
         return new quby.ast.Bool(
-            new quby.lexer.Sym( offset, true )
+                new quby.lexer.Sym( offset, true )
         );
     });
     terminals.literals.FALSE.onMatch( function(match, offset) {
         return new quby.ast.Bool(
-            new quby.lexer.Sym( offset, false )
+                new quby.lexer.Sym( offset, false )
         );
     });
     terminals.literals.NULL.onMatch( function(match, offset) {
         return new quby.ast.Null(
-            new quby.lexer.Sym( offset, null )
+                new quby.lexer.Sym( offset, null )
         );
     });
     terminals.literals.NIL.onMatch( function(match, offset) {
         return new quby.ast.Null(
-            new quby.lexer.Sym( offset, null )
+                new quby.lexer.Sym( offset, null )
+        );
+    });
+    terminals.literals.symbol.onMatch( function(match, offset) {
+        return new quby.ast.Symbol( 
+                new quby.lexer.Sym( offset, match )
         );
     });
     terminals.literals.string.onMatch( function(match, offset) {
         return new quby.ast.String(
-            new quby.lexer.Sym( offset, match )
+                new quby.lexer.Sym( offset, match )
         );
     });
     terminals.literals.number.onMatch( function(match, offset) {
         return new quby.ast.Number(
-            new quby.lexer.Sym( offset, match )
+                new quby.lexer.Sym( offset, match )
         );
     });
 
@@ -1142,12 +1180,6 @@ var quby = window['quby'] || {};
                 return new quby.ast.ExprParenthesis( expr );
             } );
 
-    var symbol = parse.
-            a( terminals.ops.colon, terminals.identifiers.variableName ).
-            onMatch( function(colon, identifier) {
-                return new quby.ast.Symbol( identifier );
-            });
-
     /**
      * These add operations on to the end of an expr.
      *
@@ -1274,7 +1306,6 @@ var quby = window['quby'] || {};
                     lambda,
 
                     // literals
-                    symbol,
                     terminals.literals,
 
                     // admin bits
