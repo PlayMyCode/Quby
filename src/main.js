@@ -51,8 +51,12 @@ var quby = window['quby'] || {};
         Parser: function () {
             this.validator = new quby.main.Validator();
 
-            this.enableStrictMode = function( mode ) {
-                this.validator.enableStrictMode( mode );
+            this.enableStrictMode = function() {
+                this.validator.setStrictMode( true );
+            };
+
+            this.disableStrictMode = function() {
+                this.validator.setStrictMode( false );
             };
 
             /**
@@ -576,7 +580,7 @@ var quby = window['quby'] || {};
 
             this.symbols = new quby.main.SymbolTable();
 
-            this.enableStrictMode = function(mode) {
+            this.setStrictMode = function(mode) {
                 this.strictMode = !! mode;
             };
 
@@ -884,39 +888,28 @@ var quby = window['quby'] || {};
                     line = 0;
                 }
 
-                var es = this.errors[ line ];
-
-                if ( es === undefined ) {
-                    this.errors[line] = msg;
-                } else if ( es instanceof Array ) {
-                    es.push( msg );
-                } else {
-                    this.errors[line] = [ es, msg ];
-                }
+                this.errors.push({
+                        line: line,
+                        msg: msg
+                });
             };
 
             this.getErrors = function () {
-                if ( this.errors.length === 0 ) {
-                    return this.errors;
-                } else {
-                    var errors = this.errors,
-                        sortedErrors = [];
+                var errors = this.errors;
 
-                    for ( var k in errors ) {
-                        if ( errors.hasOwnProperty(k) ) {
-                            var es = errors[k];
+                if ( errors.length > 0 ) {
+                    errors.sort(function(a, b) {
+                        return a.line - b.line;
+                    });
 
-                            if ( es instanceof Array ) {
-                                for ( var i = 0; i < es.length; i++ ) {
-                                    sortedErrors.push( es[i] );
-                                }
-                            } else {
-                                sortedErrors.push( es );
-                            }
-                        }
+                    var sortedErrors = new Array( errors.length );
+                    for ( var i = 0; i < errors.length; i++ ) {
+                        sortedErrors[i] = errors[i].msg;
                     }
 
                     return sortedErrors;
+                } else {
+                    return errors;
                 }
             };
 
@@ -929,7 +922,7 @@ var quby = window['quby'] || {};
                 if ( ! program ) {
                     // avoid unneeded error messages
                     if (this.errors.length === 0) {
-                        this.parseError(null, 'Unknown parse error; source code cannot be parsed!');
+                        this.strictError( null, "No source code provided" );
                     }
                 } else {
                     try {

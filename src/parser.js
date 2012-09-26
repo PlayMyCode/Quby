@@ -1495,10 +1495,6 @@ var quby = window['quby'] || {};
             );
     
     quby.parser = {
-            parseDebug: function( origSrc, onFinish, onDebug ) {
-                quby.parser.parse( origSrc, onFinish, onDebug );
-            },
-
             /**
              * The entry point for the parser, and the only way to interact.
              *
