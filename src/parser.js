@@ -10,7 +10,7 @@ var quby = window['quby'] || {};
  *
  * In many ways this is glue code, as it uses:
  *  - parse.js for parsing
- *  - quby.syntax for building the AST
+ *  - quby.ast for building the AST
  *  - quby.lexer for building the symbols
  *
  * It is also built to have it's work lined across multiple time intervals. That
@@ -777,38 +777,38 @@ var quby = window['quby'] || {};
     } );
 
     terminals.literals.TRUE.onMatch( function(match, offset) {
-        return new quby.syntax.Bool(
+        return new quby.ast.Bool(
             new quby.lexer.Sym( offset, true )
         );
     });
     terminals.literals.FALSE.onMatch( function(match, offset) {
-        return new quby.syntax.Bool(
+        return new quby.ast.Bool(
             new quby.lexer.Sym( offset, false )
         );
     });
     terminals.literals.NULL.onMatch( function(match, offset) {
-        return new quby.syntax.Null(
+        return new quby.ast.Null(
             new quby.lexer.Sym( offset, null )
         );
     });
     terminals.literals.NIL.onMatch( function(match, offset) {
-        return new quby.syntax.Null(
+        return new quby.ast.Null(
             new quby.lexer.Sym( offset, null )
         );
     });
     terminals.literals.string.onMatch( function(match, offset) {
-        return new quby.syntax.String(
+        return new quby.ast.String(
             new quby.lexer.Sym( offset, match )
         );
     });
     terminals.literals.number.onMatch( function(match, offset) {
-        return new quby.syntax.Number(
+        return new quby.ast.Number(
             new quby.lexer.Sym( offset, match )
         );
     });
 
     terminals.admin.inline.onMatch( function(match, offset) {
-        return new quby.syntax.Inline(
+        return new quby.ast.Inline(
                 new quby.lexer.Sym(
                         offset,
                         match.substring( 3, match.length-3 )
@@ -816,7 +816,7 @@ var quby = window['quby'] || {};
         );
     });
     terminals.admin.preInline.onMatch( function(match, offset) {
-        return new quby.syntax.PreInline(
+        return new quby.ast.PreInline(
                 new quby.lexer.Sym(
                         offset,
                         match.substring( 6, match.length-3 )
@@ -848,16 +848,16 @@ var quby = window['quby'] || {};
             optional( statementSeperator ).
             onMatch( function(onStart, stmts, endEnd) {
                 if ( stmts === null ) {
-                    return new quby.syntax.Statements();
+                    return new quby.ast.Statements();
                 } else {
-                    return new quby.syntax.Statements( stmts );
+                    return new quby.ast.Statements( stmts );
                 }
             });
 
     var exprs = parse.
             repeatSeperator( expr, terminals.symbols.comma ).
             onMatch( function(exprs) {
-                return new quby.syntax.Parameters().
+                return new quby.ast.Parameters().
                         set( exprs );
             });
 
@@ -865,23 +865,23 @@ var quby = window['quby'] || {};
             onMatch( function(identifier) {
                 switch ( identifier.terminal ) {
                     case terminals.identifiers.variableName:
-                        return new quby.syntax.Variable( identifier );
+                        return new quby.ast.Variable( identifier );
                     case terminals.identifiers.global:
-                        return new quby.syntax.GlobalVariable(
+                        return new quby.ast.GlobalVariable(
                                 new quby.lexer.IdSym(
                                         identifier.offset,
                                         identifier.match
                                 )
                         );
                     case terminals.identifiers.field:
-                        return new quby.syntax.FieldVariable(
+                        return new quby.ast.FieldVariable(
                                 new quby.lexer.IdSym(
                                         identifier.offset,
                                         identifier.match.substring(1)
                                 )
                         );
                     case terminals.keywords.THIS:
-                        return new quby.syntax.ThisVariable( identifier.offset, null );
+                        return new quby.ast.ThisVariable( identifier.offset, null );
                     default:
                         log(identifier);
                         throw new Error("Unknown terminal met for variables: " + identifier);
@@ -892,16 +892,16 @@ var quby = window['quby'] || {};
             onMatch( function(identifier) {
                 switch ( identifier.terminal ) {
                     case terminals.identifiers.variableName:
-                        return new quby.syntax.VariableAssignment( identifier );
+                        return new quby.ast.VariableAssignment( identifier );
                     case terminals.identifiers.global:
-                        return new quby.syntax.GlobalVariableAssignment(
+                        return new quby.ast.GlobalVariableAssignment(
                                 new quby.lexer.IdSym(
                                         identifier.offset,
                                         identifier.match
                                 )
                         );
                     case terminals.identifiers.field:
-                        return new quby.syntax.FieldVariableAssignment(
+                        return new quby.ast.FieldVariableAssignment(
                                 new quby.lexer.IdSym(
                                         identifier.offset,
                                         identifier.match.substring(1)
@@ -920,7 +920,7 @@ var quby = window['quby'] || {};
             optional( terminals.endOfLine ).
             then( terminals.symbols.rightSquare ).
             onMatch( function( leftSquare, keyExpr, endOfLine, rightSquare) {
-                return new quby.syntax.ArrayAccess( null, keyExpr );
+                return new quby.ast.ArrayAccess( null, keyExpr );
             });
 
     var singleOpExpr = parse.
@@ -933,9 +933,9 @@ var quby = window['quby'] || {};
             onMatch( function( op, expr ) {
                 switch ( op.terminal ) {
                     case ops.not:
-                        return new quby.syntax.Not( expr );
+                        return new quby.ast.Not( expr );
                     case terminals.ops.subtract:
-                        return new quby.syntax.SingleSub(expr);
+                        return new quby.ast.SingleSub(expr);
                     case ops.plus:
                         return expr;
                     default:
@@ -951,9 +951,9 @@ var quby = window['quby'] || {};
             then( terminals.symbols.rightSquare ).
             onMatch( function(lSquare, exprs, endOfLine, rSquare) {
                 if ( exprs !== null ) {
-                    return new quby.syntax.ArrayDefinition( exprs );
+                    return new quby.ast.ArrayDefinition( exprs );
                 } else {
-                    return new quby.syntax.ArrayDefinition();
+                    return new quby.ast.ArrayDefinition();
                 }
             } );
 
@@ -962,7 +962,7 @@ var quby = window['quby'] || {};
             either( terminals.ops.colon, terminals.ops.mapArrow ).
             then( expr ).
             onMatch( function(left, mapAssign, right) {
-                return new quby.syntax.Mapping( left, right );
+                return new quby.ast.Mapping( left, right );
             });
 
     var hashDefinition = parse.
@@ -972,11 +972,11 @@ var quby = window['quby'] || {};
             then( terminals.symbols.rightBrace ).
             onMatch( function(lBrace, mappings, endOfLine, rBrace) {
                 if ( mappings !== null ) {
-                    return new quby.syntax.HashDefinition(
-                            new quby.syntax.Mappings( mappings )
+                    return new quby.ast.HashDefinition(
+                            new quby.ast.Mappings( mappings )
                     );
                 } else {
-                    return new quby.syntax.HashDefinition();
+                    return new quby.ast.HashDefinition();
                 }
             } );
 
@@ -985,9 +985,9 @@ var quby = window['quby'] || {};
             optional( exprs ).
             onMatch( function(yld, exprs) {
                 if ( exprs !== null ) {
-                    return new quby.syntax.YieldStmt( exprs, exprs );
+                    return new quby.ast.YieldStmt( exprs, exprs );
                 } else {
-                    return new quby.syntax.YieldStmt(
+                    return new quby.ast.YieldStmt(
                             new quby.lexer.Sym( yld.offset, 'yield' )
                     );
                 }
@@ -998,10 +998,10 @@ var quby = window['quby'] || {};
             optional( expr ).
             onMatch( function(rtn, expr) {
                 if ( expr !== null ) {
-                    return new quby.syntax.ReturnStmt( expr );
+                    return new quby.ast.ReturnStmt( expr );
                 } else {
-                    return new quby.syntax.ReturnStmt(
-                            new quby.syntax.Null(rtn)
+                    return new quby.ast.ReturnStmt(
+                            new quby.ast.Null(rtn)
                     );
                 }
             } );
@@ -1016,13 +1016,13 @@ var quby = window['quby'] || {};
                             variables,
                             parse.a( terminals.ops.bitwiseAnd, terminals.identifiers.variableName ).
                                     onMatch( function(bitAnd, name) {
-                                        return new quby.syntax.ParameterBlockVariable( name );
+                                        return new quby.ast.ParameterBlockVariable( name );
                                     } )
                     ),
                     terminals.symbols.comma
             ).
             onMatch( function( params ) {
-                return new quby.syntax.Parameters().
+                return new quby.ast.Parameters().
                         set( params );
             });
 
@@ -1044,7 +1044,7 @@ var quby = window['quby'] || {};
             then( terminals.symbols.rightBracket ).
             onMatch( function(lParen, params, end, rParen) {
                 if ( params === null ) {
-                    return new quby.syntax.Parameters();
+                    return new quby.ast.Parameters();
                 } else {
                     return params;
                 }
@@ -1080,7 +1080,7 @@ var quby = window['quby'] || {};
             then( terminals.ops.bitwiseOr ).
             onMatch( function(lOr, params, end, rOr) {
                 if ( params !== null ) {
-                    return new quby.syntax.Parameters().set( params );
+                    return new quby.ast.Parameters().set( params );
                 } else {
                     return null;
                 }
@@ -1094,7 +1094,7 @@ var quby = window['quby'] || {};
                             optional( statements ).
                             then( terminals.symbols.rightBrace ).
                             onMatch( function( lBrace, params, stmts, rBrace ) {
-                                return new quby.syntax.FunctionBlock(params, stmts);
+                                return new quby.ast.FunctionBlock(params, stmts);
                             } ),
                     parse.
                             a( terminals.keywords.DO ).
@@ -1102,7 +1102,7 @@ var quby = window['quby'] || {};
                             optional( statements ).
                             then( terminals.keywords.END ).
                             onMatch( function( lBrace, params, stmts, rBrace ) {
-                                return new quby.syntax.FunctionBlock(params, stmts);
+                                return new quby.ast.FunctionBlock(params, stmts);
                             } )
             );
 
@@ -1111,7 +1111,7 @@ var quby = window['quby'] || {};
             optional( statements ).
             then( terminals.keywords.END ).
             onMatch( function(def, params, stmts, end) {
-                return new quby.syntax.Lambda( params, stmts );
+                return new quby.ast.Lambda( params, stmts );
             });
 
     var functionCall = parse.
@@ -1120,9 +1120,9 @@ var quby = window['quby'] || {};
             optional( block ).
             onMatch( function(name, exprs, block) {
                 if ( name.lower == quby.runtime.SUPER_KEYWORD ) {
-                    return new quby.syntax.SuperCall( name, exprs, block );
+                    return new quby.ast.SuperCall( name, exprs, block );
                 } else {
-                    return new quby.syntax.FunctionCall( name, exprs, block );
+                    return new quby.ast.FunctionCall( name, exprs, block );
                 }
             } );
 
@@ -1132,7 +1132,7 @@ var quby = window['quby'] || {};
             then( parameterExprs ).
             optional( block ).
             onMatch( function(dot, name, exprs, block) {
-                return new quby.syntax.MethodCall( null, name, exprs, block );
+                return new quby.ast.MethodCall( null, name, exprs, block );
             } );
 
     var newInstance = parse.
@@ -1141,7 +1141,7 @@ var quby = window['quby'] || {};
             then( parameterExprs ).
             optional( block ).
             onMatch( function(nw, klass, exprs, block) {
-                return new quby.syntax.NewInstance( klass, exprs, block );
+                return new quby.ast.NewInstance( klass, exprs, block );
             } );
 
     var exprInParenthesis = parse.
@@ -1150,13 +1150,13 @@ var quby = window['quby'] || {};
             optional( terminals.endOfLine ).
             then( terminals.symbols.rightBracket ).
             onMatch( function(left, expr, endOfLine, right) {
-                return new quby.syntax.ExprParenthesis( expr );
+                return new quby.ast.ExprParenthesis( expr );
             } );
 
     var symbol = parse.
             a( terminals.ops.colon, terminals.identifiers.variableName ).
             onMatch( function(colon, identifier) {
-                return new quby.syntax.Symbol( identifier );
+                return new quby.ast.Symbol( identifier );
             });
 
     /**
@@ -1218,48 +1218,48 @@ var quby = window['quby'] || {};
                             onMatch( function(op, right) {
                                 switch( op.terminal ) {
                                     case ops.assignment:
-                                        return new quby.syntax.Assignment( null, right );
+                                        return new quby.ast.Assignment( null, right );
                                     case ops.plus:
-                                        return new quby.syntax.Add( null, right );
+                                        return new quby.ast.Add( null, right );
                                     case ops.subtract:
-                                        return new quby.syntax.Sub( null, right );
+                                        return new quby.ast.Sub( null, right );
                                     case ops.divide:
-                                        return new quby.syntax.Divide( null, right );
+                                        return new quby.ast.Divide( null, right );
                                     case ops.multiply:
-                                        return new quby.syntax.Mult( null, right );
+                                        return new quby.ast.Mult( null, right );
 
                                     case ops.logicalAnd:
-                                        return new quby.syntax.BoolAnd( null, right );
+                                        return new quby.ast.BoolAnd( null, right );
                                     case ops.logicalOr:
-                                        return new quby.syntax.BoolOr( null, right );
+                                        return new quby.ast.BoolOr( null, right );
 
                                     case ops.equality:
-                                        return new quby.syntax.Equality( null, right );
+                                        return new quby.ast.Equality( null, right );
 
                                     case ops.modulus:
-                                        return new quby.syntax.Mod( null, right );
+                                        return new quby.ast.Mod( null, right );
 
                                     case ops.lessThan:
-                                        return new quby.syntax.LessThan( null, right );
+                                        return new quby.ast.LessThan( null, right );
                                     case ops.greaterThan:
-                                        return new quby.syntax.GreaterThan( null, right );
+                                        return new quby.ast.GreaterThan( null, right );
                                     case ops.lessThanEqual:
-                                        return new quby.syntax.LessThanEqual( null, right );
+                                        return new quby.ast.LessThanEqual( null, right );
                                     case ops.greaterThanEqual:
-                                        return new quby.syntax.GreaterThanEqual( null, right );
+                                        return new quby.ast.GreaterThanEqual( null, right );
 
                                     case ops.shiftLeft:
-                                        return new quby.syntax.ShiftLeft( null, right );
+                                        return new quby.ast.ShiftLeft( null, right );
                                     case ops.shiftRight:
-                                        return new quby.syntax.ShiftRight( null, right );
+                                        return new quby.ast.ShiftRight( null, right );
 
                                     case ops.bitwiseAnd:
-                                        return new quby.syntax.BitAnd( null, right );
+                                        return new quby.ast.BitAnd( null, right );
                                     case ops.bitwiseOr:
-                                        return new quby.syntax.BitOr( null, right );
+                                        return new quby.ast.BitOr( null, right );
 
                                     case ops.power:
-                                        return new quby.syntax.Power( null, right );
+                                        return new quby.ast.Power( null, right );
 
                                     default:
                                         throw Error("Unknown op given: " + op);
@@ -1316,7 +1316,7 @@ window._.expr = expr;
                                 } )
                 ).
                 onMatch( function( name, superClass ) {
-                    return new quby.syntax.ClassHeader( name, superClass );
+                    return new quby.ast.ClassHeader( name, superClass );
                 } );
 
     var moduleDefinition = parse.
@@ -1325,7 +1325,7 @@ window._.expr = expr;
                 optional( statements ).
                 then( terminals.keywords.END ).
                 onMatch( function(keyModule, name, stmts, end) {
-                    return new quby.syntax.ModuleDefinition(name, stmts);
+                    return new quby.ast.ModuleDefinition(name, stmts);
                 } );
 
     var classDefinition = parse.
@@ -1334,7 +1334,7 @@ window._.expr = expr;
                 optional( statements ).
                 then( terminals.keywords.END ).
                 onMatch( function(klass, header, stmts, end) {
-                    return new quby.syntax.ClassDefinition( header, stmts );
+                    return new quby.ast.ClassDefinition( header, stmts );
                 } );
 
     var functionDefinition = parse.
@@ -1347,18 +1347,18 @@ window._.expr = expr;
                     if ( def.terminal === terminals.keywords.DEF ) {
                         // 'new' method, class constructor
                         if ( name.terminal === terminals.keywords.NEW ) {
-                            return new quby.syntax.Constructor(
+                            return new quby.ast.Constructor(
                                     new quby.lexer.Sym( name.offset, 'new' ),
                                     params,
                                     stmts
                             );
                         // normal function
                         } else {
-                            return new quby.syntax.Function( name, params, stmts );
+                            return new quby.ast.Function( name, params, stmts );
                         }
                     // admin method
                     } else {
-                        return new quby.syntax.AdminMethod( name, params, stmts );
+                        return new quby.ast.AdminMethod( name, params, stmts );
                     }
                 } );
 
@@ -1372,7 +1372,7 @@ window._.expr = expr;
                 optional( terminals.keywords.THEN ).
                 then( statements ).
                 onMatch( function( IF, condition, THEN, stmts ) {
-                    return new quby.syntax.IfBlock( condition, stmts );
+                    return new quby.ast.IfBlock( condition, stmts );
                 } );
 
     var isElseIf = parse.
@@ -1385,7 +1385,7 @@ window._.expr = expr;
                 optional( terminals.keywords.THEN ).
                 a( statements ).
                 onMatch( function(elseIf, condition, then, stmts) {
-                    return new quby.syntax.IfBlock( condition, stmts );
+                    return new quby.ast.IfBlock( condition, stmts );
                 } );
 
     var ifElseIfs = parse.
@@ -1393,7 +1393,7 @@ window._.expr = expr;
                 maybeThis().
                 onMatch( function(elseIf, elseIfs) {
                     if ( elseIfs === null ) {
-                        elseIfs = new quby.syntax.IfElseIfs();
+                        elseIfs = new quby.ast.IfElseIfs();
                     }
 
                     return elseIfs.unshift( elseIf );
@@ -1409,7 +1409,7 @@ window._.expr = expr;
                 optional( ifElse ).
                 then( terminals.keywords.END ).
                 onMatch( function(start, otherIfs, elses, end) {
-                    return new quby.syntax.IfStmt( start, otherIfs, elses );
+                    return new quby.ast.IfStmt( start, otherIfs, elses );
                 } );
 
     var whileUntilStatement = parse.
@@ -1418,9 +1418,9 @@ window._.expr = expr;
                 then( terminals.keywords.END ).
                 onMatch( function( whileUntil, expr, stmts, end ) {
                     if ( whileUntil.terminal === terminals.keywords.WHILE ) {
-                        return new quby.syntax.WhileLoop( expr, stmts );
+                        return new quby.ast.WhileLoop( expr, stmts );
                     } else {
-                        return new quby.syntax.UntilLoop( expr, stmts );
+                        return new quby.ast.UntilLoop( expr, stmts );
                     }
                 } );
 
@@ -1432,9 +1432,9 @@ window._.expr = expr;
                 then( expr ).
                 onMatch( function(loop, stmts, end, whileUntil, expr) {
                     if ( whileUntil.terminal === terminals.keywords.WHILE ) {
-                        return new quby.syntax.LoopWhile( expr, stmts );
+                        return new quby.ast.LoopWhile( expr, stmts );
                     } else {
-                        return new quby.syntax.LoopUntil( expr, stmts );
+                        return new quby.ast.LoopUntil( expr, stmts );
                     }
                 } );
 
