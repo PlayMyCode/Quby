@@ -874,8 +874,9 @@ var parse = window['parse'] = (function( window, undefined ) {
      * of the given input.
      *
      * @param match The item to use for the matching test.
+     * @param name Optional, a name for this terminal (for error reporting).
      */
-    var Terminal = function( match ) {
+    var Terminal = function( match, name ) {
         this.id = INVALID_TERMINAL;
 
         /**
@@ -884,7 +885,10 @@ var parse = window['parse'] = (function( window, undefined ) {
          * Used for error reporting, so you can have something readable,
          * rather then things like 'E_SOMETHING_END_BLAH_TERMINAL'.
          */
-        this.termName = "<Anonymous Terminal>";
+        var nameSupplied = ( name !== undefined );
+        this.termName = !nameSupplied ?
+                "<Anonymous Terminal>" :
+                name ;
 
         /**
          * When true, this has been explicitely named.
@@ -955,6 +959,12 @@ var parse = window['parse'] = (function( window, undefined ) {
          */
         this.postMatch = null;
 
+        /**
+         * Some terminals are silently hidden away,
+         * this is so they can still see their parents.
+         */
+        this.terminalParent = null;
+
         if ( match instanceof Terminal ) {
             return match;
         } else if ( isFunction(match) ) {
@@ -978,10 +988,16 @@ var parse = window['parse'] = (function( window, undefined ) {
                              match.length === 1
                     )
             ) {
-                this.termName = "<Terminal '" + match + "'>";
-
                 if ( matchType === 'string' ) {
+                    if ( ! nameSupplied ) {
+                        this.termName = "'" + match + "'";
+                    }
+
                     match = match.charCodeAt( 0 );
+                } else {
+                    if ( ! nameSupplied ) {
+                        this.termName = "'" + String.fromCharCode( match ) + "'";
+                    }
                 }
 
                 this.literalLength = 1;
@@ -1010,10 +1026,12 @@ var parse = window['parse'] = (function( window, undefined ) {
                 } else {
                     this.testData = stringToCodes( match );
 
-                    if ( match > 20 ) {
-                        this.termName = "<Terminal '" + match.substring( 0, 20 ) + "...'>";
-                    } else {
-                        this.termName = "<Terminal '" + match + "'>";
+                    if ( ! nameSupplied ) {
+                        if ( match > 20 ) {
+                            this.termName = "'" + match.substring( 0, 20 ) + "'";
+                        } else {
+                            this.termName = "'" + match + "'";
+                        }
                     }
                 }
 
@@ -1028,7 +1046,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                     literalLength = Number.MAX_VALUE;
 
                 for ( var i = 0; i < match.length; i++ ) {
-                    var innerTerm = new Terminal( match[i] );
+                    var innerTerm = new Terminal( match[i], name );
 
                     if ( innerTerm.isLiteral ) {
                         literalLength = Math.min( literalLength, innerTerm.literalLength );
@@ -1036,6 +1054,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                         isLiteral = false;
                     }
 
+                    innerTerm.setParentTerm( this );
                     mTerminals[i] = innerTerm;
                 }
 
@@ -1056,6 +1075,18 @@ var parse = window['parse'] = (function( window, undefined ) {
         Object.preventExtensions( this );
     }
 
+    Terminal.prototype.getParentTerm = function() {
+        if ( this.terminalParent !== null ) {
+            return this.terminalParent.getParentTerm();
+        } else {
+            return this;
+        }
+    }
+
+    Terminal.prototype.setParentTerm = function( parent ) {
+        this.terminalParent = parent;
+    }
+
     Terminal.prototype['name'] = function( name ) {
         if ( arguments.length === 0 ) {
             return this.termName;
@@ -1071,6 +1102,17 @@ var parse = window['parse'] = (function( window, undefined ) {
 
     Terminal.prototype.setID = function( id ) {
         this.id = id;
+
+        /*
+         * Arrays are silently removed,
+         * so pass the id on,
+         * otherwise the grammar breaks.
+         */
+        if ( this.type === TYPE_ARRAY ) {
+            for ( var i = 0; i < this.testData.length; i++ ) {
+                this.testData[i].setID( id );
+            }
+        }
 
         return this;
     }
@@ -1996,8 +2038,9 @@ var parse = window['parse'] = (function( window, undefined ) {
              * This is because we might have to come down here for an optional
              * term, or skip it.
              */
-            if ( rules.length > 0 ) {
-                var rule = rules[0];
+            var i = 0;
+            do {
+                var rule = rules[i];
 
                 if ( rule instanceof Terminal ) {
                     if ( rule.id !== INVALID_TERMINAL ) {
@@ -2018,7 +2061,9 @@ var parse = window['parse'] = (function( window, undefined ) {
                 } else {
                     bruteScan( rule, seenRules, idsFound );
                 }
-            }
+
+                i++;
+            } while ( i < rules.length && isOptional[i] );
         } else {
             return;
         }
@@ -2051,8 +2096,8 @@ var parse = window['parse'] = (function( window, undefined ) {
 
     ParserRule.prototype.terminalScan = function() {
         if ( this.compiledLookups === null ) {
-            var rules = this.rules,
-                len = rules.length,
+            var rules   = this.rules,
+                len     = rules.length,
                 lookups = new Array( len );
 
             for ( var i = 0; i < len; i++ ) {
@@ -2067,7 +2112,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                         if ( r instanceof Terminal ) {
                             addRuleToLookup( r.id, ruleLookup, r );
                         } else {
-                            var ids = [],
+                            var ids  = [],
                                 seen = [];
 
                             bruteScan( r, seen, ids );
@@ -2082,7 +2127,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                 } else if ( rule instanceof Terminal ) {
                     addRuleToLookup( rule.id, ruleLookup, rule );
                 } else {
-                    var ids = [],
+                    var ids  = [],
                         seen = [];
 
                     bruteScan( rule, seen, ids );
@@ -2557,11 +2602,11 @@ var parse = window['parse'] = (function( window, undefined ) {
     };
 
     ParserRule.prototype.ruleTestSeperator = function( symbols, inputSrc ) {
-        var lookups = this.compiledLookups,
-            peekID  = symbols.peekID(),
+        var lookups  = this.compiledLookups,
+            peekID   = symbols.peekID(),
             onFinish = null,
-            rules   = lookups[0],
-            rule    = rules[peekID];
+            rules    = lookups[0],
+            rule     = rules[peekID];
 
         if ( rule === undefined ) {
             return null;
@@ -2711,6 +2756,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                     break;
                 }
             }
+
 
             if ( args === null ) {
                 // needs to remember it's recursive position when we leave
@@ -3004,8 +3050,7 @@ var parse = window['parse'] = (function( window, undefined ) {
          */
         for ( var i = 0; i < allTerms.length; i++ ) {
             var term = allTerms[i],
-                test = term.testData,
-                id   = term.id;
+                test = term.testData;
 
             if ( i < ignoresLen ) {
                 ignoresTests[i] = test;
@@ -3016,8 +3061,13 @@ var parse = window['parse'] = (function( window, undefined ) {
                 termTests[i] = test;
             }
 
-            postMatches[i] = term.postMatch;
-            termIDs[i] = id;
+            var mostUpper = term.getParentTerm();
+            if ( mostUpper !== term ) {
+                allTerms[i] = mostUpper;
+            }
+
+            postMatches[i] = mostUpper.postMatch;
+            termIDs[i]     = mostUpper.id;
         }
 
         if ( terminals.length === 0 ) {
@@ -3479,7 +3529,7 @@ var parse = window['parse'] = (function( window, undefined ) {
 
                 return terminals;
             } else if ( termName !== null ) {
-                return Parse['terminal']( obj )['name']( formatTerminalName(termName) );
+                return Parse['terminal']( obj, formatTerminalName(termName) );
             } else {
                 return Parse['terminal']( obj );
             }
@@ -3487,12 +3537,15 @@ var parse = window['parse'] = (function( window, undefined ) {
 
         /**
          * Turns the given item into a single terminal.
+         *
+         * @param match The item used for this terminal to match against.
+         * @param termName Optional, a name for this terminal, for error reporting.
          */
-        Parse['terminal'] = function( match ) {
+        Parse['terminal'] = function( match, termName ) {
             if ( match instanceof Terminal ) {
                 return match;
             } else {
-                return new Terminal( match ).setID( this.terminalID++ );
+                return new Terminal( match, termName ).setID( this.terminalID++ );
             }
         };
 
@@ -3607,6 +3660,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                 )
             // normal number
             } else {
+                var start = i;
                 do {
                     i++;
                     code = src.charCodeAt( i );
@@ -3617,11 +3671,11 @@ var parse = window['parse'] = (function( window, undefined ) {
 
                 // Look for Decimal Number
                 if (
-                        src.charCodeAt(i+1) === FULL_STOP &&
-                        isNumericCode( src.charCodeAt(i+2) )
+                        src.charCodeAt(i) === FULL_STOP &&
+                        isNumericCode( src.charCodeAt(i+1) )
                 ) {
                     var code;
-                    i += 2;
+                    i++;
 
                     do {
                         i++;
@@ -3650,7 +3704,6 @@ var parse = window['parse'] = (function( window, undefined ) {
                     code = src.charCodeAt(i);
                 } while (
                         i  <  len  &&
-                        code !== SEMI_COLON &&
                         code !== SLASH_N
                 );
 
@@ -3688,6 +3741,8 @@ var parse = window['parse'] = (function( window, undefined ) {
          * A terminal for a string, double or single quoted.
          */
         Parse['terminal']['STRING'] = function(src, i, code, len) {
+            var start = i;
+
             // double quote string
             if ( code === DOUBLE_QUOTE ) {
                 do {
@@ -3702,7 +3757,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                         src.charCodeAt(i-1) !== BACKSLASH
                 ) )
 
-                return i;
+                return i+1;
             // single quote string
             } else if ( code === SINGLE_QUOTE ) {
                 do {
@@ -3717,7 +3772,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                         src.charCodeAt(i-1) !== BACKSLASH
                 ) )
 
-                return i;
+                return i+1;
             }
         };
 

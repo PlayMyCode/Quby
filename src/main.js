@@ -998,10 +998,10 @@ var quby = window['quby'] || {};
                     this.parseError(null, 'Unknown issue with your code has caused the parser to crash!');
 
                     if ( window.console && window.console.log ) {
-                        window.console.log( err );
-
                         if ( err.stack ) {
                             window.console.log( err.stack );
+                        } else {
+                            window.console.log( err );
                         }
                     }
                 }

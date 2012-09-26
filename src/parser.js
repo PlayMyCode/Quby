@@ -534,7 +534,8 @@ var quby = window['quby'] || {};
                     colon               : ':',
                     mapArrow            : '=>',
 
-                    equality            : '==',
+                    equal               : '==',
+                    notEqual            : '!=',
 
                     shiftLeft           : '<<',
                     shiftRight          : '>>',
@@ -584,7 +585,7 @@ var quby = window['quby'] || {};
                             return i;
                         }
                     },
-                    field : function(src, i, code, len) {
+                    objectField : function(src, i, code, len) {
                         if ( code === AT ) {
                             i++;
 
@@ -861,6 +862,12 @@ var quby = window['quby'] || {};
                         set( exprs );
             });
 
+    var variable = parse.
+            a( terminals.identifiers.variableName ).
+            onMatch( function(name) {
+                return new quby.ast.Variable( name );
+            } );
+
     var variables = parse.either( terminals.identifiers, terminals.keywords.THIS ).
             onMatch( function(identifier) {
                 switch ( identifier.terminal ) {
@@ -873,7 +880,7 @@ var quby = window['quby'] || {};
                                         identifier.match
                                 )
                         );
-                    case terminals.identifiers.field:
+                    case terminals.identifiers.objectField:
                         return new quby.ast.FieldVariable(
                                 new quby.lexer.IdSym(
                                         identifier.offset,
@@ -885,30 +892,6 @@ var quby = window['quby'] || {};
                     default:
                         log(identifier);
                         throw new Error("Unknown terminal met for variables: " + identifier);
-                }
-            });
-
-    var variableAssignments = parse.either( terminals.identifiers ).
-            onMatch( function(identifier) {
-                switch ( identifier.terminal ) {
-                    case terminals.identifiers.variableName:
-                        return new quby.ast.VariableAssignment( identifier );
-                    case terminals.identifiers.global:
-                        return new quby.ast.GlobalVariableAssignment(
-                                new quby.lexer.IdSym(
-                                        identifier.offset,
-                                        identifier.match
-                                )
-                        );
-                    case terminals.identifiers.field:
-                        return new quby.ast.FieldVariableAssignment(
-                                new quby.lexer.IdSym(
-                                        identifier.offset,
-                                        identifier.match.substring(1)
-                                )
-                        );
-                    default:
-                        throw new Error("Unknown terminal for variables: " + identifier);
                 }
             });
 
@@ -1073,9 +1056,14 @@ var quby = window['quby'] || {};
                 }
             } );
 
+    var blockParamVariables = parse.repeatSeperator(
+            variable,
+            terminals.symbols.comma
+    );
+
     var blockParams = parse.
             a( terminals.ops.bitwiseOr ).
-            optionalSeperator( terminals.identifiers.variableName, terminals.symbols.comma ).
+            optional( blockParamVariables ).
             optional( terminals.endOfLine ).
             then( terminals.ops.bitwiseOr ).
             onMatch( function(lOr, params, end, rOr) {
@@ -1091,15 +1079,16 @@ var quby = window['quby'] || {};
                     parse.
                             a( terminals.symbols.leftBrace ).
                             optional( blockParams ).
-                            optional( statements ).
+                            optional( statements  ).
                             then( terminals.symbols.rightBrace ).
                             onMatch( function( lBrace, params, stmts, rBrace ) {
                                 return new quby.ast.FunctionBlock(params, stmts);
                             } ),
+
                     parse.
                             a( terminals.keywords.DO ).
                             optional( blockParams ).
-                            optional( statements ).
+                            optional( statements  ).
                             then( terminals.keywords.END ).
                             onMatch( function( lBrace, params, stmts, rBrace ) {
                                 return new quby.ast.FunctionBlock(params, stmts);
@@ -1119,7 +1108,7 @@ var quby = window['quby'] || {};
             then( parameterExprs ).
             optional( block ).
             onMatch( function(name, exprs, block) {
-                if ( name.lower == quby.runtime.SUPER_KEYWORD ) {
+                if ( name.lower === quby.runtime.SUPER_KEYWORD ) {
                     return new quby.ast.SuperCall( name, exprs, block );
                 } else {
                     return new quby.ast.FunctionCall( name, exprs, block );
@@ -1195,7 +1184,8 @@ var quby = window['quby'] || {};
                                     ops.logicalAnd,
                                     ops.logicalOr,
 
-                                    ops.equality,
+                                    ops.equal,
+                                    ops.notEqual,
 
                                     ops.modulus,
 
@@ -1233,8 +1223,10 @@ var quby = window['quby'] || {};
                                     case ops.logicalOr:
                                         return new quby.ast.BoolOr( null, right );
 
-                                    case ops.equality:
+                                    case ops.equal:
                                         return new quby.ast.Equality( null, right );
+                                    case ops.notEqual:
+                                        return new quby.ast.NotEquality( null, right );
 
                                     case ops.modulus:
                                         return new quby.ast.Mod( null, right );
@@ -1267,8 +1259,6 @@ var quby = window['quby'] || {};
                             })
             );
 
-window._ = {};
-window._.expr = expr;
     expr.
             either(
                     singleOpExpr,

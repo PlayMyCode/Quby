@@ -215,6 +215,7 @@ var quby = window['quby'] || {};
                 this.seperator = strSeperator;
                 this.offset = null;
                 this.length = 0;
+                this.appendToLast = appendToLast;
             },
             {
                 add: function (stmt) {
@@ -242,7 +243,7 @@ var quby = window['quby'] || {};
                     for (var i = 0; i < length; i++) {
                         this.stmts[i].print(p);
 
-                        if (appendToLast || i < length - 1) {
+                        if (this.appendToLast || i < length - 1) {
                             p.append(this.seperator);
                         }
                     }
@@ -390,20 +391,6 @@ var quby = window['quby'] || {};
                 this.set( mappings );
             },
             qubyAst.SyntaxList
-    );
-
-    qubyAst.Mapping = util.klass(
-            function (left, right) {
-                qubyAst.Op.call(this, left, right, ":");
-            },
-            qubyAst.Op,
-            {
-                print: function (p) {
-                    this.left.print(p);
-                    p.append(',');
-                    this.right.print(p);
-                }
-            }
     );
 
     qubyAst.StmtBlock = util.klass(
@@ -780,80 +767,6 @@ var quby = window['quby'] || {};
     );
 
     /**
-     * Defines a constructor for a class.
-     */
-    qubyAst.Constructor = util.klass(
-            function (sym, parameters, stmtBody) {
-                qubyAst.Function.call(this, sym, parameters, stmtBody);
-
-                this.isConstructor = true;
-                this.className = '';
-                this.klass = null;
-            },
-
-            qubyAst.Function,
-            {
-                setClass: function (klass) {
-                    this.klass = klass;
-
-                    this.callName = quby.runtime.formatNew(klass.name, this.getNumParameters());
-
-                    this.className = klass.callName;
-                },
-
-                validate: function (v) {
-                    if ( v.ensureInClass(this, "Constructors must be defined within a class.") ) {
-                        this.setClass( v.getCurrentClass().klass );
-
-                        this.isExtensionClass = v.isInsideExtensionClass();
-                        if ( this.isExtensionClass ) {
-                            v.ensureAdminMode( this, "Cannot add constructor to core class: '" + v.getCurrentClass().klass.name + "'" );
-                        }
-
-                        v.setInConstructor(true);
-                        qubyAst.Function.prototype.validate.call( this, v );
-                        v.setInConstructor(false);
-                    }
-                },
-
-                printParameters: function (p) {
-                    p.append('(');
-
-                    if ( ! this.isExtensionClass ) {
-                        p.append( quby.runtime.THIS_VARIABLE, ',' );
-                    }
-
-                    if (
-                            this.parameters !== null &&
-                            this.parameters.length > 0
-                    ) {
-                        this.parameters.print(p);
-                        p.append(',');
-                    }
-
-                    p.append( quby.runtime.BLOCK_VARIABLE, ')' );
-                },
-
-                printBody: function (p) {
-                    p.append('{');
-
-                    this.printPreVars(p);
-                    p.endStatement();
-
-                    if ( this.stmtBody !== null ) {
-                        this.stmtBody.print(p);
-                    }
-
-                    if ( ! this.isExtensionClass ) {
-                        p.append('return ', quby.runtime.THIS_VARIABLE, ';');
-                    }
-
-                    p.append( '}' );
-                }
-            }
-    );
-
-    /**
      * Defines a function or method definition.
      */
     qubyAst.Function = util.klass(
@@ -1003,218 +916,75 @@ var quby = window['quby'] || {};
     );
 
     /**
-     * The base FunctionGenerator prototype. This does basic checks to ensure
-     * the function we want to create actually exists.
-     *
-     * It handles storing common items.
+     * Defines a constructor for a class.
      */
-    qubyAst.FunctionGenerator = util.klass(
-            function( obj, methodName, numParams ) {
-                this.obj = obj;
-                this.offset = obj.offset;
+    qubyAst.Constructor = util.klass(
+            function (sym, parameters, stmtBody) {
+                qubyAst.Function.call(this, sym, parameters, stmtBody);
 
+                this.isConstructor = true;
+                this.className = '';
                 this.klass = null;
-
-                // the name of this modifier, i.e. read, write, attr, get, set, getset
-                this.modifierName = obj.name;
-
-                // flag used for checking if it's a generator,
-                // only used inside this FunctionGenerator
-                this.isGenerator = true;
-
-                // the name of the method this generates
-                this.name = methodName;
-                this.callName = quby.runtime.formatFun( methodName, numParams );
             },
 
+            qubyAst.Function,
             {
-                /* This validation code relies on the fact that when a function
-                 * is defined on a class, it becomes the current function for that
-                 * callname, regardless of if it's a diplicate function or not.
-                 */
-                validate: function(v) {
-                    this.klass = v.getCurrentClass();
+                setClass: function (klass) {
+                    this.klass = klass;
 
-                    // checks for duplicate before this get
-                    if ( this.validateNameClash(v) ) {
-                        v.defineFun( this );
-                        v.pushFunScope( this );
+                    this.callName = quby.runtime.formatNew(klass.name, this.getNumParameters());
 
-                        this.validateInside( v );
-
-                        v.popScope();
-
-                        var _this = this;
-                        v.onEndValidate( function(v) { _this.onEndValidate(v); } );
-                    }
+                    this.className = klass.callName;
                 },
 
-                getNumParameters: function() {
-                    return numParams;
-                },
+                validate: function (v) {
+                    if ( v.ensureInClass(this, "Constructors must be defined within a class.") ) {
+                        this.setClass( v.getCurrentClass().klass );
 
-                onEndValidate: function(v) {
-                    this.validateNameClash( v );
-                },
-
-                validateInside: function(v) {
-                    // do nothing
-                },
-
-                validateNameClash: function( v ) {
-                    var currentFun = this.klass.getFun( this.callName );
-
-                    if ( currentFun !== null && currentFun !== this ) {
-                        // Give an error message depending on if we are
-                        // dealing with a colliding modifier or function.
-                        var errMsg = ( currentFun.isGenerator ) ?
-                                "'" + this.modifierName + "' modifier in class '" + this.klass.klass.name + "' clashes with modifier '" + currentFun.modifierName + '", for generating: "' + this.name + '" method' :
-                                "'" + this.modifierName + "' modifier in class '" + this.klass.klass.name + "' clashes with defined method: '" + this.name + '"' ;
-
-                        v.parseError( this.offset, errMsg );
-
-                        return false;
-                    } else {
-                        return true;
-                    }
-                },
-            }
-    );
-
-    qubyAst.FunctionAttrGenerator = util.klass(
-            function (obj, methodName, numParams, fieldObj, proto) {
-                var fieldName;
-                if ( fieldObj instanceof qubyAst.Variable || fieldObj instanceof qubyAst.FieldVariable ) {
-                    fieldName = fieldObj.identifier;
-                } else if ( fieldObj instanceof qubyAst.Symbol ) {
-                    fieldName = fieldObj.value;
-                } else {
-                    fieldName = null;
-                }
-
-                var fullName = fieldName ? ( methodName + util.string.capitalize(fieldName) ) : methodName ;
-
-                // doesn't matter if fieldName is null for this, as it will be invalid laterz
-                qubyAst.FunctionGenerator.call( this, obj, fullName, numParams );
-
-                // the name of our field, null if invalid
-                this.fieldName = fieldName;
-                this.fieldObj = fieldObj;
-
-                // this is our fake field
-                this.field = null;
-            },
-
-            qubyAst.FunctionGenerator,
-            {
-                validate: function(v) {
-                    if ( this.fieldName !== null ) {
-                        qubyAst.FunctionGenerator.prototype.validate.call( this, v );
-                    } else {
-                        v.parseError( this.fieldObj.offset, " Invalid parameter for generating '" + this.name + "' method" );
-                    }
-                },
-
-                validateInside: function(v) {
-                    this.field = new proto( new quby.lexer.EmptyIdSym(this.offset, this.fieldName) );
-                    this.field.validate( v );
-                }
-            }
-    );
-
-    var FunctionReadGeneratorFieldVariable = util.klass(
-            function( id ) {
-                qubyAst.FieldVariable.call( this, id );
-            },
-
-            qubyAst.FieldVariable,
-            {
-                validateField: function(v) { } // we do this check ourselves later
-            }
-    );
-
-    qubyAst.FunctionReadGenerator = util.klass(
-            function (obj, methodPrefix, field) {
-                qubyAst.FunctionAttrGenerator.call( this, obj, methodPrefix, 0, field, FunctionReadGeneratorFieldVariable );
-            },
-
-            qubyAst.FunctionAttrGenerator,
-            {
-                onEndValidate: function(v) {
-                    qubyAst.FunctionAttrGenerator.prototype.onEndValidate.call( this, v );
-
-                    if ( this.field ) {
-                        if ( ! this.klass.hasFieldCallName(this.field.callName) ) {
-                            v.parseError( this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name );
+                        this.isExtensionClass = v.isInsideExtensionClass();
+                        if ( this.isExtensionClass ) {
+                            v.ensureAdminMode( this, "Cannot add constructor to core class: '" + v.getCurrentClass().klass.name + "'" );
                         }
+
+                        v.setInConstructor(true);
+                        qubyAst.Function.prototype.validate.call( this, v );
+                        v.setInConstructor(false);
                     }
                 },
 
-                /*
-                 * This will be a method.
-                 */
-                print: function(p) {
-                    if ( this.field ) {
-                        p.append(this.callName, '=function(){return ');
-                        this.field.print( p );
-                        p.append(';}');
+                printParameters: function (p) {
+                    p.append('(');
+
+                    if ( ! this.isExtensionClass ) {
+                        p.append( quby.runtime.THIS_VARIABLE, ',' );
                     }
-                },
-            }
-    );
 
-    qubyAst.FunctionWriteGenerator = util.klass(
-            function (obj, methodPrefix, field) {
-                qubyAst.FunctionAttrGenerator.call( this,
-                        obj,
-                        methodPrefix,
-                        1,
-                        field,
-                        qubyAst.FieldVariableAssignment
-                )
-            },
-
-            qubyAst.FieldVariableAssignment,
-            {
-                onEndValidate: function(v) {
-                    qubyAst.FunctionAttrGenerator.prototype.onEndValidate.call( this, v );
-
-                    if ( this.field ) {
-                        if ( ! this.klass.hasFieldCallName(this.field.callName) ) {
-                            v.parseError( this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name );
-                        }
+                    if (
+                            this.parameters !== null &&
+                            this.parameters.length > 0
+                    ) {
+                        this.parameters.print(p);
+                        p.append(',');
                     }
+
+                    p.append( quby.runtime.BLOCK_VARIABLE, ')' );
                 },
 
-                /*
-                 * This will be a method.
-                 */
-                print: function(p) {
-                    if ( this.field ) {
-                        p.append(this.callName, '=function(t){return ');
-                            this.field.print( p );
-                            p.append('=t;');
-                        p.append('}');
+                printBody: function (p) {
+                    p.append('{');
+
+                    this.printPreVars(p);
+                    p.endStatement();
+
+                    if ( this.stmtBody !== null ) {
+                        this.stmtBody.print(p);
                     }
-                },
-            }
-    );
 
-    qubyAst.FunctionReadWriteGenerator = util.klass(
-            function( obj, getPre, setPre, fieldObj ) {
-                this.getter = new qubyAst.FunctionReadGenerator( obj, getPre, fieldObj );
-                this.setter = new qubyAst.FunctionWriteGenerator( obj, setPre, fieldObj );
-            },
+                    if ( ! this.isExtensionClass ) {
+                        p.append('return ', quby.runtime.THIS_VARIABLE, ';');
+                    }
 
-            {
-                validate: function( v ) {
-                    this.getter.validate( v );
-                    this.setter.validate( v );
-                },
-
-                print: function( p ) {
-                    this.getter.print( p );
-                    this.setter.print( p );
+                    p.append( '}' );
                 }
             }
     );
@@ -2134,7 +1904,25 @@ var quby = window['quby'] || {};
             }
     ),
 
-    /* ### Assignments ### */
+    /*
+     * ### Assignments ###
+     */
+
+    qubyAst.Mapping = util.klass(
+            function (left, right) {
+                qubyAst.Op.call(this, left, right, ":");
+            },
+
+            qubyAst.Op,
+            {
+                print: function (p) {
+                    this.left.print(p);
+                    p.append(',');
+                    this.right.print(p);
+                }
+            }
+    );
+
     qubyAst.Assignment = util.klass(
             function (left, right) {
                 qubyAst.Op.call(this, left, right, '=', false, 14);
@@ -2630,6 +2418,230 @@ var quby = window['quby'] || {};
             },
             qubyAst.Literal
     );
+
+    /*
+     * ### Function Generating stuff ###
+     */
+
+    /**
+     * The base FunctionGenerator prototype. This does basic checks to ensure
+     * the function we want to create actually exists.
+     *
+     * It handles storing common items.
+     */
+    qubyAst.FunctionGenerator = util.klass(
+            function( obj, methodName, numParams ) {
+                this.obj = obj;
+                this.offset = obj.offset;
+
+                this.klass = null;
+
+                // the name of this modifier, i.e. read, write, attr, get, set, getset
+                this.modifierName = obj.name;
+
+                // flag used for checking if it's a generator,
+                // only used inside this FunctionGenerator
+                this.isGenerator = true;
+
+                // the name of the method this generates
+                this.name = methodName;
+                this.callName = quby.runtime.formatFun( methodName, numParams );
+            },
+
+            {
+                /* This validation code relies on the fact that when a function
+                 * is defined on a class, it becomes the current function for that
+                 * callname, regardless of if it's a diplicate function or not.
+                 */
+                validate: function(v) {
+                    this.klass = v.getCurrentClass();
+
+                    // checks for duplicate before this get
+                    if ( this.validateNameClash(v) ) {
+                        v.defineFun( this );
+                        v.pushFunScope( this );
+
+                        this.validateInside( v );
+
+                        v.popScope();
+
+                        var _this = this;
+                        v.onEndValidate( function(v) { _this.onEndValidate(v); } );
+                    }
+                },
+
+                getNumParameters: function() {
+                    return numParams;
+                },
+
+                onEndValidate: function(v) {
+                    this.validateNameClash( v );
+                },
+
+                validateInside: function(v) {
+                    // do nothing
+                },
+
+                validateNameClash: function( v ) {
+                    var currentFun = this.klass.getFun( this.callName );
+
+                    if ( currentFun !== null && currentFun !== this ) {
+                        // Give an error message depending on if we are
+                        // dealing with a colliding modifier or function.
+                        var errMsg = ( currentFun.isGenerator ) ?
+                                "'" + this.modifierName + "' modifier in class '" + this.klass.klass.name + "' clashes with modifier '" + currentFun.modifierName + '", for generating: "' + this.name + '" method' :
+                                "'" + this.modifierName + "' modifier in class '" + this.klass.klass.name + "' clashes with defined method: '" + this.name + '"' ;
+
+                        v.parseError( this.offset, errMsg );
+
+                        return false;
+                    } else {
+                        return true;
+                    }
+                },
+            }
+    );
+
+    qubyAst.FunctionAttrGenerator = util.klass(
+            function (obj, methodName, numParams, fieldObj, proto) {
+                var fieldName;
+                if ( fieldObj instanceof qubyAst.Variable || fieldObj instanceof qubyAst.FieldVariable ) {
+                    fieldName = fieldObj.identifier;
+                } else if ( fieldObj instanceof qubyAst.Symbol ) {
+                    fieldName = fieldObj.value;
+                } else {
+                    fieldName = null;
+                }
+
+                var fullName = fieldName ? ( methodName + util.string.capitalize(fieldName) ) : methodName ;
+
+                // doesn't matter if fieldName is null for this, as it will be invalid laterz
+                qubyAst.FunctionGenerator.call( this, obj, fullName, numParams );
+
+                // the name of our field, null if invalid
+                this.fieldName = fieldName;
+                this.fieldObj = fieldObj;
+
+                // this is our fake field
+                this.field = null;
+            },
+
+            qubyAst.FunctionGenerator,
+            {
+                validate: function(v) {
+                    if ( this.fieldName !== null ) {
+                        qubyAst.FunctionGenerator.prototype.validate.call( this, v );
+                    } else {
+                        v.parseError( this.fieldObj.offset, " Invalid parameter for generating '" + this.name + "' method" );
+                    }
+                },
+
+                validateInside: function(v) {
+                    this.field = new proto( new quby.lexer.EmptyIdSym(this.offset, this.fieldName) );
+                    this.field.validate( v );
+                }
+            }
+    );
+
+    var FunctionReadGeneratorFieldVariable = util.klass(
+            function( id ) {
+                qubyAst.FieldVariable.call( this, id );
+            },
+
+            qubyAst.FieldVariable,
+            {
+                validateField: function(v) { } // we do this check ourselves later
+            }
+    );
+
+    qubyAst.FunctionReadGenerator = util.klass(
+            function (obj, methodPrefix, field) {
+                qubyAst.FunctionAttrGenerator.call( this, obj, methodPrefix, 0, field, FunctionReadGeneratorFieldVariable );
+            },
+
+            qubyAst.FunctionAttrGenerator,
+            {
+                onEndValidate: function(v) {
+                    qubyAst.FunctionAttrGenerator.prototype.onEndValidate.call( this, v );
+
+                    if ( this.field ) {
+                        if ( ! this.klass.hasFieldCallName(this.field.callName) ) {
+                            v.parseError( this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name );
+                        }
+                    }
+                },
+
+                /*
+                 * This will be a method.
+                 */
+                print: function(p) {
+                    if ( this.field ) {
+                        p.append(this.callName, '=function(){return ');
+                        this.field.print( p );
+                        p.append(';}');
+                    }
+                },
+            }
+    );
+
+    qubyAst.FunctionWriteGenerator = util.klass(
+            function (obj, methodPrefix, field) {
+                qubyAst.FunctionAttrGenerator.call( this,
+                        obj,
+                        methodPrefix,
+                        1,
+                        field,
+                        qubyAst.FieldVariable
+                )
+
+                this.setAssignment();
+            },
+
+            qubyAst.FieldVariable,
+            {
+                onEndValidate: function(v) {
+                    qubyAst.FunctionAttrGenerator.prototype.onEndValidate.call( this, v );
+
+                    if ( this.field ) {
+                        if ( ! this.klass.hasFieldCallName(this.field.callName) ) {
+                            v.parseError( this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name );
+                        }
+                    }
+                },
+
+                /*
+                 * This will be a method.
+                 */
+                print: function(p) {
+                    if ( this.field ) {
+                        p.append(this.callName, '=function(t){return ');
+                            this.field.print( p );
+                            p.append('=t;');
+                        p.append('}');
+                    }
+                },
+            }
+    );
+
+    qubyAst.FunctionReadWriteGenerator = util.klass(
+            function( obj, getPre, setPre, fieldObj ) {
+                this.getter = new qubyAst.FunctionReadGenerator( obj, getPre, fieldObj );
+                this.setter = new qubyAst.FunctionWriteGenerator( obj, setPre, fieldObj );
+            },
+
+            {
+                validate: function( v ) {
+                    this.getter.validate( v );
+                    this.setter.validate( v );
+                },
+
+                print: function( p ) {
+                    this.getter.print( p );
+                    this.setter.print( p );
+                }
+            }
+    );
+
 
     /* Other */
     qubyAst.PreInline = util.klass(
