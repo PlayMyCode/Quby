@@ -1114,24 +1114,39 @@ var quby = window['quby'] || {};
 
     var block = parse.
             either(
-                    parse.
-                            a( terminals.symbols.leftBrace ).
-                            optional( blockParams ).
-                            optional( statements  ).
-                            then( terminals.symbols.rightBrace ).
-                            onMatch( function( lBrace, params, stmts, rBrace ) {
-                                return new quby.ast.FunctionBlock(params, stmts);
-                            } ),
+                    terminals.symbols.leftBrace,
+                    terminals.keywords.DO
+            ).
+            optional( blockParams ).
+            optional( statements  ).
+            thenEither(
+                    terminals.symbols.rightBrace,
+                    terminals.keywords.END
+            ).
+            onMatch( function( lBrace, params, stmts, rBrace ) {
+                var block = new quby.ast.FunctionBlock( params, stmts );
 
-                    parse.
-                            a( terminals.keywords.DO ).
-                            optional( blockParams ).
-                            optional( statements  ).
-                            then( terminals.keywords.END ).
-                            onMatch( function( lBrace, params, stmts, rBrace ) {
-                                return new quby.ast.FunctionBlock(params, stmts);
-                            } )
-            );
+                /*
+                 * If the opening and closing braces do not match,
+                 * give a warning.
+                 *
+                 * Things that will warn are:
+                 *     do }
+                 *     { end
+                 *
+                 * This is a relic from the old parser,
+                 * and supported only to avoid breaking
+                 * working games.
+                 */
+                if (
+                        (lBrace.terminal === terminals.symbols.leftBrace ) !==
+                        (rBrace.terminal === terminals.symbols.rightBrace)
+                ) {
+                    block.setMismatchedBraceWarning();
+                }
+
+                return block;
+            } );
 
     var lambda = parse.
             a( terminals.keywords.DEF, parameterDefinition ).

@@ -1369,10 +1369,16 @@ var quby = window['quby'] || {};
 
                 this.parameters = parameters;
                 this.stmtBody   = statements;
+
+                this.mismatchedBraceWarning = false;
             },
 
             qubyAst.Syntax,
             {
+                setMismatchedBraceWarning: function() {
+                    this.mismatchedBraceWarning = true;
+                },
+
                 print: function (p) {
                     p.append('function(');
 
@@ -1393,6 +1399,10 @@ var quby = window['quby'] || {};
                 },
 
                 validate: function (v) {
+                    if ( this.mismatchedBraceWarning ) {
+                        v.strictError( this.getOffset(), "mismatched do-block syntax (i.e. 'do something() }')" );
+                    }
+
                     v.pushBlockScope();
 
                     if ( this.parameters !== null ) {
@@ -1637,6 +1647,18 @@ var quby = window['quby'] || {};
     );
 
     /**
+     * 0 is the tightest, most binding precendence, often
+     * known as the 'highest precedence'.
+     *
+     * Higher numbers lower the priority of the precedence.
+     * For example * binds tighter than +, so you might
+     * assign the precedences:
+     *
+     *      + -> 3
+     *      * -> 4
+     *
+     * ... giving * a higher precedence than +.
+     *
      * @param left
      * @param right
      * @param strOp
@@ -1908,9 +1930,12 @@ var quby = window['quby'] || {};
      * ### Assignments ###
      */
 
+    /*
+     * Has the highest precedence, giving it the lowest priority.
+     */
     qubyAst.Mapping = util.klass(
             function (left, right) {
-                qubyAst.Op.call(this, left, right, ":");
+                qubyAst.Op.call( this, left, right, ":", false, 100 );
             },
 
             qubyAst.Op,

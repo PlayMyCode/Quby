@@ -51,6 +51,10 @@ var quby = window['quby'] || {};
         Parser: function () {
             this.validator = new quby.main.Validator();
 
+            this.enableStrictMode = function( mode ) {
+                this.validator.enableStrictMode( mode );
+            };
+
             /**
              * Parse a single file, adding it to the program being built.
              *
@@ -124,7 +128,8 @@ var quby = window['quby'] || {};
                         function() {
                             var output = _this.validator.finaliseProgram();
                             var result = new quby.main.Result(
-                                    output, _this.validator.getErrors()
+                                    output,
+                                    _this.validator.getErrors()
                             );
 
                             util.future.runFun( function() {
@@ -286,7 +291,7 @@ var quby = window['quby'] || {};
                         validator.addProgram( this.program );
                     } else {
                         for (var i = 0; i < es.length; i++) {
-                            validator.parseErrorLine(es[i].line, es[i].msg);
+                            validator.parseErrorLine( es[i].line, es[i].msg );
                         }
                     }
                 }
@@ -519,6 +524,8 @@ var quby = window['quby'] || {};
             // the various program trees that have been parsed
             this.programs = [];
 
+            this.strictMode = true;
+
             this.classes = {};
             this.currentClass = null;
             this.rootClass = new quby.main.RootClassProxy();
@@ -568,6 +575,10 @@ var quby = window['quby'] || {};
             this.isAdminMode = false;
 
             this.symbols = new quby.main.SymbolTable();
+
+            this.enableStrictMode = function(mode) {
+                this.strictMode = !! mode;
+            };
 
             this.addPreInline = function(inline) {
                 this.preInlines.push( inline );
@@ -840,20 +851,73 @@ var quby = window['quby'] || {};
 
             this.pushScope();
 
-            this.parseError = function (lineInfo, msg) {
-                if (lineInfo) {
-                    this.parseErrorLine(lineInfo.source.getLine(lineInfo.offset), msg);
-                } else {
-                    this.errors.push(msg);
+            /**
+             * Strict Errors are errors which we can live with,
+             * and will not impact on the resulting program,
+             * but should really be fixed.
+             *
+             * This is mostly here to smooth over the cracks
+             * when breaking changes are made.
+             *
+             * Old version can stay, and the new one can be
+             * enforced as a strict error (presuming that
+             * behaviour does not change).
+             */
+            this.strictError = function( lineInfo, msg ) {
+                if ( this.strictMode ) {
+                    this.parseError( lineInfo, msg );
                 }
             };
 
-            this.parseErrorLine = function (line, msg) {
-                this.errors.push("line " + line + ", " + msg);
+            this.parseError = function( lineInfo, msg ) {
+                if ( lineInfo ) {
+                    this.parseErrorLine( lineInfo.source.getLine(lineInfo.offset), msg );
+                } else {
+                    this.parseErrorLine( null, msg );
+                }
+            };
+
+            this.parseErrorLine = function( line, msg ) {
+                if ( line !== null && line !== undefined ) {
+                    msg = "line " + line + ", " + msg;
+                } else {
+                    line = 0;
+                }
+
+                var es = this.errors[ line ];
+
+                if ( es === undefined ) {
+                    this.errors[line] = msg;
+                } else if ( es instanceof Array ) {
+                    es.push( msg );
+                } else {
+                    this.errors[line] = [ es, msg ];
+                }
             };
 
             this.getErrors = function () {
-                return this.errors;
+                if ( this.errors.length === 0 ) {
+                    return this.errors;
+                } else {
+                    var errors = this.errors,
+                        sortedErrors = [];
+
+                    for ( var k in errors ) {
+                        if ( errors.hasOwnProperty(k) ) {
+                            var es = errors[k];
+
+                            if ( es instanceof Array ) {
+                                for ( var i = 0; i < es.length; i++ ) {
+                                    sortedErrors.push( es[i] );
+                                }
+                            } else {
+                                sortedErrors.push( es );
+                            }
+                        }
+                    }
+
+                    return sortedErrors;
+                }
             };
 
             this.hasErrors = function() {
@@ -864,7 +928,7 @@ var quby = window['quby'] || {};
             this.addProgram = function (program) {
                 if ( ! program ) {
                     // avoid unneeded error messages
-                    if (this.errors.length == 0) {
+                    if (this.errors.length === 0) {
                         this.parseError(null, 'Unknown parse error; source code cannot be parsed!');
                     }
                 } else {
