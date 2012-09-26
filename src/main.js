@@ -1427,6 +1427,25 @@ var quby = window['quby'] || {};
 
                 this.news[index] = fun;
             };
+
+            /**
+             * Returns an array containing all of the number of
+             * parameters, that this expects.
+             */
+            this.getNewParameterList = function() {
+                if ( this.news.length === 0 ) {
+                    return [ 0 ];
+                } else {
+                    var numParams = [];
+
+                    for ( var k in this.news ) {
+                        numParams.push( k );
+                    }
+
+                    return numParams;
+                }
+            };
+
             this.hasNew = function (fun) {
                 return this.news[fun.getNumParameters()] != undefined;
             };

@@ -797,9 +797,6 @@ var quby = window['quby'] || {};
     })
 
     /* The onMatch callbacks for altering the symbols when matched. */
-    terminals.keywords.NEW.onMatch( function(match, offset) {
-        return new quby.lexer.Sym( offset, 'new' );
-    });
     terminals.keywords.RETURN.onMatch( function(match, offset) {
         return new quby.lexer.Sym( offset, 'return' );
     });
