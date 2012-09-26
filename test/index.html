@@ -296,9 +296,30 @@
 
                 var parser = new quby.main.Parser();
 
+                var compileTime = 0,
+                    symbolsTime = 0,
+                    rulesTime   = 0,
+                    totalTime   = 0;
+
+                var updateControlsTime = function() {
+                    document.getElementsByClassName( 'controls-time-info' )[0].innerHTML =
+                            "compile " + compileTime + "ms<br/>" +
+                            "symbols " + symbolsTime + "ms<br/>" +
+                            "rules " + rulesTime   + "ms<br/>" +
+                            "total " + totalTime   + "ms" ;
+                };
+
                 if ( includeCore ) {
                     var core = getSourceFile("./core.qb");
-                    parser.parse( core, true );
+
+                    parser.parse( core, true, null, function(symbols, times) {
+                        compileTime += times.compile;
+                        symbolsTime += times.symbols;
+                        rulesTime   += times.rules;
+                        totalTime   += times.total;
+
+                        updateControlsTime();
+                    } );
                 }
 
                 if ( debugMode ) {
@@ -311,11 +332,12 @@
 
                         outputSymbols.value = displaySymbols.join( "\n" );
 
-                        document.getElementsByClassName( 'controls-time-info' )[0].innerHTML =
-                                "compile " + times.compile + "ms<br/>" +
-                                "symbols " + times.symbols + "ms<br/>" +
-                                "rules " + times.rules   + "ms<br/>" +
-                                "total " + times.total   + "ms" ;
+                        compileTime += times.compile;
+                        symbolsTime += times.symbols;
+                        rulesTime   += times.rules;
+                        totalTime   += times.total;
+
+                        updateControlsTime();
                     });
                 } else {
                     parser.parse( sourceCode.value, isAdmin );

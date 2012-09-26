@@ -296,7 +296,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.Parameters = util.klass(
-            function () {
+            function() {
                 qubyAst.SyntaxList.call(this, ',', false);
 
                 this.blockParam = null;
@@ -343,6 +343,17 @@ var quby = window['quby'] || {};
                     return this;
                 },
 
+                set: function( params ) {
+                    for ( var i = 0; i < params.length; i++ ) {
+                        if ( params[i].isBlockParam ) {
+                            this.setBlockParam( params[i] );
+                            params.splice( i, 1 );
+                        }
+                    }
+
+                    return qubyAst.SyntaxList.prototype.set.call( this, params );
+                },
+
                 /**
                  * Sets the block parameter for this set of parameters.
                  * This can only be set once, and no more parameters should be set after
@@ -350,7 +361,7 @@ var quby = window['quby'] || {};
                  *
                  * @param blockParam A block parameter for this set of parameters.
                  */
-                setBlockParam: function (blockParam) {
+                setBlockParam: function( blockParam ) {
                     // You can only have 1 block param.
                     // If a second is given, store it later for a validation error.
                     if (this.blockParam !== null) {
@@ -422,7 +433,7 @@ var quby = window['quby'] || {};
                     return this.stmts;
                 },
 
-                printBlockWrap: function( pre, postCondition, postBlock ) {
+                printBlockWrap: function( p, preCondition, postCondition, postBlock ) {
                     p.append( preCondition );
                     this.getCondition().printAsCondition(p)
                     p.append( postCondition ).flush();
@@ -488,7 +499,7 @@ var quby = window['quby'] || {};
             qubyAst.StmtBlock,
             {
                 print: function (p) {
-                    this.printBlockWrap( 'if(', '){', '}' );
+                    this.printBlockWrap( p, 'if(', '){', '}' );
                 }
             }
     );
@@ -501,7 +512,7 @@ var quby = window['quby'] || {};
             qubyAst.StmtBlock,
             {
                 print: function (p) {
-                    this.printBlockWrap( 'while(', '){', '}' );
+                    this.printBlockWrap( p, 'while(', '){', '}' );
                 }
             }
     );
@@ -514,7 +525,7 @@ var quby = window['quby'] || {};
             qubyAst.StmtBlock,
             {
                 print: function (p) {
-                    this.printBlockWrap( 'while(!(', ')){', '}' );
+                    this.printBlockWrap( p, 'while(!(', ')){', '}' );
                 }
             }
     );
