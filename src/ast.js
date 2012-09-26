@@ -168,6 +168,9 @@ var quby = window['quby'] || {};
 
                 setOffset: function(offset) {
                     this.offset = offset;
+                },
+                getOffset: function() {
+                    return this.offset;
                 }
             }
     );
@@ -2135,41 +2138,38 @@ var quby = window['quby'] || {};
     qubyAst.Assignment = util.klass(
             function (left, right) {
                 qubyAst.Op.call(this, left, right, '=', false, 14);
+
+                this.isCollectionAssignment = false;
             },
 
             qubyAst.Op,
             {
-                print: function (p) {
-                    this.left.print(p);
-                    p.append('=');
-                    this.right.print(p);
-                }
-            }
-    );
-
-    qubyAst.ArrayAssignment = util.klass(
-            function(arrayAccess, expr) {
-                qubyAst.Syntax.call(this, arrayAccess.offset);
-
-                this.left  = arrayAccess;
-                this.right = expr;
-            },
-
-            qubyAst.Syntax,
-            {
-                print: function (p) {
-                    p.append('quby_setCollection(');
-                    this.left.array.print(p);
-                    p.append(',');
-                    this.left.index.print(p);
-                    p.append(',');
-                    this.right.print(p);
-                    p.append(')');
+                setCollectionMode: function() {
+                    this.isCollectionAssignment = true;
                 },
 
-                validate: function (v) {
-                    this.right.validate(v);
-                    this.left.validate(v);
+                validate: function(v) {
+                    if ( this.left.setAssignment === undefined ) {
+                        v.parseError( this.left.getOffset() || this.getOffset(), "Illegal assignment" );
+                    } else {
+                        if ( this.left.setAssignment(v, this) !== false ) {
+                            qubyAst.Op.prototype.validate.call( this, v );
+                        }
+                    }
+                },
+
+                print: function (p) {
+                    if ( this.isCollectionAssignment ) {
+                        p.append('quby_setCollection(');
+                        this.left.print(p);
+                        p.append(',');
+                        this.right.print(p);
+                        p.append(')');
+                    } else {
+                        this.left.print(p);
+                        p.append('=');
+                        this.right.print(p);
+                    }
                 }
             }
     );
@@ -2217,41 +2217,10 @@ var quby = window['quby'] || {};
             }
     );
 
-    qubyAst.FieldVariableAssignment = util.klass(
-            function (identifier) {
-                // value is set temporarily
-                qubyAst.FieldIdentifier.call(this, identifier);
-            },
+    /*
+     * ### Variables ###
+     */
 
-            qubyAst.FieldIdentifier,
-            {
-                validateField: function (v) {
-                    v.assignField(this);
-                },
-                print: function (p) {
-                    p.append(quby.runtime.getThisVariable(this.isInsideExtensionClass), '.', this.callName);
-                }
-            }
-    );
-    qubyAst.GlobalVariableAssignment = util.klass(
-            function( identifier ) {
-                qubyAst.Identifier.call( this, identifier, quby.runtime.formatGlobal(identifier.value) );
-            },
-
-            qubyAst.Identifier,
-            {
-                validate: function (v) {
-                    // check if the name is blank, i.e. $
-                    if ( this.identifier.length === 0 ) {
-                        v.parseError( this.offset, "Global variable name is blank" );
-                    } else {
-                        v.assignGlobal( this );
-                    }
-                }
-            }
-    );
-
-    /* ### Variables ### */
     qubyAst.Variable = util.klass(
             function (identifier) {
                 qubyAst.Identifier.call(this, identifier, quby.runtime.formatVar(identifier.value));
@@ -2287,7 +2256,7 @@ var quby = window['quby'] || {};
 
                 print: function(p) {
                     if ( this.isAssignment && this.useVar ) {
-                        p.append('var ');
+                        p.append( 'var ' );
                     }
 
                     qubyAst.Identifier.prototype.print.call( this, p );
@@ -2304,21 +2273,40 @@ var quby = window['quby'] || {};
                 qubyAst.Identifier.call( this, identifier, quby.runtime.formatGlobal(identifier.value) );
 
                 this.isGlobal = true;
+                this.isAssignment = false;
             },
 
             qubyAst.Identifier,
             {
                 print: function (p) {
-                    p.append('quby_checkGlobal(', this.callName, ',\'', this.identifier, '\')');
+                    if ( this.isAssignment ) {
+                        qubyAst.Identifier.prototype.print.call( this, p );
+                    } else {
+                        p.append('quby_checkGlobal(', this.callName, ',\'', this.identifier, '\')');
+                    }
                 },
 
                 validate: function (v) {
-                    if (v.ensureOutParameters(this, "Global variable cannot be used as a parameter, global: '" + this.identifier + "'.")) {
-                        v.useGlobal(this);
+                    if ( this.isAssignment ) {
+                        // check if the name is blank, i.e. $
+                        if ( this.identifier.length === 0 ) {
+                            v.parseError( this.offset, "Global variable name is blank" );
+                        } else {
+                            v.assignGlobal( this );
+                        }
+                    } else {
+                        if (v.ensureOutParameters(this, "Global variable cannot be used as a parameter, global: '" + this.identifier + "'.")) {
+                            v.useGlobal(this);
+                        }
                     }
+                },
+
+                setAssignment: function(v) {
+                    this.isAssignment = true;
                 }
             }
     );
+
     qubyAst.ParameterBlockVariable = util.klass(
             function (identifier) {
                 qubyAst.Variable.call( this, identifier );
@@ -2335,10 +2323,11 @@ var quby = window['quby'] || {};
             }
     );
     qubyAst.FieldVariable = util.klass(
-            function(sym) {
-                qubyAst.FieldIdentifier.call( this, sym );
+            function( identifier ) {
+                qubyAst.FieldIdentifier.call( this, identifier );
 
                 this.klass = null;
+                this.isAssignment = false;
             },
 
             qubyAst.FieldIdentifier,
@@ -2354,42 +2343,55 @@ var quby = window['quby'] || {};
                 },
 
                 validateField: function (v) {
-                    v.useField( this );
-                    this.isConstructor = v.isConstructor();
+                    if ( this.isAssignment ) {
+                        v.assignField(this);
+                    } else {
+                        v.useField( this );
+                        this.isConstructor = v.isConstructor();
+                    }
                 },
 
                 print: function (p) {
                     if ( this.klass ) {
-                        var strName = this.identifier +
-                                quby.runtime.FIELD_NAME_SEPERATOR +
-                                this.klass.name ;
-
-                        // this is about doing essentially either:
-                        //     ( this.field == undefined ? error('my_field') : this.field )
-                        //  ... or ...
-                        //     getField( this.field, 'my_field' );
-                        var thisVar = quby.runtime.getThisVariable(this.isInsideExtensionClass);
-                        if (quby.compilation.hints.useInlinedGetField()) {
-                            p.append(
-                                    '(',
-                                        thisVar, ".", this.callName,
-                                        '===undefined?quby.runtime.fieldNotFoundError(' + thisVar + ',"', strName, '"):',
-                                        thisVar, ".", this.callName,
-                                    ')'
-                            );
+                        if ( this.isAssignment ) {
+                            p.append(quby.runtime.getThisVariable(this.isInsideExtensionClass), '.', this.callName);
                         } else {
-                            p.append(
-                                    "quby_getField(",
-                                        thisVar, ".", this.callName, ',',
-                                        thisVar, ",'",
-                                        strName,
-                                    "')"
-                            );
+                            var strName = this.identifier +
+                                    quby.runtime.FIELD_NAME_SEPERATOR +
+                                    this.klass.name ;
+
+                            // this is about doing essentially either:
+                            //     ( this.field == undefined ? error('my_field') : this.field )
+                            //  ... or ...
+                            //     getField( this.field, 'my_field' );
+                            var thisVar = quby.runtime.getThisVariable(this.isInsideExtensionClass);
+                            if (quby.compilation.hints.useInlinedGetField()) {
+                                p.append(
+                                        '(',
+                                            thisVar, ".", this.callName,
+                                            '===undefined?quby.runtime.fieldNotFoundError(' + thisVar + ',"', strName, '"):',
+                                            thisVar, ".", this.callName,
+                                        ')'
+                                );
+                            } else {
+                                p.append(
+                                        "quby_getField(",
+                                            thisVar, ".", this.callName, ',',
+                                            thisVar, ",'",
+                                            strName,
+                                        "')"
+                                );
+                            }
                         }
                     }
+                },
+
+                setAssignment: function(v) {
+                    this.isAssignment = true;
                 }
             }
     );
+
     qubyAst.ThisVariable = util.klass(
             function( sym ) {
                 qubyAst.Syntax.call( this, sym.offset );
@@ -2409,11 +2411,20 @@ var quby = window['quby'] || {};
                 },
                 print: function(p) {
                     p.append(quby.runtime.getThisVariable(this.isInsideExtensionClass));
+                },
+
+                setAssignment: function(v) {
+                    v.parseError( this.offset, "Cannot assign a value to 'this'" );
+
+                    return false;
                 }
             }
     );
 
-    /* ### Arrays ### */
+    /*
+     * ### Arrays ###
+     */
+
     qubyAst.ArrayAccess = util.klass(
             function( array, index ) {
                 qubyAst.Syntax.call(
@@ -2423,21 +2434,29 @@ var quby = window['quby'] || {};
 
                 this.array = array;
                 this.index = index;
+
+                this.isAssignment = false;
             },
 
             qubyAst.Syntax,
             {
                 print: function (p) {
-                    p.append('quby_getCollection(');
-                    this.array.print(p);
-                    p.append(',');
-                    this.index.print(p);
-                    p.append(')');
+                    if ( this.isAssignment ) {
+                        this.array.print(p);
+                        p.append(',');
+                        this.index.print(p);
+                    } else {
+                        p.append('quby_getCollection(');
+                        this.array.print(p);
+                        p.append(',');
+                        this.index.print(p);
+                        p.append(')');
+                    }
                 },
 
                 validate: function (v) {
-                    this.array.validate(v);
                     this.index.validate(v);
+                    this.array.validate(v);
                 },
 
                 appendLeft: function( array ) {
@@ -2449,10 +2468,15 @@ var quby = window['quby'] || {};
                     }
 
                     return this;
+                },
+
+                setAssignment: function(v, parentAss) {
+                    this.isAssignment = true;
+                    parentAss.setCollectionMode();
                 }
             }
     );
-            
+
     qubyAst.ArrayDefinition = util.klass(
             function (parameters) {
                 var offset;

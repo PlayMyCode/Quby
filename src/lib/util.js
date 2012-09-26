@@ -47,8 +47,8 @@ var util = window['util'] = {};
 
     var browserName = calculateName();
 
-    util.klass = function( constructor ) {
-        var proto = constructor.prototype;
+    util.klass = function( init ) {
+        var proto = init.prototype;
 
         for ( var i = 1; i < arguments.length; i++ ) {
             var funs = arguments[i];
@@ -64,7 +64,7 @@ var util = window['util'] = {};
             }
         }
 
-        return constructor;
+        return init;
     }
 
     util.browser = {
