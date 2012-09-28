@@ -255,7 +255,7 @@
             ] );
         </script>
         <script>//<![CDATA[
-            var includeCore = true;
+            var includeCore = false;
             var isAdmin = true;
             var debugMode = true;
             
@@ -432,7 +432,12 @@
         </script>
         
         <script id="example_code" type="quby">//<![CDATA[
-            a = 3
+            class Foo
+                def bar()
+                    if true
+                        a = 3
+                end
+            end
         //]]></script>
 
         <!-- Out example script code -->

@@ -1197,13 +1197,21 @@ var parse = window['parse'] = (function( window, undefined ) {
      };
 
      var TerminalError = function( i, terminal, match ) {
-         this['isTerminal']     = true;
+         if ( i instanceof Symbol ) {
+             return new TerminalError(
+                    i.offset,
+                    i.terminal,
+                    i.match
+             );
+         } else {
+             this['isTerminal']     = true;
 
-         this['offset']         = i;
-         this['terminal']       = terminal;
-         this['terminalName']   = terminal.termName;
-         this['match']          = match;
-         this['isLiteral']      = terminal.isLiteral;
+             this['offset']         = i;
+             this['terminal']       = terminal;
+             this['terminalName']   = terminal.termName;
+             this['match']          = match;
+             this['isLiteral']      = terminal.isLiteral;
+         }
      };
 
      /**
@@ -1277,6 +1285,7 @@ var parse = window['parse'] = (function( window, undefined ) {
         this.length = symbolLength;
         this.symbolIndex = 0;
         this.i = 0;
+        this.maxI = 0;
 
         this.currentString = null;
         this.currentID = INVALID_TERMINAL;
@@ -1294,6 +1303,33 @@ var parse = window['parse'] = (function( window, undefined ) {
      */
     SymbolResult.prototype.idIndex = function() {
         return this.i;
+    };
+    
+    /**
+     * If i has moved past maxI,
+     * then this will update maxI to the i value.
+     * 
+     * Otherwise i is left unchanged.
+     */
+    SymbolResult.prototype.updateMax = function() {
+        if ( this.i > this.maxI ) {
+            this.maxI = this.i;
+        }
+    };
+
+    /**
+     * @return The maximum id value the symbol result has moved up to.
+     */
+    SymbolResult.prototype.maxID = function() {
+        if ( this.i > this.maxI ) {
+            return this.i;
+        } else {
+            return this.maxI;
+        }
+    };
+
+    SymbolResult.prototype.maxSymbol = function() {
+        return this.symbols[ this.maxID()-1 ];
     };
 
     SymbolResult.prototype.hasErrors = function() {
@@ -1353,16 +1389,18 @@ var parse = window['parse'] = (function( window, undefined ) {
     };
 
     SymbolResult.prototype.back = function( increments ) {
-        if ( increments === undefined ) {
-            this.i--;
-        } else {
-            this.i -= increments;
+        var i = this.i;
+
+        if ( i > this.maxI ) {
+            this.maxI = i;
         }
 
-        if ( this.i < this.symbolIndex ) {
+        this.i = (i -= increments);
+
+        if ( i < this.symbolIndex ) {
             throw new Error("Moved back by more increments then the last finalize move location");
         } else {
-            this.currentID = this.symbolIDs[this.i];
+            this.currentID = this.symbolIDs[i];
         }
     };
 
@@ -2414,60 +2452,24 @@ var parse = window['parse'] = (function( window, undefined ) {
          * 'termsToRules' lookup.
          */
 
-        var errors = [],
-            hasError = null;
+        var errors   = [],
+            hasError = null,
+            onFinish = null;
 
-		while ( symbols.hasMore() ) {
-			var onFinish = this.ruleTest( symbols, inputSrc );
+		if ( symbols.hasMore() ) {
+			onFinish = this.ruleTest( symbols, inputSrc );
 
-            if ( onFinish !== null ) {
-                symbols.finalizeMove();
-
-                if ( hasError === null && symbols.hasMore() ) {
-                    hasError = symbols.skip();
-                }
-                
-                /*
-                 * We parse errors for as long as possible,
-                 * and so only report when re have gone back
-                 * to success.
-                 *
-                 * This way if we have 4 error symbols in a
-                 * row, only the first gives an error.
-                 */
-                if ( hasError !== null ) {
-                    errors.push( new TerminalError(
-                            hasError.offset,
-                            hasError.terminal,
-                            hasError.match
-                    ) );
-                }
-
-                return {
-                        result: onFinish(),
-                        errors: errors
-                }
-			} else {
-                var next = symbols.skip();
-
-                if ( hasError === null ) {
-                    hasError = next;
-                }
-			}
-		}
-
-        if ( hasError !== null ) {
-            errors.push( new TerminalError(
-                    hasError.offset,
-                    hasError.terminal,
-                    hasError.match
-            ) );
+            if ( onFinish === null || symbols.hasMore() ) {
+                errors.push( new TerminalError(symbols.maxSymbol()) );
+            }
+        } else {
+            errors.push( new TerminalError(symbols.maxSymbol()) );
         }
 
         return {
-                result: null,
+                result: onFinish,
                 errors: errors
-        }
+        };
     };
 
     ParserRule.prototype.ruleTest = function( symbols, inputSrc ) {
