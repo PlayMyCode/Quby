@@ -2453,19 +2453,29 @@ var parse = window['parse'] = (function( window, undefined ) {
          */
 
         var errors   = [],
-            hasError = null,
-            onFinish = null;
+            hasError = null;
 
 		if ( symbols.hasMore() ) {
-			onFinish = this.ruleTest( symbols, inputSrc );
+			var onFinish = this.ruleTest( symbols, inputSrc );
 
-            if ( onFinish === null || symbols.hasMore() ) {
+            if ( onFinish !== null ) {
+                symbols.finalizeMove();
+
+                if ( ! symbols.hasMore() ) {
+                    return {
+                            result: onFinish(),
+                            errors: errors
+                    };
+                } else {
+                    errors.push( new TerminalError(symbols.maxSymbol()) );
+                }
+            } else {
                 errors.push( new TerminalError(symbols.maxSymbol()) );
             }
         }
 
         return {
-                result: onFinish,
+                result: null,
                 errors: errors
         };
     };
