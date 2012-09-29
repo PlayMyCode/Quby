@@ -26,6 +26,112 @@ var quby = window['quby'] || {};
         },
 
         /**
+         * Looks for scripts tags with the type
+         * 'text/quby'. They are then pulled out,
+         * and parsed in order.
+         *
+         * The result is then passed into the
+         * callback given.
+         *
+         * If no callback is given, then the result
+         * is just run automatically, or throws an
+         * error if the source is incorrect.
+         */
+        runScriptTags: function( onResult ) {
+            if ( ! onResult ) {
+                onResult = function( result ) {
+                    if ( result.hasErrors() ) {
+                        throw new Error( result.getErrors()[0] );
+                    } else {
+                        result.run();
+                    }
+                };
+            }
+
+            var scripts = document.getElementsByTagName( 'script' );
+            var scriptCount        = 0,
+                loadedScripts      = [],
+                loadedScriptsAdmin = [];
+
+            var addParseScripts = function( index, text, isAdmin ) {
+                loadedScripts[index]      = text;
+                loadedScriptsAdmin[index] = isAdmin;
+            };
+
+            /*
+             * This variables ensures it should only run once,
+             * however I am pretty certain it is not needed,
+             * due to the way it's structured.
+             *
+             * This is just kept as a fallback, in case I am wrong.
+             */
+            var isParsed = false;
+            var runParseScripts = function() {
+                if ( !isParsed && scriptCount === loadedScripts.length ) {
+                    isParsed = true;
+
+                    var parser = new quby.main.Parser();
+
+                    for ( var i = 0; i < scriptCount; i++ ) {
+                        parser.parse( loadedScripts[i], loadedScriptsAdmin[i] );
+                    }
+
+                    parser.finish( onResult );
+                }
+            }
+
+            for ( var i = 0; i < scripts.length; i++ ) {
+                var script = scripts[i],
+                    type   = script.getAttribute('type');
+
+                if ( type === 'text/quby' || type === 'quby' ) {
+                    var isAdmin = ( script.getAttribute( 'data-admin' ) === 'true' ) ?
+                            true  :
+                            false ;
+
+                    var contents = script.innerHTML;
+
+                    var scriptIndex = scriptCount;
+                    scriptCount++;
+
+                    // inlined tags
+                    if ( contents !== undefined ) {
+                        // remove the CDATA wrap, if present
+                        contents = contents.
+                              replace(/^\/\/<!\[CDATA\[/, "").
+                              replace(/\/\/\]\]>$/, "");
+
+                        addParseScripts( scriptIndex, contents, isAdmin );
+                        contents = null;
+
+                    // src tags
+                    } else {
+                        var src = script.getAttribute('src');
+
+                        if ( src === undefined ) {
+                            throw new Error('cannot read script tag');
+                        } else {
+                            (function( src, scriptIndex, isAdmin ) {
+                                util.ajaxGet( scr,
+                                        function(text, status) {
+                                            if ( status >= 200 && status < 400 ) {
+                                                addParseScripts( scriptIndex, text, isAdmin );
+                                                runParseScripts();
+                                            } else {
+                                                throw new Error( "failed to load script: " + src );
+                                            }
+                                        }
+                                );
+                            })( src, scriptIndex, isAdmin );
+                        }
+                    }
+                }
+            }
+
+            runParseScripts();
+        },
+
+        /**
          *
          */
         parse: function (source, adminMode, callback) {

@@ -326,4 +326,74 @@ var util = window['util'] = {};
             }
         }
     };
+
+    util.ajax = {
+            post: function(url, callback, data, isBlocking, timestamp) {
+                return util.ajax.call(
+                        'POST',
+                        url,
+                        callback,
+                        data,
+                        isBlocking,
+                        timestamp
+                );
+            },
+
+            get: function(url, callback, data, isBlocking, timestamp) {
+                return util.ajax.call(
+                        'GET',
+                        url,
+                        callback,
+                        data,
+                        isBlocking,
+                        timestamp
+                );
+            },
+
+            call: function(method, url, callback, passData, async, timestamp) {
+                method = method.toLowerCase();
+
+                var ajaxObj = window.XMLHttpRequest ? new window.XMLHttpRequest              :
+                        ActiveXObject         ? new ActiveXObject("Microsoft.XMLHTTP") :
+                        null ;
+
+                if ( ! ajaxObj ) {
+                    return null;
+                } else {
+                    ajaxObj.onreadystatechange = function() {
+                        if ( ajaxObj.readyState == 4 ) {
+                            callback(
+                                    ajaxObj.responseText,
+                                    ajaxObj.status,
+                                    ajaxObj.responseXML
+                            );
+                        }
+                    }
+
+                    if ( method === 'post' ) {
+                        if ( timestamp ) {
+                            url += '?timestamp=' + Date.now();
+                        }
+
+                        ajaxObj.open( "POST", uri, async );
+                        ajaxObj.setRequestHeader( "Content-type", "application/x-www-form-urlencoded" );
+                        ajaxObj.setRequestHeader( "Content-Length", passData.length );
+                        ajaxObj.send(passData);
+                    } else if ( method === 'get' ) {
+                        url += '?' + passData;
+
+                        if ( timestamp ) {
+                            url += '&timestamp=' + Date.now();
+                        }
+
+                        ajaxObj.open( "GET", uri, async );
+                        ajaxObj.send( null );
+                    } else {
+                        throw new Error( "unknown method given, should be 'get' or 'post'" );
+                    }
+
+                    return ajaxObj;
+                }
+            }
+    };
 })( util );
