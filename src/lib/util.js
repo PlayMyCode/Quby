@@ -375,7 +375,7 @@ var util = window['util'] = {};
                             url += '?timestamp=' + Date.now();
                         }
 
-                        ajaxObj.open( "POST", uri, async );
+                        ajaxObj.open( "POST", url, async );
                         ajaxObj.setRequestHeader( "Content-type", "application/x-www-form-urlencoded" );
                         ajaxObj.setRequestHeader( "Content-Length", passData.length );
                         ajaxObj.send(passData);
@@ -386,7 +386,7 @@ var util = window['util'] = {};
                             url += '&timestamp=' + Date.now();
                         }
 
-                        ajaxObj.open( "GET", uri, async );
+                        ajaxObj.open( "GET", url, async );
                         ajaxObj.send( null );
                     } else {
                         throw new Error( "unknown method given, should be 'get' or 'post'" );

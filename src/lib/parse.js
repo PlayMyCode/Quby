@@ -2462,8 +2462,6 @@ var parse = window['parse'] = (function( window, undefined ) {
             if ( onFinish === null || symbols.hasMore() ) {
                 errors.push( new TerminalError(symbols.maxSymbol()) );
             }
-        } else {
-            errors.push( new TerminalError(symbols.maxSymbol()) );
         }
 
         return {

@@ -41,7 +41,7 @@ var quby = window['quby'] || {};
             if ( ! onResult ) {
                 onResult = function( result ) {
                     if ( result.hasErrors() ) {
-                        throw new Error( result.getErrors()[0] );
+                        throw new Error( result.errors[0] );
                     } else {
                         result.run();
                     }
@@ -95,7 +95,7 @@ var quby = window['quby'] || {};
                     scriptCount++;
 
                     // inlined tags
-                    if ( contents !== undefined ) {
+                    if ( contents !== '' && contents !== undefined ) {
                         // remove the CDATA wrap, if present
                         contents = contents.
                               replace(/^\/\/<!\[CDATA\[/, "").
@@ -112,7 +112,7 @@ var quby = window['quby'] || {};
                             throw new Error('cannot read script tag');
                         } else {
                             (function( src, scriptIndex, isAdmin ) {
-                                util.ajaxGet( scr,
+                                util.ajax.get( src,
                                         function(text, status) {
                                             if ( status >= 200 && status < 400 ) {
                                                 addParseScripts( scriptIndex, text, isAdmin );
