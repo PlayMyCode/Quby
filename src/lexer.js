@@ -12,26 +12,30 @@ var quby = window['quby'] || {};
         EmptyIdSym: function( offset, value ) {
             quby.lexer.EmptySym.call( this, offset, value );
             this.lower = value.toLowerCase();
+
             return this;
         },
         
         IdSym: function( offset, value ) {
             quby.lexer.Sym.call( this, offset, value );
             this.lower = value.toLowerCase();
+
             return this;
         },
         
         Sym: function (offset, value) {
             quby.lexer.EmptySym.call( this,
-                    new quby.main.LineInfo(offset, quby.main.currentParser().source),
+                    new quby.core.LineInfo( offset, quby.core.currentParser().source ),
                     value
             );
+
             return this;
         },
         
         EmptySym: function (offset, value) {
             this.offset = offset;
-            this.value = value;
+            this.value  = value;
+
             return this;
         }
     };
