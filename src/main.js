@@ -123,10 +123,10 @@ var quby = window['quby'] || {};
          *
          */
         parse: function (source, adminMode, callback) {
-            var factory = new quby.main.Parser();
+            var parser = new quby.main.Parser();
 
-            factory.parse(source, adminMode, function() {
-                factory.finish(callback);
+            parser.parse( source, adminMode, function() {
+                parser.finish( callback );
             });
         },
 
