@@ -13,6 +13,12 @@ var quby = window['quby'] || {};
      * function for starting the parser.
      */
     quby.main = {
+        runScriptTagsDisplay: function() {
+            quby.main.runScriptTags( function(r) {
+                r.runOrDisplayErrors();
+            } );
+        },
+
         /**
          * Looks for scripts tags with the type
          * 'text/quby'. They are then pulled out,
@@ -295,6 +301,87 @@ var quby = window['quby'] || {};
                  */
                 hasErrors: function() {
                     return this.errors.length > 0;
+                },
+
+                getErrors: function() {
+                    return this.errors;
+                },
+
+                runOrDisplayErrors: function() {
+                    if ( this.hasErrors() ) {
+                        this.displayErrors();
+                    } else {
+                        this.run();
+                    }
+                },
+
+                /**
+                 * This will display all of the errors within the
+                 * current web page.
+                 *
+                 * This is meant for development purposes.
+                 */
+                displayErrors: function() {
+                    console.log( 'display' );
+                    var errors = this.getErrors();
+
+                    var iframe = document.createElement('iframe');
+                    iframe.setAttribute('width', '800px');
+                    iframe.setAttribute('height', '400px');
+                    iframe.setAttribute('frameborder', '0');
+                    iframe.setAttribute('src', 'about:blank');
+
+                    iframe.style.transition =
+                    iframe.style.OTransition =
+                    iframe.style.MsTransition =
+                    iframe.style.MozTransition =
+                    iframe.style.WebkitTransition = 'opacity 200ms linear';
+
+                    iframe.style.background = 'transparent';
+                    iframe.style.opacity = 0;
+                    iframe.style.zIndex = 100000;
+                    iframe.style.top = '100px';
+                    iframe.style.right = 0;
+                    iframe.style.left = '50%';
+                    iframe.style.bottom = 0;
+                    iframe.style.position = 'fixed';
+                    iframe.style.marginLeft = '-400px';
+
+                    iframe.onload = function() {
+                        var iDoc = iframe.contentWindow || iframe.contentDocument;
+
+                        if ( iDoc.document) {
+                            iDoc = iDoc.document;
+                        }
+
+                        var html = [];
+
+                        html.push( '<div style="background: rgba(0,0,0,0.5); border-radius: 4px; width: 100%; height: 100%; position: absolute; top: 0; left: 0;">' );
+                            html.push( '<div style="width: 700px; margin: 12px auto; scroll: auto; color: whitesmoke; font-family: \'DejaVu Sans Mono\', monospaced; font-size: 14px;>' );
+                                for ( var i = 0; i < errors.length; i++ ) {
+                                    html.push( '<div style="width: 100%">' )
+                                    html.push( errors[i] )
+                                    html.push( '</div>' );
+                                }
+                            html.push( '</div>' );
+                        html.push( '</div>' );
+
+                        var iBody = iDoc.getElementsByTagName( 'body' )[0];
+                        iBody.innerHTML = html.join('');
+                        iBody.style.margin  = 0;
+                        iBody.style.padding = 0;
+
+                        iframe.style.opacity = 1;
+                    }
+
+                    var body = document.getElementsByTagName( 'body' )[0];
+                    if ( body ) {
+                        body.appendChild( iframe );
+                    } else {
+                        setTimeout( function() {
+                            document.getElementsByTagName( 'body' )[0].appendChild( iframe );
+                        }, 1000 );
+                    }
                 },
 
                 /**

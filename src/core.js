@@ -531,7 +531,7 @@ var quby = window['quby'] || {};
 
                         // adds a program to be validated by this Validator
                         validate: function( program, errors, srcData ) {
-                            if ( errors === null ) {
+                            if ( errors === null || errors.length === 0 ) {
                                 if ( ! program ) {
                                     // avoid unneeded error messages
                                     if (this.errors.length === 0) {
@@ -1715,17 +1715,6 @@ var quby = window['quby'] || {};
             this.currentStatement = null;
             this.postStatement    = null;
         }
-    }
-
-    var LineInfo = function (offset, source) {
-        this.offset = offset;
-        this.source = source;
-
-        Object.preventExtensions( this );
-    }
-
-    LineInfo.prototype.getLine = function () {
-        return this.source.getLine(this.offset);
     }
 })( quby, util );
 
