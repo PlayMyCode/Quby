@@ -372,7 +372,11 @@ var util = window['util'] = {};
 
                     if ( method === 'post' ) {
                         if ( timestamp ) {
-                            url += '?timestamp=' + Date.now();
+                            if ( url.indexOf('?') === -1 ) {
+                                url += '?timestamp=' + Date.now();
+                            } else {
+                                url += '&timestamp=' + Date.now();
+                            }
                         }
 
                         ajaxObj.open( "POST", url, async );
@@ -380,10 +384,20 @@ var util = window['util'] = {};
                         ajaxObj.setRequestHeader( "Content-Length", passData.length );
                         ajaxObj.send(passData);
                     } else if ( method === 'get' ) {
-                        url += '?' + passData;
+                        if ( passData ) {
+                            if ( url.indexOf('?') === -1 ) {
+                                url += '?' + passData;
+                            } else {
+                                url += '&' + passData;
+                            }
+                        }
 
                         if ( timestamp ) {
-                            url += '&timestamp=' + Date.now();
+                            if ( url.indexOf('?') === -1 ) {
+                                url += '?timestamp=' + Date.now();
+                            } else {
+                                url += '&timestamp=' + Date.now();
+                            }
                         }
 
                         ajaxObj.open( "GET", url, async );
