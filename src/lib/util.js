@@ -110,6 +110,77 @@ var util = window['util'] = {};
         }
     };
 
+    var SLASH_CHAR = '/'.charCodeAt(0);
+
+    var anchor = null;
+
+    util.htmlToText = function( html ) {
+        if ( anchor === null ) {
+            anchor = document.createElement('a');
+        }
+
+        anchor.innerHTML = html;
+
+        return anchor.textContent || anchor.innerText;
+    };
+
+    util.url = (function() {
+            return {
+                    /**
+                     * Given an url, this will turn it into an absolute url.
+                     */
+                    absolute: function( url ) {
+                        if ( anchor === null ) {
+                            anchor = document.createElement('a');
+                        }
+
+                        anchor.href = url;
+                        return anchor.href;
+                    },
+
+                    /**
+                     * @param url The url to test.
+                     * @param domain Optional, the domain to test for, defaults to the current domain of the document.
+                     * @return True if the url is of the domain given, otherwise false.
+                     */
+                    isDomain: function( url, domain ) {
+                        if ( domain === undefined ) {
+                            domain = document.domain;
+                        }
+
+                        return ( url.toLowerCase().indexOf(domain.toLowerCase()) === 0 );
+                    },
+
+                    /**
+                     * Removes the domain section from the
+                     * beginning of the url given.
+                     *
+                     * If the domain is not found, then it is ignored.
+                     *
+                     * @param url The url to strip the domain from.
+                     */
+                    stripDomain: function( url ) {
+                        url = util.url.absolute( url );
+
+                        if ( url.charCodeAt(0) === SLASH_CHAR && url.charCodeAt(1) !== SLASH_CHAR ) {
+                            return url;
+                        } else {
+                            /*
+                             * begins with either:
+                             *      //
+                             *      http:// (or something very similar, like https or ftp)
+                             * then ...
+                             *      everything up till the first slash
+                             */
+                            return url.replace(
+                                    /((\/\/)|([a-zA-Z]+:\/\/))([a-zA-Z0-9_\-.+]+)/,
+                                    ''
+                            );
+                        }
+                    }
+            };
+    })();
+
     util.array = {
         /**
          * Given the 'arguments' variable, this will convert it to a proper
@@ -147,16 +218,6 @@ var util = window['util'] = {};
             }
 
             return arr;
-        },
-
-        contains: function (arr, val) {
-            return (arr[val] ? true : false);
-        },
-
-        randomSort: function (arr) {
-            arr.sort(function () {
-                return (Math.round(Math.random()) - 0.5);
-            });
         },
 
         remove: function (arr, arrayIndex) {
@@ -199,133 +260,221 @@ var util = window['util'] = {};
         }
     };
 
-    util.future = {
-        DEFAULT_INTERVAL: 10,
-        isRunning: false,
-        funs: [],
+    util.future = (function() {
+        /**
+         * @const
+         * @private
+         * @type {number}
+         */
+        var DEFAULT_INTERVAL = 10;
 
-        addFuns: function( fs ) {
-            for ( var i = 0; i < fs.length; i++ ) {
-                util.future.runFun( fs[i] );
-            }
-        },
+        var isFutureRunning = false;
 
-        run: function() {
-            util.future.addFuns( arguments );
+        var futureFuns     = [],
+            futureBlocking = [];
 
-            if ( ! util.future.isRunning ) {
-                util.future.once( util.future.next );
-            }
-        },
+        var futureBlockingOffset  = 0,
+            blockingCount = 1;
 
-        runFun: function( f ) {
-            util.future.ensureFun( f );
+        /**
+         * Used to run the next function,
+         * in the scheduler. It will run right now,
+         * within this frame.
+         *
+         * @private
+         * @const
+         */
+        var runNextFuture = function( args ) {
+            if ( futureFuns.length > 0 ) {
+                utilFuture.once( function() {
+                    if ( isFutureRunning === false && futureBlocking[0] === 0 ) {
+                        isFutureRunning = true;
 
-            if ( util.future.isRunning ) {
-                util.future.funs.unshift( f );
-            } else {
-                util.future.funs.push( f );
-            }
-        },
+                        futureBlocking.shift();
+                        if ( args !== undefined ) {
+                            futureFuns.shift().apply( null, args );
+                        } else {
+                            futureFuns.shift()();
+                        }
 
-        map: function( values, f ) {
-            util.future.ensureFun( f );
+                        isFutureRunning = false;
 
-            var fs = [];
-            // this is to ensure all values are in their own unique scope
-            var addFun = function( value, f, fs ) {
-                fs.push( function() {
-                    f( value );
+                        runNextFuture();
+                    }
                 } );
-            };
-
-            for (var i = 0; i < values.length; i++) {
-                addFun( values[i], f, fs );
-            }
-
-            util.future.addFuns( fs );
-            util.future.run();
-        },
-
-        next: function() {
-            if ( util.future.funs.length > 0 ) {
-                if ( util.future.isRunning === false ) {
-                    util.future.isRunning = true;
-
-                    var fun = util.future.funs.shift();
-
-                    util.future.once(
-                            function() {
-                                fun();
-                                util.future.isRunning = false;
-
-                                util.future.next();
-                            }
-                    );
-                }
             } else {
-                util.future.isRunning = false;
+                isFutureRunning = false;
             }
-        },
+        };
 
-        ensureFun: function(f) {
+        /**
+         *
+         *
+         * @private
+         * @const
+         */
+        var ensureFun = function(f) {
             if ( ! (f instanceof Function) ) {
                 throw new Error("Function expected.");
             }
-        },
+        };
 
-        interval: function( callback, element ) {
-            var requestAnimFrame = util.future.getRequestAnimationFrame();
+        var utilFuture = {
+            block: function( f ) {
+                ensureFun( f );
 
-            if ( requestAnimFrame !== null ) {
-                var isRunningHolder = {isRunning: true};
+                var index = 0;
 
-                var recursiveCallback = function() {
-                    if ( isRunningHolder.isRunning ) {
-                        callback();
-                        requestAnimFrame( recursiveCallback, element );
+                if ( this.isRunning ) {
+                    index = 0;
+                    futureFuns.unshift( f );
+                    futureBlocking.unshift( blockingCount );
+                    futureBlockingOffset++;
+                } else {
+                    index = futureFuns.length;
+                    futureFuns.push( f );
+                    futureBlocking.push( blockingCount );
+                }
+
+                index += futureBlockingOffset;
+                index |= ( blockingCount << 16 );
+
+                blockingCount = Math.max( 0, (blockingCount+1) % 0xfff );
+
+                return index;
+            },
+
+            unblock: function( tag ) {
+                var index = tag & 0xffff;
+                var check = ( tag >> 16 ) & 0xfff;
+
+                if ( index < 0 || index >= futureBlocking.length ) {
+                    throw new Error( "state inconsistency!" );
+                } else {
+                    if ( futureBlocking[index] !== check ) {
+                        throw new Error( "wrong tag given" );
+                    } else {
+                        futureBlocking[index] = 0;
+
+                        if ( arguments.length > 1 ) {
+                            var fun  = futureFuns[index],
+                                args = util.array.argumentsToArray(arguments, 1);
+
+                            futureFuns[index] = function() {
+                                fun.apply( null, args );
+                            };
+                        }
                     }
                 }
 
-                requestAnimFrame( recursiveCallback, element );
+                runNextFuture();
+            },
 
-                return isRunningHolder;
-            } else {
-                return setInterval( callback, util.future.DEFAULT_INTERVAL );
-            }
-        },
+            hasWork: function() {
+                return futureFuns.length > 0;
+            },
 
-        clearInterval: function( tag ) {
-            if ( tag.isRunning ) {
-                tag.isRunning = false;
-            } else {
-                clearInterval( tag );
-            }
-        },
+            addFuns: function( fs ) {
+                for ( var i = 0; i < fs.length; i++ ) {
+                    utilFuture.runFun( fs[i] );
+                }
+            },
 
-        getRequestAnimationFrame : function() {
-            return  window.requestAnimationFrame       ||
-                    window.webkitRequestAnimationFrame ||
-                    window.mozRequestAnimationFrame    ||
-                    window.oRequestAnimationFrame      ||
-                    window.msRequestAnimationFrame     ||
-                    null ;
-        },
+            run: function() {
+                utilFuture.addFuns( arguments );
 
-        once: function() {
-            var request = util.future.getRequestAnimationFrame();
+                if ( ! isFutureRunning ) {
+                    runNextFuture();
+                }
+            },
 
-            for ( var i = 0, len = arguments.length; i < len; i++ ) {
-                var fun = arguments[i];
+            runFun: function( f ) {
+                ensureFun( f );
 
-                if ( request !== null ) {
-                    request( fun );
+                if ( isFutureRunning ) {
+                    futureFuns.unshift( f );
+                    futureBlocking.unshift( 0 );
+                    futureBlockingOffset++;
                 } else {
-                    setTimeout( fun, util.future.DEFAULT_INTERVAL );
+                    futureFuns.push( f );
+                    futureBlocking.push( 0 );
+                }
+            },
+
+            map: function( values, f ) {
+                ensureFun( f );
+
+                var fs = [];
+                // this is to ensure all values are in their own unique scope
+                var addFun = function( value, f, fs ) {
+                    fs.push( function() {
+                        f( value );
+                    } );
+                };
+
+                for (var i = 0; i < values.length; i++) {
+                    addFun( values[i], f, fs );
+                }
+
+                utilFuture.addFuns( fs );
+                utilFuture.run();
+            },
+
+            interval: function( callback, element ) {
+                var requestAnimFrame = utilFuture.getRequestAnimationFrame();
+
+                if ( requestAnimFrame !== null ) {
+                    var isRunningHolder = {isRunning: true};
+
+                    var recursiveCallback = function() {
+                        if ( isRunningHolder.isRunning ) {
+                            callback();
+                            requestAnimFrame( recursiveCallback, element );
+                        }
+                    }
+
+                    requestAnimFrame( recursiveCallback, element );
+
+                    return isRunningHolder;
+                } else {
+                    return setInterval( callback, DEFAULT_INTERVAL );
+                }
+            },
+
+            clearInterval: function( tag ) {
+                if ( tag.isRunning ) {
+                    tag.isRunning = false;
+                } else {
+                    clearInterval( tag );
+                }
+            },
+
+            getRequestAnimationFrame : function() {
+                return  window.requestAnimationFrame       ||
+                        window.webkitRequestAnimationFrame ||
+                        window.mozRequestAnimationFrame    ||
+                        window.oRequestAnimationFrame      ||
+                        window.msRequestAnimationFrame     ||
+                        null ;
+            },
+
+            once: function() {
+                var request = utilFuture.getRequestAnimationFrame();
+
+                for ( var i = 0, len = arguments.length; i < len; i++ ) {
+                    var fun = arguments[i];
+
+                    if ( request !== null ) {
+                        request( fun );
+                    } else {
+                        setTimeout( fun, DEFAULT_INTERVAL );
+                    }
                 }
             }
-        }
-    };
+        };
+
+        return utilFuture;
+    })( util );
 
     util.ajax = {
             post: function(url, callback, data, isBlocking, timestamp) {
@@ -339,11 +488,43 @@ var util = window['util'] = {};
                 );
             },
 
+            postFuture: function(url, callback, data, isBlocking, timestamp) {
+                var tag = util.future.block( function(status, text, xml) {
+                    callback( status, text, xml );
+                } );
+
+                return util.ajax.post(
+                        url,
+                        function(status, text, xml) {
+                            util.future.unblock( tag, status, text, xml );
+                        },
+                        data,
+                        isBlocking,
+                        timestamp
+                );
+            },
+
             get: function(url, callback, data, isBlocking, timestamp) {
                 return util.ajax.call(
                         'GET',
                         url,
                         callback,
+                        data,
+                        isBlocking,
+                        timestamp
+                );
+            },
+
+            getFuture: function(url, callback, data, isBlocking, timestamp) {
+                var tag = util.future.block( function(status, text, xml) {
+                    callback( status, text, xml );
+                } );
+
+                return util.ajax.get(
+                        url,
+                        function(status, text, xml) {
+                            util.future.unblock( tag, status, text, xml );
+                        },
                         data,
                         isBlocking,
                         timestamp
@@ -363,8 +544,8 @@ var util = window['util'] = {};
                     ajaxObj.onreadystatechange = function() {
                         if ( ajaxObj.readyState == 4 ) {
                             callback(
-                                    ajaxObj.responseText,
                                     ajaxObj.status,
+                                    ajaxObj.responseText,
                                     ajaxObj.responseXML
                             );
                         }

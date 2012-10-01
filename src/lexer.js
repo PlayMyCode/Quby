@@ -2,9 +2,10 @@
 var quby = window['quby'] || {};
 
 (function( quby, util ) {
-    var LineInfo = function (offset, source) {
+    var LineInfo = function (offset, source, name) {
         this.offset = offset;
         this.source = source;
+        this.name   = name  ;
 
         Object.preventExtensions( this );
     }
@@ -13,6 +14,9 @@ var quby = window['quby'] || {};
         return this.source.getLine(this.offset);
     }
 
+    var parserStack = [],
+        currentParser = null;
+
     /**
      * Lexer
      * 
@@ -20,6 +24,14 @@ var quby = window['quby'] || {};
      * of the parser are defined here.
      */
     quby.lexer = {
+        pushParser: function( parser ) {
+            parserStack.push( parser );
+            currentParser = parser;
+        },
+        popParser: function() {
+            currentParser = parserStack.pop();
+        },
+
         EmptyIdSym: function( offset, value ) {
             quby.lexer.EmptySym.call( this, offset, value );
             this.lower = value.toLowerCase();
@@ -36,7 +48,7 @@ var quby = window['quby'] || {};
         
         Sym: function (offset, value) {
             quby.lexer.EmptySym.call( this,
-                    new LineInfo( offset, quby.core.currentParser().source ),
+                    new LineInfo( offset, currentParser.source, currentParser.strName ),
                     value
             );
 

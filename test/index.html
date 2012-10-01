@@ -306,56 +306,65 @@
                     document.getElementsByClassName( 'controls-time-info' )[0].innerHTML =
                             "compile " + compileTime + "ms<br/>" +
                             "symbols " + symbolsTime + "ms<br/>" +
-                            "rules " + rulesTime   + "ms<br/>" +
-                            "total " + totalTime   + "ms" ;
+                            "rules "   + rulesTime   + "ms<br/>" +
+                            "total "   + totalTime   + "ms" ;
                 };
 
                 if ( includeCore ) {
                     var core = getSourceFile("./core.qb");
 
-                    parser.parse( core, true, null, function(symbols, times) {
-                        compileTime += times.compile;
-                        symbolsTime += times.symbols;
-                        rulesTime   += times.rules;
-                        totalTime   += times.total;
+                    parser.
+                            parse( core ).
+                            adminMode( true ).
+                            debug( function(symbols, times) {
+                                compileTime += times.compile;
+                                symbolsTime += times.symbols;
+                                rulesTime   += times.rules;
+                                totalTime   += times.total;
 
-                        updateControlsTime();
-                    } );
+                                updateControlsTime();
+                            } );
                 }
 
                 if ( debugMode ) {
-                    parser.parse( sourceCode.value, isAdmin, null, function(symbols, times) {
-                        var displaySymbols = new Array( symbols.length );
+                    parser.
+                            parse( sourceCode.value ).
+                            adminMode( isAdmin ).
+                            debug( function(symbols, times) {
+                                var displaySymbols = new Array( symbols.length );
 
-                        for ( var i = 0; i < symbols.length; i++ ) {
-                            displaySymbols[i] = symbols[i].name();
-                        }
+                                for ( var i = 0; i < symbols.length; i++ ) {
+                                    displaySymbols[i] = symbols[i].name();
+                                }
 
-                        outputSymbols.value = displaySymbols.join( "\n" );
+                                outputSymbols.value = displaySymbols.join( "\n" );
 
-                        compileTime += times.compile;
-                        symbolsTime += times.symbols;
-                        rulesTime   += times.rules;
-                        totalTime   += times.total;
+                                compileTime += times.compile;
+                                symbolsTime += times.symbols;
+                                rulesTime   += times.rules;
+                                totalTime   += times.total;
 
-                        updateControlsTime();
-                    });
+                                updateControlsTime();
+                            });
                 } else {
-                    parser.parse( sourceCode.value, isAdmin );
+                    parser.
+                            parse( sourceCode.value ).
+                            adminMode( isAdmin );
                 }
 
-                parser.finish( function(result) {
-                    outputCode.value  = result.getCode();
-                    outputError.value = result.hasErrors() ?
-                            result.errors.join("\r\n") + "\r\n" :
-                            '' ;
-                    
-                    _result = result;
-                    
-                    if ( callback ) {
-                        callback();
-                    }
-                } );
+                parser.
+                        finalize( function(result) {
+                            outputCode.value  = result.getCode();
+                            outputError.value = result.hasErrors() ?
+                                    result.errors.map(function(e) { return e.message }).join("\r\n") + "\r\n" :
+                                    '' ;
+                            
+                            _result = result;
+                            
+                            if ( callback ) {
+                                callback();
+                            }
+                        } );
             }
 
             function runCode() {

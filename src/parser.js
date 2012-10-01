@@ -1502,11 +1502,16 @@ var quby = window['quby'] || {};
              * @param onFinish The function to call when parsing has finished.
              * @param onDebug An optional callback, for sending debug information into.
              */
-            parse : function( src, onFinish, onDebug ) {
+            parse: function( src, parser, onFinish, onDebug ) {
+                quby.lexer.pushParser( parser );
+
                 statements.parse(
                         src,
                         preParse( src ),
-                        onFinish,
+                        function( program, errors ) {
+                            quby.lexer.popParser( parser );
+                            onFinish( program, errors );
+                        },
                         onDebug || null
                 );
             }

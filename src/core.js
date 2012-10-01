@@ -18,56 +18,56 @@ var quby = window['quby'] || {};
 (function( quby, util ) {
     var STATEMENT_END = ';\n';
 
-    var parserStack = [];
-
     quby.core = {
             /**
-             * Main parser engine running code.
-             */
-            currentParser: function () {
-                return parserStack[ parserStack.length - 1 ];
-            },
-
-            /**
-             * For creating a new Parser object.
+             * This is the point that joins together
+             * quby.main to quby.core.
              *
-             * @param source The source code to parse.
+             * Given a quby.main.ParserInstance, and a
+             * quby.core.Validator, this will run the
+             * actual parse process and pump the results
+             * through the validator.
+             *
+             * It accesses the internal properties of
+             * objects freely, because this is to hide
+             * their access from teh public API (namely
+             * the ParserInstance).
              */
-            ParserInner: (function() {
-                var ParserInner = function( source ) {
-                    this.source = new SourceLines( source );
+            runParser: function( instance, validator ) {
+                var callback      = instance.whenFinished,
+                    debugCallback = instance.debugCallback,
+                    srcData       = instance.source,
+                    name          = instance.strName;
 
-                    Object.preventExtensions( this );
-                }
+                quby.parser.parse(
+                        srcData.getSource(),
+                        instance,
 
-                ParserInner.prototype = {
-                    run: function( callback, debugCallback ) {
-                        var self = this;
+                        function( program, errors ) {
+                            validator.adminMode(  instance.isAdmin  );
+                            validator.strictMode( instance.isStrict );
 
-                        parserStack.push( this );
+                            validator.validate( program, errors, srcData );
 
-                        quby.parser.parse(
-                                self.source.getSource(),
+                            if ( callback !== undefined && callback !== null ) {
+                                util.future.runFun( callback );
+                            }
 
-                                function(program, errors) {
-                                    parserStack.pop();
-                                    callback( program, errors, self.source );
-                                },
+                            instance.hasParsed = true;
+                        },
 
-                                debugCallback
-                        );
-                    }
-                }
-
-                return ParserInner;
-            })(),
+                        debugCallback
+                );
+            },
 
             Validator: (function () {
                 var Validator = function() {
                     // the various program trees that have been parsed
                     this.programs = [];
 
-                    this.strictMode = true;
+                    this.lastErrorName = null;
+
+                    this.isStrict = true;
 
                     this.classes = {};
                     this.currentClass = null;
@@ -159,8 +159,12 @@ var quby = window['quby'] || {};
                 };
 
                 Validator.prototype = {
-                        setStrictMode: function(mode) {
-                            this.strictMode = !! mode;
+                        strictMode: function(mode) {
+                            this.isStrict = !! mode;
+                        },
+
+                        adminMode: function(mode) {
+                            this.isAdminMode = !! mode;
                         },
 
                         addPreInline: function(inline) {
@@ -363,7 +367,7 @@ var quby = window['quby'] || {};
                             var id = variable.callName;
                             var scope = this.vars[this.vars.length - 1];
 
-                            return util.array.contains(scope, id);
+                            return !! scope[id];
                         },
                         containsLocalBlock: function() {
                             var localVars = this.vars[this.vars.length - 1];
@@ -407,8 +411,8 @@ var quby = window['quby'] || {};
                                 }
                             // Functions
                             } else {
-                                if (util.array.contains(this.funs, func.callName)) {
-                                    this.parseError(func.offset, "Function is already defined: '" + func.name + "', with " + func.getNumParameters() + " parameters.");
+                                if ( this.funs[func.callName] ) {
+                                    this.parseError( func.offset, "Function is already defined: '" + func.name + "', with " + func.getNumParameters() + " parameters." );
                                 }
 
                                 this.funs[func.callName] = func;
@@ -445,29 +449,40 @@ var quby = window['quby'] || {};
                          * behaviour does not change).
                          */
                         strictError: function( lineInfo, msg ) {
-                            if ( this.strictMode ) {
+                            if ( this.isStrict ) {
                                 this.parseError( lineInfo, msg );
                             }
                         },
 
                         parseError: function( lineInfo, msg ) {
                             if ( lineInfo ) {
-                                this.parseErrorLine( lineInfo.source.getLine(lineInfo.offset), msg );
+                                this.parseErrorLine( lineInfo.source.getLine(lineInfo.offset), msg, lineInfo.name );
                             } else {
                                 this.parseErrorLine( null, msg );
                             }
                         },
 
-                        parseErrorLine: function( line, msg ) {
-                            if ( line !== null && line !== undefined ) {
-                                msg = "line " + line + ", " + msg;
+                        parseErrorLine: function( line, error, name ) {
+                            var msg;
+
+                            if ( line !== null && line !== undefined || line < 1 ) {
+                                msg = "line " + line + ", " + error;
                             } else {
-                                line = 0;
+                                msg = error
+                                line = -1;
+                            }
+
+                            if ( ! name && name !== '' ) {
+                                name = this.lastErrorName;
+                            } else {
+                                this.lastErrorName = name;
                             }
 
                             this.errors.push({
-                                    line: line,
-                                    msg: msg
+                                    name    : name,
+                                    line    : line,
+                                    message : msg,
+                                    error   : error
                             });
                         },
 
@@ -476,18 +491,15 @@ var quby = window['quby'] || {};
 
                             if ( errors.length > 0 ) {
                                 errors.sort(function(a, b) {
-                                    return a.line - b.line;
+                                    if ( a.name === b.name ) {
+                                        return a.line - b.line;
+                                    } else {
+                                        return a.name.localeCompare( b.name );
+                                    }
                                 });
-
-                                var sortedErrors = new Array( errors.length );
-                                for ( var i = 0; i < errors.length; i++ ) {
-                                    sortedErrors[i] = errors[i].msg;
-                                }
-
-                                return sortedErrors;
-                            } else {
-                                return errors;
                             }
+
+                            return errors;
                         },
 
                         hasErrors: function() {
@@ -577,14 +589,14 @@ var quby = window['quby'] || {};
                                     var callName = fun.callName;
 
                                     // check if the function is not defined
-                                    if (!util.array.contains(this.funs, callName)) {
-                                        this.searchMissingFunAndError(fun, this.funs, 'function');
+                                    if ( ! this.funs[callName] ) {
+                                        this.searchMissingFunAndError( fun, this.funs, 'function' );
                                     }
                                 }
 
                                 /* Check all used globals were assigned to, at some point. */
-                                for (var strGlobal in this.usedGlobals) {
-                                    if (!this.globals[strGlobal]) {
+                                for ( var strGlobal in this.usedGlobals ) {
+                                    if ( ! this.globals[strGlobal] ) {
                                         var global = this.usedGlobals[strGlobal];
                                         this.parseError(global.offset, "Global used but never assigned to: '" + global.identifier + "'.");
                                     }
@@ -886,94 +898,6 @@ var quby = window['quby'] || {};
 
                 return Validator;
             })()
-    };
-
-    /**
-     * SourceLines deals with translations made to an original source code file.
-     * It also deals with managing the conversions from an offset given from the
-     * parser, to a line number in the original source code.
-     */
-    /*
-     * In practice this works through two steps:
-     *
-     *  1) The source code is 'prepped' where certain changes are made. This
-     * happens as soon as this is created and the result should be used by the
-     * parser.
-     *
-     *  2) The source code is scanned and indexed. This is for converting
-     * character offsets to line locations. This only occurres if a line number
-     * has been requested, which in turn should only happen when there is an
-     * error. This is to ensure it's never done unless needed.
-     */
-    var SourceLines = function (src) {
-        // altered when indexed ...
-        this.numLines = 0;
-        this.lineOffsets = null;
-
-        // source code altered and should be used for indexing
-        this.source = src;
-
-        Object.preventExtensions( this );
-    };
-
-    SourceLines.prototype = {
-            index: function() {
-                // index source code on the fly, only if needed
-                if (this.lineOffsets == null) {
-                    var src = this.source;
-
-                    var len = src.length;
-                    var lastIndex = 0;
-                    var lines = [];
-                    var running = true;
-
-                    /*
-                     * Look for 1 slash n, if it's found, we use it
-                     * otherwise we use \r.
-                     *
-                     * This is so we can index any code, without having to alter it.
-                     */
-                    var searchIndex = (src.indexOf("\n", lastIndex) !== -1) ?
-                            "\n" :
-                            "\r" ;
-
-                    while ( running ) {
-                        var index = src.indexOf( searchIndex, lastIndex );
-
-                        if (index != -1) {
-                            lines.push(index);
-                            lastIndex = index + 1;
-                            // the last line
-                        } else {
-                            lines.push(len);
-                            running = false;
-                        }
-
-                        this.numLines++;
-                    }
-
-                    this.lineOffsets = lines;
-                }
-            },
-
-            getLine: function(offset) {
-                this.index();
-
-                for (var line = 0; line < this.lineOffsets.length; line++) {
-                    // lineOffset is from the end of the line.
-                    // If it's greater then offset, then we return that line.
-                    // It's +1 to start lines from 1 rather then 0.
-                    if (this.lineOffsets[line] > offset) {
-                        return line + 1;
-                    }
-                }
-
-                return this.numLines;
-            },
-
-            getSource: function () {
-                return this.source;
-            }
     };
 
     /**
