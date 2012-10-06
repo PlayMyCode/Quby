@@ -1998,14 +1998,23 @@ var quby = window['quby'] || {};
             function( identifier, callName ) {
                 qubyAst.Expr.call( this, identifier );
 
-                this.identifier = identifier.match;
-                this.callName   = callName;
+                this.identifier     = identifier.match;
+                this.callName       = callName;
+                this.isJSIdentifierFlag = false;
             },
 
             qubyAst.Expr,
             {
                 print: function (p) {
                     p.append(this.callName);
+                },
+
+                isJSIdentifier: function() {
+                    return this.isJSIdentifierFlag;
+                },
+
+                setJSIdentifier: function() {
+                    this.isJSIdentifierFlag = true;
                 }
             }
     );
@@ -2019,20 +2028,40 @@ var quby = window['quby'] || {};
             {
                 validate: function (v) {
                     if (
-                            v.ensureInClass(this, "Field '" + this.identifier + "' is used outside of a class, they can only be used inside.")
+                            v.ensureInClass( this, "field '" + this.identifier + "' is used outside of a class, they can only be used inside." )
                     ) {
+                        var klass = v.getCurrentClass().klass;
+
                         // set the correct field callName
                         this.callName = quby.runtime.formatField(
-                                v.getCurrentClass().klass.name,
+                                klass.name,
                                 this.identifier
                         );
-                        this.isInsideExtensionClass = v.isInsideExtensionClass();
 
-                        this.validateField(v);
+                        if ( this.identifier.length === 0 ) {
+                            v.parseError( this.offset, "no name provided for field of class " + klass.name );
+                        } else {
+                            this.isInsideExtensionClass = v.isInsideExtensionClass();
+
+                            this.validateField(v);
+                        }
                     }
                 },
                 validateField: function (v) {
                     quby.runtime.error("Internal", "Error, validateField of FieldIdentifier has not been overrided.");
+                }
+            }
+    );
+    qubyAst.JSIdentifier = util.klass(
+            function( identifier ) {
+                qubyAst.Identifier.call( this, identifier, identifier.match.substring(1) );
+            },
+
+            qubyAst.Identifier,
+            {
+                validate: function(v) {
+                    this.setJSIdentifier();
+                    v.ensureAdminMode( this, "inlining JS values not allowed in sandboxed mode" );
                 }
             }
     );
@@ -2691,7 +2720,7 @@ var quby = window['quby'] || {};
                 },
                 validate: function (v) {
                     v.ensureAdminMode(
-                            this, "Inlining JavaScript is not allowed outside of admin mode."
+                            this, "inlining pre-JavaScript is not allowed outside of admin mode."
                     );
 
                     v.addPreInline( this );
@@ -2714,7 +2743,7 @@ var quby = window['quby'] || {};
                     this.print(p);
                 },
                 validate: function (v) {
-                    v.ensureAdminMode(this, "Inlining JavaScript is not allowed outside of admin mode.");
+                    v.ensureAdminMode(this, "inlining JavaScript is not allowed outside of admin mode.");
                 }
             }
     );

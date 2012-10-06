@@ -627,6 +627,18 @@ var quby = window['quby'] || {};
 
                             return i;
                         }
+                    },
+
+                    jsIdentifier: function(src, i, code, len) {
+                        if ( code === HASH && isAlphaNumericCode(src.charCodeAt(i+1)) ) {
+                            i += 2;
+
+                            while ( isAlphaNumericCode(src.charCodeAt(i)) ) {
+                                i++;
+                            }
+
+                            return i;
+                        }
                     }
             },
 
@@ -876,10 +888,11 @@ var quby = window['quby'] || {};
                     case terminals.identifiers.global:
                         return new quby.ast.GlobalVariable( identifier );
                     case terminals.identifiers.objectField:
-                        identifier.match = identifier.match.substring(1);
                         return new quby.ast.FieldVariable( identifier );
                     case terminals.keywords.THIS:
                         return new quby.ast.ThisVariable( identifier );
+                    case terminals.identifiers.jsIdentifier:
+                        return new quby.ast.JSIdentifier( identifier );
                     default:
                         log(identifier);
                         throw new Error("Unknown terminal met for variables: " + identifier);
