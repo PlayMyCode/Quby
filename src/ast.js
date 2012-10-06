@@ -2191,8 +2191,8 @@ var quby = window['quby'] || {};
                         }
                     } else {
                         if (
-                                v.ensureOutParameters(this, "global variable '" + this.identifier + "' used as function parameter") &&
-                                v.ensureOutBlock(this, "global variable '" + this.identifier + "' used as block parameter")
+                                v.ensureOutFunParameters(this, "global variable '" + this.identifier + "' used as function parameter") &&
+                                v.ensureOutParameters(this, "global variable '" + this.identifier + "' used as block parameter")
                         ) {
                             v.useGlobal( this );
                         }
@@ -2232,10 +2232,10 @@ var quby = window['quby'] || {};
             {
                 validate: function(v) {
                     if (
-                            v.ensureOutParameters( this, "Class field '" + this.identifier + "' used as a parameter." ) &&
+                            v.ensureOutFunParameters( this, "class field '" + this.identifier + "' used as function parameter." ) &&
+                            v.ensureOutParameters( this, "object field '" + this.identifier + "' used as block parameter" ) &&
                             v.ensureInClass( this, "field '" + this.identifier + "' is used outside of a class, they can only be used inside." ) &&
-                            v.ensureInMethod( this, "Class field '" + this.identifier + "' is used outside of a method." ) &&
-                            v.ensureOutBlock( this, "object field '" + this.identifier + "' used as block parameter" )
+                            v.ensureInMethod( this, "class field '" + this.identifier + "' is used outside of a method." )
                     ) {
                         var klass = v.getCurrentClass().klass;
                         this.klass = klass;
@@ -2315,8 +2315,8 @@ var quby = window['quby'] || {};
             {
                 validate: function(v) {
                     if (
-                            v.ensureOutParameters(this, "'this' object is used as a parameter") &&
-                            v.ensureOutBlock(this, "'this' used as a block parameter")
+                            v.ensureOutFunParameters(this, "'this' used as function parameter") &&
+                            v.ensureOutParameters(this, "'this' used as a block parameter")
                     ) {
                         v.ensureInMethod(this, "'this' is referenced outside of a class method (or you've named a variable 'this')");
                     }

@@ -784,6 +784,9 @@ var quby = window['quby'] || {};
                         ensureOutParameters: function(syn, errorMsg) {
                             return this.ensureTest(this.isInsideParameters(), syn, errorMsg);
                         },
+                        ensureOutFunParameters: function(syn, errorMsg) {
+                            return this.ensureTest(this.isInsideFunParameters(), syn, errorMsg);
+                        },
                         ensureInFunParameters: function(syn, errorMsg) {
                             return this.ensureTest(!this.isInsideFunParameters(), syn, errorMsg);
                         },
