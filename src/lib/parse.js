@@ -1189,57 +1189,160 @@ var parse = window['parse'] = (function( window, undefined ) {
      *
      *  **  **  **  **  **  **  **  **  **  **  **  **  */
 
-     var SymbolError = function( i, str ) {
-         this['isSymbol'] = true;
+    var SymbolError = function( i, str ) {
+        this['isSymbol'] = true;
 
-         this['offset'] = i;
-         this['match']  = str;
-     };
+        this['offset'] = i;
+        this['match']  = str;
+    };
 
-     var TerminalError = function( i, terminal, match ) {
-         if ( i instanceof Symbol ) {
-             return new TerminalError(
-                    i.offset,
-                    i.terminal,
-                    i.match
-             );
-         } else {
-             this['isTerminal']     = true;
+    var TerminalError = function( i, terminal, match ) {
+        if ( i instanceof Symbol ) {
+            return new TerminalError(
+                   i.offset,
+                   i.terminal,
+                   i.match
+            );
+        } else {
+            this['isTerminal']     = true;
 
-             this['offset']         = i;
-             this['terminal']       = terminal;
-             this['terminalName']   = terminal.termName;
-             this['match']          = match;
-             this['isLiteral']      = terminal.isLiteral;
-         }
-     };
+            this['offset']         = i;
+            this['terminal']       = terminal;
+            this['terminalName']   = terminal.termName;
+            this['match']          = match;
+            this['isLiteral']      = terminal.isLiteral;
+        }
+    };
 
-     /**
-      * A wrapper for holding the Symbol result information.
-      *
-      * It's essentially a struct like object.
-      */
-     var Symbol = function( terminal, offset, str ) {
-         this['terminal']       = terminal;
-         this['offset']         = offset  ;
-         this['match']          = str     ;
-     };
+    /**
+     * SourceLines deals with translations made to an original source code file.
+     * It also deals with managing the conversions from an offset given from the
+     * parser, to a line number in the original source code.
+     */
+    /*
+     * In practice this works through two steps:
+     *
+     *  1) The source code is 'prepped' where certain changes are made. This
+     * happens as soon as this is created and the result should be used by the
+     * parser.
+     *
+     *  2) The source code is scanned and indexed. This is for converting
+     * character offsets to line locations. This only occurres if a line number
+     * has been requested, which in turn should only happen when there is an
+     * error. This is to ensure it's never done unless needed.
+     */
+    var SourceLines = function( src, name ) {
+        // altered when indexed ...
+        this.numLines = 0;
+        this.lineOffsets = null;
+  
+        // source code altered and should be used for indexing
+        this.source = src;
 
-     /**
-      * Converts this to what it should be for the 'onMatch' callbacks.
-      *
-      * If there is no callback set on the inner symbol, then this is returned.
-      * If there is a callback, then it is run, and the result is returned.
-      */
-     Symbol.prototype.onFinish = function() {
-         var onMatch = this.terminal.onMatchFun;
+        this.name = name || '<Unknown Script>';
 
-         if ( onMatch !== null ) {
-             return onMatch( this['match'], this['offset'] );
-         } else {
-             return this;
-         }
-     }
+        Object.preventExtensions( this );
+    };
+  
+    SourceLines.prototype = {
+            index: function() {
+                // index source code on the fly, only if needed
+                if (this.lineOffsets == null) {
+                    var src = this.source;
+  
+                    var len = src.length;
+                    var lastIndex = 0;
+                    var lines = [];
+                    var running = true;
+  
+                    /*
+                     * Look for 1 slash n, if it's found, we use it
+                     * otherwise we use \r.
+                     *
+                     * This is so we can index any code, without having to alter it.
+                     */
+                    var searchIndex = (src.indexOf("\n", lastIndex) !== -1) ?
+                            "\n" :
+                            "\r" ;
+  
+                    while ( running ) {
+                        var index = src.indexOf( searchIndex, lastIndex );
+  
+                        if (index != -1) {
+                            lines.push(index);
+                            lastIndex = index + 1;
+                            // the last line
+                        } else {
+                            lines.push(len);
+                            running = false;
+                        }
+  
+                        this.numLines++;
+                    }
+  
+                    this.lineOffsets = lines;
+                }
+            },
+
+            getName: function() {
+                return this.name;
+            },
+  
+            getLine: function( offset ) {
+                this.index();
+  
+                for (var line = 0; line < this.lineOffsets.length; line++) {
+                    // lineOffset is from the end of the line.
+                    // If it's greater then offset, then we return that line.
+                    // It's +1 to start lines from 1 rather then 0.
+                    if (this.lineOffsets[line] > offset) {
+                        return line + 1;
+                    }
+                }
+  
+                return this.numLines;
+            },
+  
+            getSource: function () {
+                return this.source;
+            }
+    };
+
+    /**
+     * A wrapper for holding the Symbol result information.
+     *
+     * It's essentially a struct like object.
+     */
+    var Symbol = function( terminal, offset, sourceLines, match ) {
+        this['terminal']        = terminal;
+        this['offset']          = offset  ;
+        this['source']          = sourceLines;
+        this['match']           = match   ;
+    };
+
+    Symbol.prototype.clone = function( newMatch ) {
+        return new Symbol( this.terminal, this.offset, this.source, newMatch );
+    };
+
+    /**
+     * Converts this to what it should be for the 'onMatch' callbacks.
+     *
+     * If there is no callback set on the inner symbol, then this is returned.
+     * If there is a callback, then it is run, and the result is returned.
+     */
+    Symbol.prototype.onFinish = function() {
+        var onMatch = this.terminal.onMatchFun;
+
+        if ( onMatch !== null ) {
+            return onMatch( this );
+        } else {
+            return this;
+        }
+    };
+
+    Symbol.prototype.getLine = function() {
+        return this.source.getLine( this.offset );
+    };
 
     /**
      * This wraps the output from parsing the symbols.
@@ -2305,17 +2408,24 @@ var parse = window['parse'] = (function( window, undefined ) {
      * @param {string} parseSrc optional, an alternative source code used for parsing.
      * @param callback A function to call when parsing is complete.
      * @param debugCallback An optional debugging callback, which if provided, will be called with debugging info.
+     * @param data Optional, data to pass into every terminal's on finish.
      */
-    ParserRule.prototype['parse'] = function( displaySrc, parseSrc, callback, debugCallback ) {
-        if ( callback === undefined ) {
-            callback = parseSrc;
-            parseSrc = displaySrc;
-        }
+    ParserRule.prototype['parse'] = function( options ) {
+        var displaySrc      = options['src'];
+        var parseSrc        = options['src']        || displaySrc;
 
-        this.parseInner( displaySrc, parseSrc, callback, debugCallback );
+        var name            = options['name']       || null;
+        var callback        = options['onFinish']   || null;
+        var debugCallback   = options['onDebug']    || null;
+
+        this.parseInner( displaySrc, parseSrc, callback, debugCallback, name );
     };
 
-    ParserRule.prototype.parseInner = function( input, parseInput, callback, debugCallback ) {
+    ParserRule.prototype.parseInner = function( input, parseInput, callback, debugCallback, name ) {
+        if ( typeof displaySrc !== 'string' && !(displaySrc instanceof String) ) {
+            throw new Error("Non-string source given as input");
+        }
+
         if (
                 debugCallback !== undefined &&
                 debugCallback !== null &&
@@ -2324,9 +2434,9 @@ var parse = window['parse'] = (function( window, undefined ) {
             throw new Error("Invalid debugCallback object given");
         }
 
-        var self  = this,
+        var self        = this,
             compileTime = this.compileTime,
-            start = Date.now();
+            start       = Date.now();
 
         this.parseSymbols( input, parseInput, function(symbols, symbolsTime) {
             if ( symbols.hasErrors() ) {
@@ -2398,10 +2508,12 @@ var parse = window['parse'] = (function( window, undefined ) {
 
         window['util']['future']['run']( function() {
             var start = Date.now();
+
             var symbols = _this.parseSymbolsInner(
                     input,
                     parseInput,
-                    _this.parseParent.timeSymbolsFlag
+                    _this.parseParent.timeSymbolsFlag,
+                    name
             );
             var time = Date.now() - start;
 
@@ -3006,7 +3118,9 @@ var parse = window['parse'] = (function( window, undefined ) {
      *
      *  strings: a substrings for each symbol, where the terminal stated to return a string
      */
-    ParserRule.prototype.parseSymbolsInner = function( inputSrc, src ) {
+    ParserRule.prototype.parseSymbolsInner = function( inputSrc, src, name ) {
+        var sourceLines = new SourceLines( inputSrc, name );
+
         var symbolI     = 0,
 
             len         = src.length,
@@ -3201,8 +3315,13 @@ var parse = window['parse'] = (function( window, undefined ) {
                     } 
 
                     if ( r > i ) {
-                        symbolIDs[symbolI] = termIDs[j];
-                        symbols[ symbolI++ ] = new Symbol( allTerms[j], i, null );
+                        symbolIDs[ symbolI ] = termIDs[j];
+                        symbols[ symbolI++ ] = new Symbol(
+                                allTerms[j],
+                                i,
+                                sourceLines,
+                                null
+                        );
 
                         // If we were in error mode,
                         // report the error section.
@@ -3247,11 +3366,12 @@ var parse = window['parse'] = (function( window, undefined ) {
                     r = termTests[j]( src, i, code, len );
 
                     if ( r !== undefined && r !== false && r > i ) {
-                        symbolIDs[symbolI] = termIDs[j];
+                        symbolIDs[ symbolI ] = termIDs[j];
 
                         symbols[ symbolI++ ] = new Symbol(
                                 allTerms[j],
                                 i,
+                                sourceLines,
                                 inputSrc.substring( i, r )
                         );
 

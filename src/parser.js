@@ -797,64 +797,69 @@ var quby = window['quby'] || {};
     })
 
     /* The onMatch callbacks for altering the symbols when matched. */
-    terminals.keywords.RETURN.onMatch( function(match, offset) {
-        return new quby.lexer.Sym( offset, 'return' );
+    terminals.keywords.RETURN.onMatch( function(symbol) {
+        return new quby.lexer.Sym( symbol.source, 'return' );
     });
 
-    terminals.identifiers.variableName.onMatch( function(match, offset) {
-        var sym = new quby.lexer.IdSym( offset, match );
+    terminals.identifiers.variableName.onMatch( function(symbol) {
+        var sym = new quby.lexer.IdSym( symbol.source, symbol.match );
         sym.terminal = terminals.identifiers.variableName;
         return sym;
     } );
 
-    terminals.literals.TRUE.onMatch( function(match, offset) {
+    terminals.literals.TRUE.onMatch( function(symbol) {
         return new quby.ast.Bool(
-                new quby.lexer.Sym( offset, true )
+                new quby.lexer.Sym( symbol.source, 'true' )
         );
     });
-    terminals.literals.FALSE.onMatch( function(match, offset) {
+    terminals.literals.FALSE.onMatch( function(symbol) {
         return new quby.ast.Bool(
-                new quby.lexer.Sym( offset, false )
+                new quby.lexer.Sym( symbol.source, 'false' )
         );
     });
-    terminals.literals.NULL.onMatch( function(match, offset) {
+    terminals.literals.NULL.onMatch( function(symbol) {
         return new quby.ast.Null(
-                new quby.lexer.Sym( offset, null )
+                new quby.lexer.Sym( symbol.source, 'null' )
         );
     });
-    terminals.literals.NIL.onMatch( function(match, offset) {
+    terminals.literals.NIL.onMatch( function(symbol) {
         return new quby.ast.Null(
-                new quby.lexer.Sym( offset, null )
+                new quby.lexer.Sym( symbol.source, 'null' )
         );
     });
-    terminals.literals.symbol.onMatch( function(match, offset) {
+    terminals.literals.symbol.onMatch( function(symbol) {
         return new quby.ast.Symbol( 
-                new quby.lexer.Sym( offset, match )
+                new quby.lexer.Sym( symbol.source, symbol.match )
         );
     });
-    terminals.literals.string.onMatch( function(match, offset) {
+    terminals.literals.string.onMatch( function(symbol) {
+        // escape the \n's
         return new quby.ast.String(
-                new quby.lexer.Sym( offset, match )
+                new quby.lexer.Sym( symbol.source,  symbol.match.replace( /\n/g, "\\n" ) )
         );
     });
-    terminals.literals.number.onMatch( function(match, offset) {
+    terminals.literals.number.onMatch( function(symbol) {
         return new quby.ast.Number(
-                new quby.lexer.Sym( offset, match )
+                new quby.lexer.Sym( symbol.source, symbol.match )
         );
     });
 
-    terminals.admin.inline.onMatch( function(match, offset) {
+    terminals.admin.inline.onMatch( function(symbol) {
+        var match = symbol.match;
+
         return new quby.ast.Inline(
                 new quby.lexer.Sym(
-                        offset,
+                        symbol.source,
                         match.substring( 3, match.length-3 )
                 )
         );
     });
-    terminals.admin.preInline.onMatch( function(match, offset) {
+    terminals.admin.preInline.onMatch( function(symbol) {
+        var match = symbol.match;
+
         return new quby.ast.PreInline(
                 new quby.lexer.Sym(
-                        offset,
+                        symbol.source,
                         match.substring( 6, match.length-3 )
                 )
         );
@@ -912,6 +917,7 @@ var quby = window['quby'] || {};
                         return new quby.ast.GlobalVariable(
                                 new quby.lexer.IdSym(
                                         identifier.offset,
+                                        identifier.source,
                                         identifier.match
                                 )
                         );
@@ -919,6 +925,7 @@ var quby = window['quby'] || {};
                         return new quby.ast.FieldVariable(
                                 new quby.lexer.IdSym(
                                         identifier.offset,
+                                        identifier.source,
                                         identifier.match.substring(1)
                                 )
                         );
@@ -1006,7 +1013,7 @@ var quby = window['quby'] || {};
                     return new quby.ast.YieldStmt( exprs, exprs );
                 } else {
                     return new quby.ast.YieldStmt(
-                            new quby.lexer.Sym( yld.offset, 'yield' )
+                            new quby.lexer.Sym( yld.offset, yld.source, 'yield' )
                     );
                 }
             } );
@@ -1502,18 +1509,18 @@ var quby = window['quby'] || {};
              * @param onFinish The function to call when parsing has finished.
              * @param onDebug An optional callback, for sending debug information into.
              */
-            parse: function( src, parser, onFinish, onDebug ) {
-                quby.lexer.pushParser( parser );
+            parse: function( src, name, onFinish, onDebug ) {
+                statements.parse({
+                        name    : name,
+                        src     : src,
+                        inputSrc: preParse( src ),
 
-                statements.parse(
-                        src,
-                        preParse( src ),
-                        function( program, errors ) {
+                        onFinish: function( program, errors ) {
                             quby.lexer.popParser( parser );
                             onFinish( program, errors );
                         },
-                        onDebug || null
-                );
+                        onDebug: onDebug || null
+                });
             }
     };
 })( quby, util, window )

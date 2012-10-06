@@ -117,10 +117,6 @@ var quby = window['quby'] || {};
 
         ParserInstance: (function() {
             var ParserInstance = function( source ) {
-                this.source = source ?
-                        new SourceLines( source ) :
-                        null ;
-
                 this.isStrict = true ;
                 this.isAdmin  = false;
 
@@ -305,8 +301,6 @@ var quby = window['quby'] || {};
                                 url,
                                 function(status, text) {
                                     if ( status >= 200 && status < 400 ) {
-                                        instance.source = new SourceLines( text );
-
                                         quby.core.runParser( instance, validator );
                                     } else {
                                         throw new Error( "failed to load script: " + url );
@@ -530,93 +524,5 @@ var quby = window['quby'] || {};
 
             return Result;
         })()
-    };
-
-    /**
-     * SourceLines deals with translations made to an original source code file.
-     * It also deals with managing the conversions from an offset given from the
-     * parser, to a line number in the original source code.
-     */
-    /*
-     * In practice this works through two steps:
-     *
-     *  1) The source code is 'prepped' where certain changes are made. This
-     * happens as soon as this is created and the result should be used by the
-     * parser.
-     *
-     *  2) The source code is scanned and indexed. This is for converting
-     * character offsets to line locations. This only occurres if a line number
-     * has been requested, which in turn should only happen when there is an
-     * error. This is to ensure it's never done unless needed.
-     */
-    var SourceLines = function (src) {
-        // altered when indexed ...
-        this.numLines = 0;
-        this.lineOffsets = null;
-
-        // source code altered and should be used for indexing
-        this.source = src;
-
-        Object.preventExtensions( this );
-    };
-
-    SourceLines.prototype = {
-            index: function() {
-                // index source code on the fly, only if needed
-                if (this.lineOffsets == null) {
-                    var src = this.source;
-
-                    var len = src.length;
-                    var lastIndex = 0;
-                    var lines = [];
-                    var running = true;
-
-                    /*
-                     * Look for 1 slash n, if it's found, we use it
-                     * otherwise we use \r.
-                     *
-                     * This is so we can index any code, without having to alter it.
-                     */
-                    var searchIndex = (src.indexOf("\n", lastIndex) !== -1) ?
-                            "\n" :
-                            "\r" ;
-
-                    while ( running ) {
-                        var index = src.indexOf( searchIndex, lastIndex );
-
-                        if (index != -1) {
-                            lines.push(index);
-                            lastIndex = index + 1;
-                            // the last line
-                        } else {
-                            lines.push(len);
-                            running = false;
-                        }
-
-                        this.numLines++;
-                    }
-
-                    this.lineOffsets = lines;
-                }
-            },
-
-            getLine: function(offset) {
-                this.index();
-
-                for (var line = 0; line < this.lineOffsets.length; line++) {
-                    // lineOffset is from the end of the line.
-                    // If it's greater then offset, then we return that line.
-                    // It's +1 to start lines from 1 rather then 0.
-                    if (this.lineOffsets[line] > offset) {
-                        return line + 1;
-                    }
-                }
-
-                return this.numLines;
-            },
-
-            getSource: function () {
-                return this.source;
-            }
     };
 })( quby, util );

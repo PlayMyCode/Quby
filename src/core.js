@@ -1272,7 +1272,7 @@ var quby = window['quby'] || {};
                 // but only for non-core classes
                 if (this.news.length == 0 && !this.klass.isExtensionClass) {
                     var constructor = new quby.ast.Constructor(
-                            quby.lexer.EmptySym(thisKlass.offset, "new"),
+                            thisKlass.clone( "new" ),
                             null,
                             null
                     );

@@ -2357,14 +2357,14 @@ var quby = window['quby'] || {};
 
     /* Literals */
     qubyAst.Literal = util.klass(
-            function (val, value, isTrue) {
-                qubyAst.Expr.call(this, val.offset);
+            function( sym, value, isTrue ) {
+                qubyAst.Expr.call(this, sym.offset);
 
                 this.isLiteral = true;
                 this.isTrue = (!!isTrue);
 
                 this.value = ( ! value ) ?
-                        val.value :
+                        sym.value :
                         value ;
             },
 
@@ -2374,8 +2374,7 @@ var quby = window['quby'] || {};
                     // do nothing
                 },
                 print: function (p) {
-                    var str = String(this.value);
-                    p.append( String(this.value) );
+                    p.append( this.value );
                 },
 
                 /**
@@ -2409,18 +2408,9 @@ var quby = window['quby'] || {};
             }
     );
 
-    qubyAst.String = util.klass(
-            function (sym) {
-                sym.value = sym.value.replace( /\n/g, "\\n" );
-                return new qubyAst.Literal(sym, undefined, true);
-            },
-
-            qubyAst.Literal
-    );
-
     qubyAst.Number = util.klass(
             function(sym) {
-                qubyAst.Literal.call(this, sym, undefined, true);
+                qubyAst.Literal.call(this, sym, true);
             },
 
             qubyAst.Literal,
@@ -2441,19 +2431,17 @@ var quby = window['quby'] || {};
             }
     );
 
-    qubyAst.Bool = util.klass(
-            function (sym) {
-                return new qubyAst.Literal( sym, undefined, sym.value );
-            },
-            qubyAst.Literal
-    );
+    qubyAst.String = function (sym) {
+        return new qubyAst.Literal( sym, true );
+    };
 
-    qubyAst.Null = util.klass(
-            function (sym) {
-                return new qubyAst.Literal(sym, 'null', false);
-            },
-            qubyAst.Literal
-    );
+    qubyAst.Bool = function( sym ) {
+        return new qubyAst.Literal( sym, sym.value );
+    };
+
+    qubyAst.Null = function( sym ) {
+        return new qubyAst.Literal( sym, false );
+    };
 
     /*
      * ### Function Generating stuff ###
@@ -2539,7 +2527,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.FunctionAttrGenerator = util.klass(
-            function (obj, methodName, numParams, fieldObj, proto) {
+            function( obj, methodName, numParams, fieldObj, proto ) {
                 var fieldName;
                 if ( fieldObj instanceof qubyAst.Variable || fieldObj instanceof qubyAst.FieldVariable ) {
                     fieldName = fieldObj.identifier;
@@ -2556,7 +2544,7 @@ var quby = window['quby'] || {};
 
                 // the name of our field, null if invalid
                 this.fieldName = fieldName;
-                this.fieldObj = fieldObj;
+                this.fieldObj  = fieldObj;
 
                 // this is our fake field
                 this.field = null;
@@ -2573,7 +2561,10 @@ var quby = window['quby'] || {};
                 },
 
                 validateInside: function(v) {
-                    this.field = new proto( new quby.lexer.EmptyIdSym(this.offset, this.fieldName) );
+                    this.field = new proto(
+                            this.offset.clone( this.fieldName )
+                    );
+
                     this.field.validate( v );
                 }
             }
