@@ -139,10 +139,11 @@ var quby = window['quby'] || {};
     qubyAst.Syntax = util.klass(
             function( offset ) {
                 this.offset = offset;
+                this.isJSLiteralFlag = false;
             },
 
             {
-                print: function (printer) {
+                print: function(printer) {
                     quby.runtime.error("Internal", "Error, print has not been overridden");
                 },
 
@@ -151,7 +152,7 @@ var quby = window['quby'] || {};
                  * When called, this will store the result in a temporary variable, and test against
                  * Quby's idea of false ('false' and 'null').
                  */
-                printAsCondition: function (p) {
+                printAsCondition: function(p) {
                     p.appendPre( 'var ', quby.runtime.TEMP_VARIABLE, ';' );
 
                     p.append('((', quby.runtime.TEMP_VARIABLE, '=');
@@ -171,6 +172,14 @@ var quby = window['quby'] || {};
                 },
                 getOffset: function() {
                     return this.offset;
+                },
+
+                isJSLiteral: function() {
+                    return this.isJSLiteralFlag;
+                },
+
+                setJSLiteral: function() {
+                    this.isJSLiteralFlag = true;
                 }
             }
     );
@@ -181,7 +190,7 @@ var quby = window['quby'] || {};
      * and passes the calls to validate and print on to them.
      */
     qubyAst.TransparentList = util.klass(
-            function ( stmts ) {
+            function( stmts ) {
                 this.stmts = stmts;
             },
 
@@ -210,7 +219,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.SyntaxList = util.klass(
-            function (strSeperator, appendToLast) {
+            function(strSeperator, appendToLast) {
                 this.stmts = [];
                 this.seperator = strSeperator;
                 this.offset = null;
@@ -218,7 +227,7 @@ var quby = window['quby'] || {};
                 this.appendToLast = appendToLast;
             },
             {
-                add: function (stmt) {
+                add: function(stmt) {
                     this.ensureOffset( stmt );
                     this.stmts.push(stmt);
                     this.length++;
@@ -237,7 +246,7 @@ var quby = window['quby'] || {};
                         this.offset = stmt.offset;
                     }
                 },
-                print: function (p) {
+                print: function(p) {
                     var length = this.stmts.length;
 
                     for (var i = 0; i < length; i++) {
@@ -260,7 +269,7 @@ var quby = window['quby'] || {};
                     return this;
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     for (var i = 0; i < this.stmts.length; i++) {
                         this.stmts[i].validate(v);
                     }
@@ -279,7 +288,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.Statements = util.klass(
-            function ( stmtsArray ) {
+            function( stmtsArray ) {
                 qubyAst.SyntaxList.call( this, '', false );
 
                 if ( stmtsArray !== undefined ) {
@@ -330,7 +339,7 @@ var quby = window['quby'] || {};
                 /**
                  * Adds to the beginning of the parameters.
                  */
-                addFirst: function (param) {
+                addFirst: function(param) {
                     if (param.isBlockParam) {
                         this.setBlockParam(param);
                     } else {
@@ -373,11 +382,11 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                getBlockParam: function () {
+                getBlockParam: function() {
                     return this.blockParam;
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     if (this.blockParam != null) {
                         if (this.errorParam != null) {
                             v.parseError(this.errorParam.offset, "Only one block parameter is allowed.");
@@ -396,7 +405,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.Mappings = util.klass(
-            function ( mappings ) {
+            function( mappings ) {
                 qubyAst.SyntaxList.call(this, ',', false);
 
                 this.set( mappings );
@@ -418,7 +427,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                validate: function (v) {
+                validate: function(v) {
                     if (this.condition !== null) {
                         this.condition.validate(v);
                     }
@@ -444,7 +453,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.IfStmt = util.klass(
-            function (ifs, elseIfs, elseBlock) {
+            function(ifs, elseIfs, elseBlock) {
                 qubyAst.Syntax.call(this, ifs.offset);
 
                 this.ifStmts = ifs;
@@ -454,7 +463,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                validate: function (v) {
+                validate: function(v) {
                     this.ifStmts.validate(v);
 
                     if (this.elseIfStmts !== null) {
@@ -466,7 +475,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                print: function (p) {
+                print: function(p) {
                     this.ifStmts.print(p);
 
                     if ( this.elseIfStmts !== null ) {
@@ -484,60 +493,60 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.IfElseIfs = util.klass(
-            function () {
-                qubyAst.SyntaxList.call(this, 'else ', false);
+            function() {
+                qubyAst.SyntaxList.call( this, 'else ', false );
             },
             
             qubyAst.SyntaxList
     );
 
     qubyAst.IfBlock = util.klass(
-            function (condition, stmts) {
-                qubyAst.StmtBlock.call(this, condition, stmts);
+            function(condition, stmts) {
+                qubyAst.StmtBlock.call( this, condition, stmts );
             },
 
             qubyAst.StmtBlock,
             {
-                print: function (p) {
+                print: function(p) {
                     this.printBlockWrap( p, 'if(', '){', '}' );
                 }
             }
     );
 
     qubyAst.WhileLoop = util.klass(
-            function (condition, stmts) {
+            function(condition, stmts) {
                 qubyAst.StmtBlock.call(this, condition, stmts);
             },
 
             qubyAst.StmtBlock,
             {
-                print: function (p) {
+                print: function(p) {
                     this.printBlockWrap( p, 'while(', '){', '}' );
                 }
             }
     );
 
     qubyAst.UntilLoop = util.klass(
-            function (condition, stmts) {
+            function(condition, stmts) {
                 qubyAst.StmtBlock.call(this, condition, stmts);
             },
 
             qubyAst.StmtBlock,
             {
-                print: function (p) {
+                print: function(p) {
                     this.printBlockWrap( p, 'while(!(', ')){', '}' );
                 }
             }
     );
 
     qubyAst.LoopWhile = util.klass(
-            function (condition, stmts) {
+            function(condition, stmts) {
                 qubyAst.StmtBlock.call(this, condition, stmts);
             },
 
             qubyAst.StmtBlock,
             {
-                print: function (p) {
+                print: function(p) {
                     // flush isn't needed here,
                     // because statements on the first line will always take place
                     p.append('do{');
@@ -550,13 +559,13 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.LoopUntil = util.klass(
-            function (condition, stmts) {
+            function(condition, stmts) {
                 qubyAst.StmtBlock.call(this, condition, stmts);
             },
 
             qubyAst.StmtBlock,
             {
-                print: function (p) {
+                print: function(p) {
                     p.append('do{');
                     this.getStmts().print(p);
                     p.append('}while(!(');
@@ -571,7 +580,7 @@ var quby = window['quby'] || {};
      * such as this classes identifier and it's super class identifier.
      */
     qubyAst.ClassHeader = util.klass(
-            function (identifier, extendsId) {
+            function(identifier, extendsId) {
                 qubyAst.Syntax.call( this, identifier );
 
                 if (extendsId == null) {
@@ -589,7 +598,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                validate: function (v) {
+                validate: function(v) {
                     var name = this.classId.getLower();
 
                     if (this.hasSuper()) {
@@ -613,21 +622,21 @@ var quby = window['quby'] || {};
                  * 'getSuperName' will return the name of the root class (i.e.
                  * Object).
                  */
-                hasSuper: function () {
+                hasSuper: function() {
                     return this.extendId !== null;
                 },
 
                 /**
                  * Returns the call name for the super class to this class header.
                  */
-                getSuperCallName: function () {
+                getSuperCallName: function() {
                     return this.extendsCallName;
                 },
 
                 /**
                  * Returns the name of the super class to this class header.
                  */
-                getSuperName: function () {
+                getSuperName: function() {
                     return this.extendsName;
                 }
             }
@@ -643,10 +652,10 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                print: function (p) {
+                print: function(p) {
                     // TODO
                 },
-                validate: function (v) {
+                validate: function(v) {
                     // TODO
                 }
             }
@@ -681,7 +690,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                validate: function (v) {
+                validate: function(v) {
                     v.ensureOutFun(this, "Class '" + this.name + "' defined within a function, this is not allowed.");
                     v.ensureOutBlock(this, "Class '" + this.name + "' defined within a block, this is not allowed.");
 
@@ -696,11 +705,11 @@ var quby = window['quby'] || {};
                     v.unsetClass();
                 },
 
-                print: function (p) {
+                print: function(p) {
                     return this.classValidator.printOnce(p);
                 },
 
-                getHeader: function () {
+                getHeader: function() {
                     return this.header;
                 },
 
@@ -712,7 +721,7 @@ var quby = window['quby'] || {};
                  *
                  * @return The callName for the parent class of this class.
                  */
-                getSuperCallName: function () {
+                getSuperCallName: function() {
                     var superCallName = this.header.getSuperCallName();
 
                     if (superCallName == this.callName) {
@@ -744,7 +753,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                print: function (p) {
+                print: function(p) {
                     p.setCodeMode(false);
 
                     if ( this.statements !== null ) {
@@ -754,7 +763,7 @@ var quby = window['quby'] || {};
                     p.setCodeMode(true);
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     v.ensureOutClass(this, "Classes cannot be defined within another class.");
 
                     v.setClass(this);
@@ -771,8 +780,21 @@ var quby = window['quby'] || {};
                  * The parent class of all extension classes is the root class,
                  * always.
                  */
-                getSuperCallName: function () {
+                getSuperCallName: function() {
                     return quby.runtime.ROOT_CLASS_CALL_NAME;
+                }
+            }
+    );
+
+    qubyAst.ClassIdentifier = util.klass(
+            function( symName ) {
+            },
+            {
+                validate: function(v) {
+                    // todo, look up this class!
+                },
+                print: function(v) {
+                    // todo print out a '_class_function' or whatever is needed for the check
                 }
             }
     );
@@ -803,11 +825,11 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                addPreVariable: function (variable) {
+                addPreVariable: function(variable) {
                     this.preVariables.push(variable);
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     this.isMethod = v.isInsideClass();
 
                     var isOutFun = true;
@@ -843,7 +865,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                print: function (p) {
+                print: function(p) {
                     if (!this.isMethod) {
                         p.setCodeMode(false);
                     }
@@ -862,7 +884,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                printParameters: function (p) {
+                printParameters: function(p) {
                     p.append('(');
 
                     if ( this.getNumParameters() > 0 ) {
@@ -873,7 +895,7 @@ var quby = window['quby'] || {};
                     p.append( quby.runtime.BLOCK_VARIABLE, ')');
                 },
 
-                printBody: function (p) {
+                printBody: function(p) {
                     p.append('{');
 
                     this.printPreVars(p);
@@ -887,7 +909,7 @@ var quby = window['quby'] || {};
                     p.append('return null;', '}');
                 },
 
-                printPreVars: function (p) {
+                printPreVars: function(p) {
                     /*
                      * Either pre-print all local vars + the block var,
                      * or print just the block var.
@@ -918,7 +940,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                getNumParameters: function () {
+                getNumParameters: function() {
                     return ( this.parameters !== null ) ?
                             this.parameters.length :
                             0 ;
@@ -930,7 +952,7 @@ var quby = window['quby'] || {};
      * Defines a constructor for a class.
      */
     qubyAst.Constructor = util.klass(
-            function (sym, parameters, stmtBody) {
+            function(sym, parameters, stmtBody) {
                 qubyAst.Function.call(this, sym, parameters, stmtBody);
 
                 this.isConstructor = true;
@@ -940,7 +962,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Function,
             {
-                setClass: function (klass) {
+                setClass: function(klass) {
                     this.klass = klass;
 
                     this.callName = quby.runtime.formatNew(klass.name, this.getNumParameters());
@@ -948,7 +970,7 @@ var quby = window['quby'] || {};
                     this.className = klass.callName;
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     if ( v.ensureInClass(this, "Constructors must be defined within a class.") ) {
                         this.setClass( v.getCurrentClass().klass );
 
@@ -963,7 +985,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                printParameters: function (p) {
+                printParameters: function(p) {
                     p.append('(');
 
                     if ( ! this.isExtensionClass ) {
@@ -981,7 +1003,7 @@ var quby = window['quby'] || {};
                     p.append( quby.runtime.BLOCK_VARIABLE, ')' );
                 },
 
-                printBody: function (p) {
+                printBody: function(p) {
                     p.append('{');
 
                     this.printPreVars(p);
@@ -1001,7 +1023,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.AdminMethod = util.klass(
-            function (name, parameters, stmtBody) {
+            function(name, parameters, stmtBody) {
                 qubyAst.Function.call(this, name, parameters, stmtBody);
 
                 this.callName = this.name;
@@ -1009,7 +1031,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Function,
             {
-                validate: function (v) {
+                validate: function(v) {
                     v.ensureAdminMode(this, "Admin (or hash) methods cannot be defined without admin rights.");
 
                     if (v.ensureInClass(this, "Admin methods can only be defined within a class.")) {
@@ -1048,7 +1070,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                print: function (p) {
+                print: function(p) {
                     if ( this.functionGenerator ) {
                         this.functionGenerator.print(p);
                     } else {
@@ -1060,13 +1082,13 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                printFunCall: function (p) {
+                printFunCall: function(p) {
                     p.append(this.callName, '(');
                     this.printParams(p);
                     p.append(')');
                 },
 
-                printParams: function (p) {
+                printParams: function(p) {
                     // parameters
                     if (this.getNumParameters() > 0) {
                         this.parameters.print(p);
@@ -1081,7 +1103,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                setIsMethod: function () {
+                setIsMethod: function() {
                     this.isMethod = true;
                 },
 
@@ -1099,7 +1121,7 @@ var quby = window['quby'] || {};
                     v.useFun(this);
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     var generator = null;
 
                     if ( v.isInsideClassDefinition() ) {
@@ -1129,14 +1151,14 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                getNumParameters: function () {
+                getNumParameters: function() {
                     return ( this.parameters !== null ) ? this.parameters.length : 0 ;
                 }
             }
     );
 
     qubyAst.MethodCall = util.klass(
-            function (expr, name, parameters, block) {
+            function(expr, name, parameters, block) {
                 qubyAst.FunctionCall.call(this, name, parameters, block);
 
                 this.isMethod = true;
@@ -1145,8 +1167,8 @@ var quby = window['quby'] || {};
 
             qubyAst.FunctionCall,
             {
-                print: function (p) {
-                    if (this.expr.isThis) {
+                print: function(p) {
+                    if ( this.expr instanceof qubyAst.ThisVariable ) {
                         qubyAst.FunctionCall.prototype.print.call( this, p );
                     } else {
                         this.printExpr(p);
@@ -1168,14 +1190,14 @@ var quby = window['quby'] || {};
                 },
 
                 validateThis: function(v) {
-                    if ( this.expr.isThis && v.isInsideClass() ) {
-                        v.useThisClassFun(this);
+                    if ( (this.expr instanceof qubyAst.ThisVariable) && v.isInsideClass() ) {
+                        v.useThisClassFun( this );
                     } else {
                         v.useFun( this );
                     }
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     this.expr.validate(v);
 
                     qubyAst.FunctionCall.prototype.validate.call( this, v );
@@ -1194,13 +1216,13 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.SuperCall = util.klass(
-            function (name, parameters, block) {
+            function(name, parameters, block) {
                 qubyAst.FunctionCall.call(this, name, parameters, block);
             },
 
             qubyAst.FunctionCall,
             {
-                print: function (p) {
+                print: function(p) {
                     if ( this.superKlassVal !== undefined ) {
                         var superKlass = this.superKlassVal.klass.name;
                         var superConstructor = quby.runtime.formatNew(superKlass, this.getNumParameters());
@@ -1211,14 +1233,14 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     if ( v.ensureInConstructor(this, "Super can only be called from within a constructor.") ) {
                         this.klassVal = v.getCurrentClass();
 
                         // _this fixes alias issues within the callback
                         var _this = this;
 
-                        v.onEndValidate(function (v) {
+                        v.onEndValidate(function(v) {
                             var header = _this.klassVal.klass.getHeader();
                             var superCallName = header.getSuperCallName();
                             _this.superKlassVal = v.getClass(superCallName);
@@ -1245,6 +1267,51 @@ var quby = window['quby'] || {};
             }
     );
 
+    qubyAst.NewJSInstance = util.klass(
+            function(name, parameters, block) {
+                qubyAst.Syntax.call( this, expr );
+
+                this.expr       = expr;
+                this.block      = block;
+                this.parameters = parameters;
+            },
+            {
+                validate: function(v) {
+                    if ( v.ensureAdminMode(this, "cannot create JS instances in Sandbox mode") ) {
+                        this.expr.setJSLiteral();
+                        this.expr.validate( v );
+                    }
+
+                    if ( this.parameters !== null ) {
+                        this.parameters.validate( v );
+                    }
+
+                    if ( block !== null ) {
+                        this.block.validate( v );
+                    }
+                },
+
+                print: function(p) {
+                    p.append( 'new ' );
+                    this.expr.print( p )
+                    p.append( '(' );
+
+                    if ( this.parameters !== null ) {
+                        this.parameters.print(p);
+
+                        if ( this.block !== null ) {
+                            p.append( ',' );
+                            this.block.print(p);
+                        }
+                    } else {
+                        this.block.print(p);
+                    }
+
+                    p.append( ')' );
+                }
+            }
+    );
+
     qubyAst.NewInstance = util.klass(
             function(name, parameters, block) {
                 qubyAst.FunctionCall.call(this, name, parameters, block);
@@ -1255,7 +1322,7 @@ var quby = window['quby'] || {};
 
             qubyAst.FunctionCall,
             {
-                print: function (p) {
+                print: function(p) {
                     p.append( this.callName, '(' );
 
                     // if a standard class,
@@ -1269,7 +1336,7 @@ var quby = window['quby'] || {};
                     p.append(')');
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     if ( this.parameters !== null ) {
                         this.parameters.validate(v);
                     }
@@ -1280,7 +1347,7 @@ var quby = window['quby'] || {};
 
                     // this can only be validated after the classes have been fully defined
                     var _this = this;
-                    v.onEndValidate(function (v) {
+                    v.onEndValidate(function(v) {
                         var klassVal = v.getClass(_this.className);
 
                         if ( klassVal ) {
@@ -1315,12 +1382,12 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                print: function (p) {
+                print: function(p) {
                     p.append( 'return ' );
 
                     this.expr.print(p);
                 },
-                validate: function (v) {
+                validate: function(v) {
                     if (!v.isInsideFun() && !v.isInsideBlock()) {
                         v.parseError(this.offset, "Return cannot be used outside a function or a block.");
                     }
@@ -1331,7 +1398,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.YieldStmt = util.klass(
-            function (offsetObj, args) {
+            function(offsetObj, args) {
                 qubyAst.Syntax.call( this, offsetObj );
 
                 this.parameters = args || null;
@@ -1339,7 +1406,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                validate: function (v) {
+                validate: function(v) {
                     v.ensureInFun(this, "Yield can only be used from inside a function.");
 
                     if ( this.parameters !== null ) {
@@ -1347,7 +1414,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                print: function (p) {
+                print: function(p) {
                     var paramsLen = ( this.parameters !== null ) ?
                             this.parameters.length :
                             0 ;
@@ -1365,7 +1432,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.FunctionBlock = util.klass(
-            function (parameters, statements) {
+            function(parameters, statements) {
                 qubyAst.Syntax.call( this,
                         // only pass in the offset if we have it,
                         // otherwise a null value
@@ -1386,7 +1453,7 @@ var quby = window['quby'] || {};
                     this.mismatchedBraceWarning = true;
                 },
 
-                print: function (p) {
+                print: function(p) {
                     p.append('function(');
 
                     if ( this.parameters !== null ) {
@@ -1405,7 +1472,7 @@ var quby = window['quby'] || {};
                     );
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     if ( this.mismatchedBraceWarning ) {
                         v.strictError( this.getOffset(), "mismatched do-block syntax (i.e. 'do something() }')" );
                     }
@@ -1425,7 +1492,7 @@ var quby = window['quby'] || {};
                     v.popScope();
                 },
 
-                getNumParameters: function () {
+                getNumParameters: function() {
                     return ( this.parameters !== null ) ?
                             this.parameters.length :
                             0 ;
@@ -1434,7 +1501,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.Lambda = util.klass(
-            function (parameters, statements) {
+            function(parameters, statements) {
                 qubyAst.FunctionBlock.call( this, parameters, statements );
             },
 
@@ -1453,7 +1520,7 @@ var quby = window['quby'] || {};
      * @param isResultBool An optimization flag. Pass in true if the result of this Expression will always be a 'true' or 'false'. Optional, and defaults to false.
      */
     qubyAst.Expr = util.klass(
-            function (offset, isResultBool) {
+            function(offset, isResultBool) {
                 qubyAst.Syntax.call(this, offset);
 
                 this.isResultBool = (!! isResultBool);
@@ -1461,7 +1528,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                printAsCondition: function (p) {
+                printAsCondition: function(p) {
                     if ( this.isResultBool ) {
                         this.print(p);
                     } else {
@@ -1579,7 +1646,7 @@ var quby = window['quby'] || {};
      * All single operations have precedence of 1.
      */
     qubyAst.SingleOp = util.klass(
-            function (expr, strOp, isResultBool) {
+            function(expr, strOp, isResultBool) {
                 qubyAst.BalancingExpr.call(this, expr.offset, isResultBool);
 
                 this.expr  = expr;
@@ -1588,13 +1655,13 @@ var quby = window['quby'] || {};
 
             qubyAst.BalancingExpr,
             {
-                validate: function (v) {
+                validate: function(v) {
                     if ( this.isBalanced(v) ) {
                         this.expr.validate(v);
                     }
                 },
 
-                print: function (p) {
+                print: function(p) {
                     p.append('(', this.strOp);
                     this.expr.print(p);
                     p.append(')');
@@ -1624,7 +1691,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.SingleSub = util.klass(
-            function (expr) {
+            function(expr) {
                 qubyAst.SingleOp.call( this, expr, "-", false );
             },
             
@@ -1632,7 +1699,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.Not = util.klass(
-            function (expr) {
+            function(expr) {
                 qubyAst.SingleOp.call( this, expr, "!", true );
             },
 
@@ -1673,7 +1740,7 @@ var quby = window['quby'] || {};
      * @param precedence Lower is higher, must be a number.
      */
     qubyAst.Op = util.klass(
-            function (left, right, strOp, isResultBool, precedence) {
+            function(left, right, strOp, isResultBool, precedence) {
                 var offset = left ? left.offset : null;
                 qubyAst.BalancingExpr.call( this, offset, isResultBool );
 
@@ -1690,7 +1757,7 @@ var quby = window['quby'] || {};
 
             qubyAst.BalancingExpr,
             {
-                print: function (p) {
+                print: function(p) {
                     var bracket = quby.compilation.hints.doubleBracketOps();
 
                     if ( bracket ) {
@@ -1716,7 +1783,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     if ( this.isBalanced(v) ) {
                         this.right.validate(v);
                         this.left.validate(v);
@@ -1827,13 +1894,40 @@ var quby = window['quby'] || {};
     qubyAst.GreaterThan         = newShortOp( ">" , 6, true );
     qubyAst.GreaterThanEqual    = newShortOp( ">=", 6, true );
 
+    qubyAst.IsInstanceOf = util.klass(
+            function(left, right) {
+                qubyAst.Op.call( this, left, right, 'instanceof', true, 7 );
+
+                if ( this.right.isJSLiteral() ) {
+                    this.setJSLiteral();
+                }
+            },
+            {
+                validate: function(v) {
+                    if ( this.isJSLiteral() ) {
+                        if ( v.ensureAdminMode('JS inlining for instance check, is not allowed in Sandbox mode') ) {
+                            // todo, check if the class exists
+                            this.right.validate( v );
+                            this.left.validate( v );
+                        }
+                    } else if ( this.right instanceof qubyAst.Variable ) {
+                        this.right = new qubyAst.ClassIdentifier( this.right.offset );
+                        this.right.validate( v );
+                        this.left.validate( v );
+                    } else {
+                        v.parseError( this.offset, "expecting a class name for instance check" );
+                    }
+                }
+            }
+    );
+
     /* Equality Comparison */
-    qubyAst.Equality            = newShortOp( "==", 7, true );
-    qubyAst.NotEquality         = newShortOp( "!=", 7, true );
+    qubyAst.Equality            = newShortOp( "==", 8, true );
+    qubyAst.NotEquality         = newShortOp( "!=", 8, true );
 
     /* Bit Functions */
-    qubyAst.BitAnd = newShortOp( '&', 8 );
-    qubyAst.BitOr  = newShortOp( '|', 8 );
+    qubyAst.BitAnd = newShortOp( '&', 9 );
+    qubyAst.BitOr  = newShortOp( '|', 9 );
 
     qubyAst.BoolOp = util.klass(
             function(left, right, syntax, precedence) {
@@ -1861,7 +1955,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.BoolOr = util.klass(
-            function (left, right) {
+            function(left, right) {
                 qubyAst.BoolOp.call(this, left, right, "||", 12);
             },
 
@@ -1885,7 +1979,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.BoolAnd = util.klass(
-            function (left, right) {
+            function(left, right) {
                 qubyAst.BoolOp.call(this, left, right, "&&", 11);
             },
 
@@ -1917,13 +2011,13 @@ var quby = window['quby'] || {};
     qubyAst.Sub    = newShortOp( "-", 4 );
 
     qubyAst.Power = util.klass(
-            function (left, right) {
+            function(left, right) {
                 qubyAst.Op.call(this, left, right, '**', false, 2);
             },
 
             qubyAst.Op,
             {
-                print: function (p) {
+                print: function(p) {
                     p.append('Math.pow(');
                     this.left.print(p);
                     p.append(',');
@@ -1941,13 +2035,13 @@ var quby = window['quby'] || {};
      * Has the highest precedence, giving it the lowest priority.
      */
     qubyAst.Mapping = util.klass(
-            function (left, right) {
+            function(left, right) {
                 qubyAst.Op.call( this, left, right, ":", false, 100 );
             },
 
             qubyAst.Op,
             {
-                print: function (p) {
+                print: function(p) {
                     this.left.print(p);
                     p.append(',');
                     this.right.print(p);
@@ -1956,7 +2050,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.Assignment = util.klass(
-            function (left, right) {
+            function(left, right) {
                 qubyAst.Op.call(this, left, right, '=', false, 14);
 
                 this.isCollectionAssignment = false;
@@ -1978,7 +2072,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                print: function (p) {
+                print: function(p) {
                     if ( this.isCollectionAssignment ) {
                         p.append('quby_setCollection(');
                         this.left.print(p);
@@ -2000,68 +2094,16 @@ var quby = window['quby'] || {};
 
                 this.identifier     = identifier.match;
                 this.callName       = callName;
-                this.isJSIdentifierFlag = false;
             },
 
             qubyAst.Expr,
             {
-                print: function (p) {
-                    p.append(this.callName);
+                setCallName: function( newCallName ) {
+                    this.callName = newCallName;
                 },
 
-                isJSIdentifier: function() {
-                    return this.isJSIdentifierFlag;
-                },
-
-                setJSIdentifier: function() {
-                    this.isJSIdentifierFlag = true;
-                }
-            }
-    );
-    qubyAst.FieldIdentifier = util.klass(
-            function( identifier ) {
-                // set temporary callName (the identifier.match)
-                qubyAst.Identifier.call( this, identifier, identifier.match.substring(1) );
-            },
-
-            qubyAst.Identifier,
-            {
-                validate: function (v) {
-                    if (
-                            v.ensureInClass( this, "field '" + this.identifier + "' is used outside of a class, they can only be used inside." )
-                    ) {
-                        var klass = v.getCurrentClass().klass;
-
-                        // set the correct field callName
-                        this.callName = quby.runtime.formatField(
-                                klass.name,
-                                this.identifier
-                        );
-
-                        if ( this.identifier.length === 0 ) {
-                            v.parseError( this.offset, "no name provided for field of class " + klass.name );
-                        } else {
-                            this.isInsideExtensionClass = v.isInsideExtensionClass();
-
-                            this.validateField(v);
-                        }
-                    }
-                },
-                validateField: function (v) {
-                    quby.runtime.error("Internal", "Error, validateField of FieldIdentifier has not been overrided.");
-                }
-            }
-    );
-    qubyAst.JSIdentifier = util.klass(
-            function( identifier ) {
-                qubyAst.Identifier.call( this, identifier, identifier.match.substring(1) );
-            },
-
-            qubyAst.Identifier,
-            {
-                validate: function(v) {
-                    this.setJSIdentifier();
-                    v.ensureAdminMode( this, "inlining JS values not allowed in sandboxed mode" );
+                print: function(p) {
+                    p.append( this.callName );
                 }
             }
     );
@@ -2071,7 +2113,7 @@ var quby = window['quby'] || {};
      */
 
     qubyAst.Variable = util.klass(
-            function (identifier) {
+            function(identifier) {
                 qubyAst.Identifier.call(this, identifier, quby.runtime.formatVar(identifier.match));
 
                 this.isAssignment = false;
@@ -2080,10 +2122,10 @@ var quby = window['quby'] || {};
 
             qubyAst.Identifier,
             {
-                validate: function (v) {
+                validate: function(v) {
                     // assigning to this variable
                     if ( this.isAssignment ) {
-                        v.assignVar(this);
+                        v.assignVar( this );
                         // blocks can alter local variables, allowing var prevents this.
                         this.useVar = ! v.isInsideBlock();
                     // reading from this variable
@@ -2091,13 +2133,17 @@ var quby = window['quby'] || {};
                         if ( v.isInsideParameters() ) {
                             // it presumes scope has already been pushed by the function it's within
                             if ( v.containsLocalVar(this) ) {
-                                v.parseError( this.offset, "Parameter variable name used multiple times, var: '" + this.identifier + "'." );
+                                v.parseError( this.offset, "parameter variable name used multiple times '" + this.identifier + "'" );
                             }
 
-                            v.assignVar(this);
+                            v.assignVar( this );
                         } else {
                             if ( ! v.containsVar(this) ) {
-                                v.parseError( this.offset, "Variable used before it's assigned to, var: " + this.identifier );
+                                if ( ! this.isJSLiteral() ) {
+                                    v.parseError( this.offset, "variable used before it's assigned to '" + this.identifier + "'" );
+                                } else if ( window[this.callName] === undefined ) {
+                                    v.parseError( this.offset, "JS variable used before it's assigned to, '" + this.identifier + "'" );
+                                }
                             }
                         }
                     }
@@ -2118,7 +2164,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.GlobalVariable = util.klass(
-            function (identifier) {
+            function(identifier) {
                 qubyAst.Identifier.call( this, identifier, quby.runtime.formatGlobal(identifier.match) );
 
                 this.isGlobal = true;
@@ -2127,7 +2173,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Identifier,
             {
-                print: function (p) {
+                print: function(p) {
                     if ( this.isAssignment ) {
                         qubyAst.Identifier.prototype.print.call( this, p );
                     } else {
@@ -2135,7 +2181,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     if ( this.isAssignment ) {
                         // check if the name is blank, i.e. $
                         if ( this.identifier.length === 0 ) {
@@ -2144,8 +2190,11 @@ var quby = window['quby'] || {};
                             v.assignGlobal( this );
                         }
                     } else {
-                        if (v.ensureOutParameters(this, "Global variable cannot be used as a parameter, global: '" + this.identifier + "'.")) {
-                            v.useGlobal(this);
+                        if (
+                                v.ensureOutParameters(this, "global variable '" + this.identifier + "' used as function parameter") &&
+                                v.ensureOutBlock(this, "global variable '" + this.identifier + "' used as block parameter")
+                        ) {
+                            v.useGlobal( this );
                         }
                     }
                 },
@@ -2157,7 +2206,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.ParameterBlockVariable = util.klass(
-            function (identifier) {
+            function(identifier) {
                 qubyAst.Variable.call( this, identifier );
 
                 this.isBlockParam = true;
@@ -2165,7 +2214,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Variable,
             {
-                validate: function (v) {
+                validate: function(v) {
                     v.ensureInFunParameters(this, "Block parameters must be defined within a functions parameters.");
                     qubyAst.Variable.prototype.validate.call( this, v );
                 }
@@ -2173,25 +2222,41 @@ var quby = window['quby'] || {};
     );
     qubyAst.FieldVariable = util.klass(
             function( identifier ) {
-                qubyAst.FieldIdentifier.call( this, identifier );
+                qubyAst.Identifier.call( this, identifier, identifier.match.substring(1) );
 
                 this.klass = null;
                 this.isAssignment = false;
             },
 
-            qubyAst.FieldIdentifier,
+            qubyAst.Identifier,
             {
-                validate: function (v) {
+                validate: function(v) {
                     if (
                             v.ensureOutParameters( this, "Class field '" + this.identifier + "' used as a parameter." ) &&
-                            v.ensureInMethod( this, "Class field '" + this.identifier + "' is used outside of a method." )
+                            v.ensureInClass( this, "field '" + this.identifier + "' is used outside of a class, they can only be used inside." ) &&
+                            v.ensureInMethod( this, "Class field '" + this.identifier + "' is used outside of a method." ) &&
+                            v.ensureOutBlock( this, "object field '" + this.identifier + "' used as block parameter" )
                     ) {
-                        qubyAst.FieldIdentifier.prototype.validate.call( this, v );
-                        this.klass = v.getCurrentClass().klass;
+                        var klass = v.getCurrentClass().klass;
+                        this.klass = klass;
+
+                        // set the correct field callName
+                        this.callName = quby.runtime.formatField(
+                                klass.name,
+                                this.identifier
+                        );
+
+                        if ( this.identifier.length === 0 ) {
+                            v.parseError( this.offset, "no name provided for field of class " + klass.name );
+                        } else {
+                            this.isInsideExtensionClass = v.isInsideExtensionClass();
+
+                            this.validateField(v);
+                        }
                     }
                 },
 
-                validateField: function (v) {
+                validateField: function(v) {
                     if ( this.isAssignment ) {
                         v.assignField(this);
                     } else {
@@ -2200,7 +2265,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                print: function (p) {
+                print: function(p) {
                     if ( this.klass ) {
                         if ( this.isAssignment ) {
                             p.append( quby.runtime.getThisVariable(this.isInsideExtensionClass), '.', this.callName );
@@ -2244,15 +2309,16 @@ var quby = window['quby'] || {};
     qubyAst.ThisVariable = util.klass(
             function( sym ) {
                 qubyAst.Syntax.call( this, sym );
-
-                this.isThis = true;
             },
 
             qubyAst.Syntax,
             {
                 validate: function(v) {
-                    if (v.ensureOutParameters(this, "'this' object is referenced as a parameter (which isn't allowed).")) {
-                        v.ensureInMethod(this, "'this' object is referenced outside of a class method (or you've named a variable 'this' which isn't allowed).");
+                    if (
+                            v.ensureOutParameters(this, "'this' object is used as a parameter") &&
+                            v.ensureOutBlock(this, "'this' used as a block parameter")
+                    ) {
+                        v.ensureInMethod(this, "'this' is referenced outside of a class method (or you've named a variable 'this')");
                     }
 
                     this.isInsideExtensionClass = v.isInsideExtensionClass();
@@ -2263,9 +2329,30 @@ var quby = window['quby'] || {};
                 },
 
                 setAssignment: function(v) {
-                    v.parseError( this.offset, "Cannot assign a value to 'this'" );
+                    v.parseError( this.offset, "cannot assign a value to 'this'" );
 
                     return false;
+                }
+            }
+    );
+
+    qubyAst.JSVariable = util.klass(
+            function( identifier ) {
+                qubyAst.Variable.call( this, identifier );
+                this.setCallName( identifier.match );
+            },
+
+            qubyAst.Variable,
+            {
+                validate: function(v) {
+                    this.setJSLiteral();
+
+                    if (
+                            v.ensureOutBlock( this, "JS variable used as block parameter" ) &&
+                            v.ensureAdminMode( this, "inlining JS values not allowed in sandboxed mode" )
+                    ) {
+                        qubyAst.Variable.prototype.validate.call( this, v );
+                    }
                 }
             }
     );
@@ -2289,7 +2376,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                print: function (p) {
+                print: function(p) {
                     if ( this.isAssignment ) {
                         this.array.print(p);
                         p.append(',');
@@ -2303,7 +2390,7 @@ var quby = window['quby'] || {};
                     }
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     this.index.validate(v);
                     this.array.validate(v);
                 },
@@ -2327,7 +2414,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.ArrayDefinition = util.klass(
-            function (parameters) {
+            function(parameters) {
                 var offset;
                 if ( parameters ) {
                     offset = parameters.offset;
@@ -2343,7 +2430,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                print: function (p) {
+                print: function(p) {
                     p.append('(new QubyArray([');
 
                     if ( this.parameters !== null ) {
@@ -2353,7 +2440,7 @@ var quby = window['quby'] || {};
                     p.append(']))');
                 },
 
-                validate: function (v) {
+                validate: function(v) {
                     if ( this.parameters !== null ) {
                         this.parameters.validate(v);
                     }
@@ -2362,13 +2449,13 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.HashDefinition = util.klass(
-            function (parameters) {
+            function(parameters) {
                 qubyAst.ArrayDefinition.call(this, parameters);
             },
 
             qubyAst.ArrayDefinition,
             {
-                print: function (p) {
+                print: function(p) {
                     p.append('(new QubyHash(');
 
                     if ( this.parameters !== null ) {
@@ -2393,10 +2480,10 @@ var quby = window['quby'] || {};
 
             qubyAst.Expr,
             {
-                validate: function (v) {
+                validate: function(v) {
                     // do nothing
                 },
-                print: function (p) {
+                print: function(p) {
                     p.append( this.match );
                 },
 
@@ -2415,17 +2502,17 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.Symbol = util.klass(
-            function (sym) {
+            function(sym) {
                 qubyAst.Literal.call(this, sym);
                 this.callName = quby.runtime.formatSymbol(this.match);
             },
 
             qubyAst.Literal,
             {
-                validate: function (v) {
+                validate: function(v) {
                     v.addSymbol( this );
                 },
-                print: function (p) {
+                print: function(p) {
                     p.append( this.callName );
                 }
             }
@@ -2454,7 +2541,7 @@ var quby = window['quby'] || {};
             }
     );
 
-    qubyAst.String = function (sym) {
+    qubyAst.String = function(sym) {
         var ast = new qubyAst.Literal( sym, true );
 
         // escape the \n's
@@ -2612,7 +2699,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.FunctionReadGenerator = util.klass(
-            function (obj, methodPrefix, field) {
+            function(obj, methodPrefix, field) {
                 qubyAst.FunctionAttrGenerator.call( this, obj, methodPrefix, 0, field, FunctionReadGeneratorFieldVariable );
             },
 
@@ -2642,7 +2729,7 @@ var quby = window['quby'] || {};
     );
 
     qubyAst.FunctionWriteGenerator = util.klass(
-            function (obj, methodPrefix, field) {
+            function(obj, methodPrefix, field) {
                 qubyAst.FunctionAttrGenerator.call( this,
                         obj,
                         methodPrefix,
@@ -2710,7 +2797,7 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                print: function (p) {
+                print: function(p) {
                     if ( ! this.isPrinted ) {
                         var match = this.offset.match;
                         p.append( match.substring(6, match.length-3) );
@@ -2718,7 +2805,7 @@ var quby = window['quby'] || {};
                         this.isPrinted = true;
                     }
                 },
-                validate: function (v) {
+                validate: function(v) {
                     v.ensureAdminMode(
                             this, "inlining pre-JavaScript is not allowed outside of admin mode."
                     );
@@ -2735,14 +2822,14 @@ var quby = window['quby'] || {};
 
             qubyAst.Syntax,
             {
-                print: function (p) {
+                print: function(p) {
                     var match = this.offset.match;
                     p.append( match.substring(3, match.length-3) );
                 },
                 printAsCondition: function(p) {
                     this.print(p);
                 },
-                validate: function (v) {
+                validate: function(v) {
                     v.ensureAdminMode(this, "inlining JavaScript is not allowed outside of admin mode.");
                 }
             }

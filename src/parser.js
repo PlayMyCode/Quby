@@ -580,14 +580,17 @@ var quby = window['quby'] || {};
                     assignment          : '=',
 
                     dot                 : '.',
+                    hash                : '#',
 
                     logicalAnd          : ['&&', 'and'],
-                    logicalOr           : ['||', 'or'],
+                    logicalOr           : ['||', 'or' ],
 
-                    not                 : ['!', 'not'],
+                    not                 : ['!' , 'not'],
 
                     bitwiseAnd          : '&',
-                    bitwiseOr           : '|'
+                    bitwiseOr           : '|',
+
+                    is                  : 'is'
             },
 
             identifiers: {
@@ -620,18 +623,6 @@ var quby = window['quby'] || {};
                     objectField : function(src, i, code, len) {
                         if ( code === AT ) {
                             i++;
-
-                            while ( isAlphaNumericCode(src.charCodeAt(i)) ) {
-                                i++;
-                            }
-
-                            return i;
-                        }
-                    },
-
-                    jsIdentifier: function(src, i, code, len) {
-                        if ( code === HASH && isAlphaNumericCode(src.charCodeAt(i+1)) ) {
-                            i += 2;
 
                             while ( isAlphaNumericCode(src.charCodeAt(i)) ) {
                                 i++;
@@ -874,28 +865,36 @@ var quby = window['quby'] || {};
                         set( exprs );
             });
 
-    var variable = parse.
-            a( terminals.identifiers.variableName ).
-            onMatch( function(name) {
-                return new quby.ast.Variable( name );
-            } );
-
-    var variables = parse.either( terminals.identifiers, terminals.keywords.THIS ).
+    var variables = parse.
+            either(
+                    terminals.identifiers,
+                    terminals.keywords.THIS,
+                    parse.
+                            a( terminals.ops.hash ).
+                            either(
+                                    terminals.identifiers.variableName,
+                                    terminals.identifiers.global
+                            ).
+                            onMatch( function( hash, name ) {
+                                return new quby.ast.JSVariable( name );
+                            } )
+            ).
             onMatch( function(identifier) {
-                switch ( identifier.terminal ) {
-                    case terminals.identifiers.variableName:
-                        return new quby.ast.Variable( identifier );
-                    case terminals.identifiers.global:
-                        return new quby.ast.GlobalVariable( identifier );
-                    case terminals.identifiers.objectField:
-                        return new quby.ast.FieldVariable( identifier );
-                    case terminals.keywords.THIS:
-                        return new quby.ast.ThisVariable( identifier );
-                    case terminals.identifiers.jsIdentifier:
-                        return new quby.ast.JSIdentifier( identifier );
-                    default:
-                        log(identifier);
-                        throw new Error("Unknown terminal met for variables: " + identifier);
+                var term = identifier.terminal;
+
+                if ( term === terminals.identifiers.variableName ) {
+                    return new quby.ast.Variable( identifier );
+                } else if ( term === terminals.identifiers.global ) {
+                    return new quby.ast.GlobalVariable( identifier );
+                } else if ( term === terminals.identifiers.objectField ) {
+                    return new quby.ast.FieldVariable( identifier );
+                } else if ( term === terminals.keywords.THIS ) {
+                    return new quby.ast.ThisVariable( identifier );
+                } else if ( identifier instanceof quby.ast.JSVariable ) {
+                    return identifier;
+                } else {
+                    log( identifier );
+                    throw new Error( "Unknown terminal met for variables: " + identifier );
                 }
             });
 
@@ -918,16 +917,17 @@ var quby = window['quby'] || {};
             ).
             then( expr ).
             onMatch( function( op, expr ) {
-                switch ( op.terminal ) {
-                    case ops.not:
-                        return new quby.ast.Not( expr );
-                    case terminals.ops.subtract:
-                        return new quby.ast.SingleSub(expr);
-                    case ops.plus:
-                        return expr;
-                    default:
-                        log( op );
-                        throw new Error("Unknown singleOpExpr match");
+                var term = op.terminal;
+
+                if ( term === ops.not ) {
+                    return new quby.ast.Not( expr );
+                } else if ( term === ops.subtract ) {
+                    return new quby.ast.SingleSub(expr);
+                } else if ( term === ops.plus ) {
+                    return expr;
+                } else {
+                    log( op );
+                    throw new Error("Unknown singleOpExpr match");
                 }
             } );
 
@@ -1059,7 +1059,7 @@ var quby = window['quby'] || {};
             } );
 
     var blockParamVariables = parse.repeatSeperator(
-            variable,
+            variables,
             terminals.symbols.comma
     );
 
@@ -1132,6 +1132,28 @@ var quby = window['quby'] || {};
                 }
             } );
 
+    var jsExtension = parse.
+            a( terminals.ops.hash ).
+            either(
+                    terminals.identifiers.variableName,
+                    terminals.identifiers.global
+            ).
+            optional(
+                    parse.
+                            a( parameterExprs ).
+                            optional( block ).
+                            onMatch( function(exprs, block) {
+                                return { exprs: exprs, block: block };
+                            } )
+            ).
+            onMatch( function(hash, name, exprsBlock) {
+                if ( exprsBlock ) {
+                    return new quby.ast.JSMethodCall( null, name, exprsBlock.exprs, exprsBlock.block );
+                } else {
+                    return new quby.ast.JSProperty( null, name );
+                }
+            });
+
     var methodCallExtension = parse.
             a( terminals.ops.dot ).
             then( terminals.identifiers.variableName ).
@@ -1143,11 +1165,26 @@ var quby = window['quby'] || {};
 
     var newInstance = parse.
             a( terminals.keywords.NEW ).
-            then( terminals.identifiers.variableName ).
-            then( parameterExprs ).
-            optional( block ).
-            onMatch( function(nw, klass, exprs, block) {
-                return new quby.ast.NewInstance( klass, exprs, block );
+            either(
+                    parse.
+                            a( terminals.ops.hash ).
+                            then( expr ).
+                            then( parameterExprs ).
+                            optional( block ).
+                            onMatch( function(hash, expr, params, block) { 
+                                return new quby.ast.NewJSInstance( klass, exprs, block );
+                            } ),
+
+                    parse.
+                            a( terminals.identifiers.variableName ).
+                            then( parameterExprs ).
+                            optional( block ).
+                            onMatch( function(name, params, block) {
+                                return new quby.ast.NewInstance( klass, exprs, block );
+                            } )
+            ).
+            onMatch( function(nw, newInstance) {
+                return newInstance;
             } );
 
     var exprInParenthesis = parse.
@@ -1173,7 +1210,8 @@ var quby = window['quby'] || {};
                     parse.
                             either(
                                     methodCallExtension,
-                                    arrayAccessExtension
+                                    arrayAccessExtension,
+                                    jsExtension
                             ).
                             optional( exprExtension ).
                             onMatch( function(left, ext) {
@@ -1211,60 +1249,65 @@ var quby = window['quby'] || {};
                                     ops.bitwiseAnd,
                                     ops.bitwiseOr,
 
+                                    ops.is,
+
                                     ops.power,
 
                                     ops.assignment
                             ).
                             then( expr ).
                             onMatch( function(op, right) {
-                                switch( op.terminal ) {
-                                    case ops.assignment:
-                                        return new quby.ast.Assignment( null, right );
-                                    case ops.plus:
-                                        return new quby.ast.Add( null, right );
-                                    case ops.subtract:
-                                        return new quby.ast.Sub( null, right );
-                                    case ops.divide:
-                                        return new quby.ast.Divide( null, right );
-                                    case ops.multiply:
-                                        return new quby.ast.Mult( null, right );
+                                var term = op.terminal;
 
-                                    case ops.logicalAnd:
-                                        return new quby.ast.BoolAnd( null, right );
-                                    case ops.logicalOr:
-                                        return new quby.ast.BoolOr( null, right );
+                                if ( term === ops.assignment ) {
+                                    return new quby.ast.Assignment( null, right );
+                                } else if ( term === ops.plus ) {
+                                    return new quby.ast.Add( null, right );
+                                } else if ( term === ops.subtract ) {
+                                    return new quby.ast.Sub( null, right );
+                                } else if ( term === ops.divide ) {
+                                    return new quby.ast.Divide( null, right );
+                                } else if ( term === ops.multiply ) {
+                                    return new quby.ast.Mult( null, right );
 
-                                    case ops.equal:
-                                        return new quby.ast.Equality( null, right );
-                                    case ops.notEqual:
-                                        return new quby.ast.NotEquality( null, right );
+                                } else if ( term === ops.logicalAnd ) {
+                                    return new quby.ast.BoolAnd( null, right );
+                                } else if ( term === ops.logicalOr ) {
+                                    return new quby.ast.BoolOr( null, right );
 
-                                    case ops.modulus:
-                                        return new quby.ast.Mod( null, right );
+                                } else if ( term === ops.equal ) {
+                                    return new quby.ast.Equality( null, right );
+                                } else if ( term === ops.notEqual ) {
+                                    return new quby.ast.NotEquality( null, right );
 
-                                    case ops.lessThan:
-                                        return new quby.ast.LessThan( null, right );
-                                    case ops.greaterThan:
-                                        return new quby.ast.GreaterThan( null, right );
-                                    case ops.lessThanEqual:
-                                        return new quby.ast.LessThanEqual( null, right );
-                                    case ops.greaterThanEqual:
-                                        return new quby.ast.GreaterThanEqual( null, right );
+                                } else if ( term === ops.modulus ) {
+                                    return new quby.ast.Mod( null, right );
 
-                                    case ops.shiftLeft:
-                                        return new quby.ast.ShiftLeft( null, right );
-                                    case ops.shiftRight:
-                                        return new quby.ast.ShiftRight( null, right );
+                                } else if ( term === ops.lessThan ) {
+                                    return new quby.ast.LessThan( null, right );
+                                } else if ( term === ops.greaterThan ) {
+                                    return new quby.ast.GreaterThan( null, right );
+                                } else if ( term === ops.lessThanEqual ) {
+                                    return new quby.ast.LessThanEqual( null, right );
+                                } else if ( term === ops.greaterThanEqual ) {
+                                    return new quby.ast.GreaterThanEqual( null, right );
 
-                                    case ops.bitwiseAnd:
-                                        return new quby.ast.BitAnd( null, right );
-                                    case ops.bitwiseOr:
-                                        return new quby.ast.BitOr( null, right );
+                                } else if ( term === ops.shiftLeft ) {
+                                    return new quby.ast.ShiftLeft( null, right );
+                                } else if ( term === ops.shiftRight ) {
+                                    return new quby.ast.ShiftRight( null, right );
 
-                                    case ops.power:
-                                        return new quby.ast.Power( null, right );
+                                } else if ( term === ops.bitwiseAnd ) {
+                                    return new quby.ast.BitAnd( null, right );
+                                } else if ( term === ops.bitwiseOr ) {
+                                    return new quby.ast.BitOr( null, right );
 
-                                    default:
+                                } else if ( term === ops.is ) {
+                                    return new quby.ast.IsInstanceOf( null, right );
+
+                                } else if ( term === ops.power ) {
+                                    return new quby.ast.Power( null, right );
+                                } else {
                                         throw Error("Unknown op given: " + op);
                                 }
                             })
