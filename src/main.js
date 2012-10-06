@@ -129,6 +129,8 @@ var quby = window['quby'] || {};
 
                 this.hasParsed = false;
 
+                this.source = source;
+
                 Object.preventExtensions( this );
             }
 

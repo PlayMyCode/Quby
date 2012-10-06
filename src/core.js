@@ -36,18 +36,18 @@ var quby = window['quby'] || {};
             runParser: function( instance, validator ) {
                 var callback      = instance.whenFinished,
                     debugCallback = instance.debugCallback,
-                    srcData       = instance.source,
+                    source        = instance.source,
                     name          = instance.strName;
 
                 quby.parser.parse(
-                        srcData.getSource(),
+                        source,
                         instance,
 
                         function( program, errors ) {
                             validator.adminMode(  instance.isAdmin  );
                             validator.strictMode( instance.isStrict );
 
-                            validator.validate( program, errors, srcData );
+                            validator.validate( program, errors );
 
                             if ( callback !== undefined && callback !== null ) {
                                 util.future.runFun( callback );
@@ -100,7 +100,7 @@ var quby = window['quby'] || {};
                     this.isParameters = false;
                     this.isFunParameters = false;
 
-                    this.isConstructor = false;
+                    this.inConstructor = false;
 
                     this.endValidateCallbacks = [];
 
@@ -136,8 +136,9 @@ var quby = window['quby'] || {};
                  * @param error The error to parse.
                  * @return Info on the error, for display purposes.
                  */
-                var formatError = function( srcData, error ) {
-                    var errLine = srcData.getLine( error.offset ),
+                var formatError = function( error ) {
+                    console.log( error );
+                    var errLine = error.getLine(),
                         strErr;
 
                     if ( error.isSymbol ) {
@@ -454,9 +455,9 @@ var quby = window['quby'] || {};
                             }
                         },
 
-                        parseError: function( lineInfo, msg ) {
-                            if ( lineInfo ) {
-                                this.parseErrorLine( lineInfo.source.getLine(lineInfo.offset), msg, lineInfo.name );
+                        parseError: function( sym, msg ) {
+                            if ( sym ) {
+                                this.parseErrorLine( sym.getLine(), msg, sym.name );
                             } else {
                                 this.parseErrorLine( null, msg );
                             }
@@ -542,7 +543,10 @@ var quby = window['quby'] || {};
                         },
 
                         // adds a program to be validated by this Validator
-                        validate: function( program, errors, srcData ) {
+                        validate: function( program, errors ) {
+                            // clear this, so errors don't seap across multiple validations
+                            this.lastErrorName = null;
+
                             if ( errors === null || errors.length === 0 ) {
                                 if ( ! program ) {
                                     // avoid unneeded error messages
@@ -567,7 +571,7 @@ var quby = window['quby'] || {};
                                 }
                             } else {
                                 for (var i = 0; i < errors.length; i++) {
-                                    var error = formatError( srcData, errors[i] );
+                                    var error = formatError( errors[i] );
                                     this.parseErrorLine( error.line, error.msg );
                                 }
                             }
@@ -664,7 +668,7 @@ var quby = window['quby'] || {};
                          * Turns all stored programs into
                          */
                         generateCode: function() {
-                            var printer = new Printer(this);
+                            var printer = new Printer();
 
                             printer.setCodeMode(false);
                             this.generatePreCode(printer);
@@ -1032,7 +1036,7 @@ var quby = window['quby'] || {};
 
     SymbolTable.prototype = {
             add: function (sym) {
-                this.symbols[sym.callName] = sym.value;
+                this.symbols[sym.callName] = sym.match;
             },
 
             print: function (p) {
@@ -1122,7 +1126,7 @@ var quby = window['quby'] || {};
                 var index = fun.callName;
 
                 if ( this.funs.hasOwnProperty(index) ) {
-                    validator.parseError(fun.offset, "Duplicate method '" + fun.name + "' definition in class '" + this.klass.name + "'.");
+                    this.validator.parseError(fun.offset, "Duplicate method '" + fun.name + "' definition in class '" + this.klass.name + "'.");
                 }
 
                 this.funs[index] = fun;
@@ -1131,7 +1135,7 @@ var quby = window['quby'] || {};
                 if ( this.hasFun(fun) ) {
                     return true;
                 } else {
-                    var parentName = klass.getSuperCallName();
+                    var parentName = this.klass.getSuperCallName();
                     var parentVal;
 
                     // if has a parent class, pass the call on to that
@@ -1178,7 +1182,7 @@ var quby = window['quby'] || {};
                 var index = fun.getNumParameters();
 
                 if ( this.news[index] != undefined ) {
-                    validator.parseError(fun.offset, "Duplicate constructor for class '" + this.klass.name + "' with " + index + " parameters.");
+                    this.validator.parseError(fun.offset, "Duplicate constructor for class '" + this.klass.name + "' with " + index + " parameters.");
                 }
 
                 this.news[index] = fun;
@@ -1226,7 +1230,7 @@ var quby = window['quby'] || {};
             print: function(p) {
                 p.setCodeMode(false);
 
-                var klassName = this.klass.callName;
+                var klassName  = this.klass.callName;
                 var superKlass = this.klass.getSuperCallName();
 
                 // class definition itself
@@ -1272,7 +1276,7 @@ var quby = window['quby'] || {};
                 // but only for non-core classes
                 if (this.news.length == 0 && !this.klass.isExtensionClass) {
                     var constructor = new quby.ast.Constructor(
-                            thisKlass.clone( "new" ),
+                            thisKlass.offset.clone( "new" ),
                             null,
                             null
                     );
@@ -1290,12 +1294,14 @@ var quby = window['quby'] || {};
                 var head = thisKlass.header;
                 var superClassVs = []; // cache the order of super classes
 
+                var validator = this.validator;
+
                 while (head.hasSuper()) {
-                    var superKlassV = this.validator.getClass(head.getSuperCallName());
+                    var superKlassV = validator.getClass(head.getSuperCallName());
 
                     if (!superKlassV) {
                         if (!quby.runtime.isCoreClass(head.getSuperName().toLowerCase())) {
-                            this.validator.parseError(thisKlass.offset,
+                            validator.parseError(thisKlass.offset,
                                     "Super class not found: '" +
                                     head.getSuperName() +
                                     "', for class '" +
@@ -1309,7 +1315,7 @@ var quby = window['quby'] || {};
                         var superKlass = superKlassV.klass;
 
                         if (seenClasses[superKlass.callName]) {
-                            this.validator.parseError(
+                            validator.parseError(
                                     thisKlass.offset,
                                     "Circular inheritance tree is found for class '" + thisKlass.name + "'."
                             );
@@ -1335,7 +1341,7 @@ var quby = window['quby'] || {};
                                 var superClassV = superClassVs[ i ];
 
                                 if ( superClassV.hasField(field) ) {
-                                    this.validator.parseError( field.offset,
+                                    validator.parseError( field.offset,
                                             "Field '@" +
                                             field.identifier +
                                             "' from class '" +
@@ -1352,7 +1358,7 @@ var quby = window['quby'] || {};
                         }
 
                         if ( ! fieldErrorHandled ) {
-                            this.validator.parseError( field.offset,
+                            validator.parseError( field.offset,
                                     "Field '@" +
                                     field.identifier +
                                     "' is used in class '" +
@@ -1371,7 +1377,7 @@ var quby = window['quby'] || {};
                         var fun = this.usedFuns[funName];
 
                         if ( ! this.hasFunInHierarchy(fun) ) {
-                            this.validator.searchMissingFunAndError(
+                            validator.searchMissingFunAndError(
                                     fun, this.funs, thisKlass.name + ' method'
                             );
                         }
@@ -1405,9 +1411,7 @@ var quby = window['quby'] || {};
      *         ~:               , =+            
      */
 
-    var Printer = function (validator) {
-        this.validator = validator;
-
+    var Printer = function() {
         this.tempVarCounter = 0;
 
         this.isCode = true;
@@ -1425,10 +1429,6 @@ var quby = window['quby'] || {};
     Printer.prototype = {
         getTempVariable: function() {
             return quby.runtime.TEMP_VARIABLE + (this.tempVarCounter++);
-        },
-
-        getValidator: function () {
-            return this.validator;
         },
 
         setCodeMode: function (isCode) {

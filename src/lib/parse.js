@@ -926,6 +926,8 @@ var parse = window['parse'] = (function( window, undefined ) {
          */
         this.isLiteral = false;
 
+        this.literal = null;
+
         /**
          * If this is a literal, then this will give the length
          * of that literal being searched for.
@@ -965,6 +967,8 @@ var parse = window['parse'] = (function( window, undefined ) {
          */
         this.terminalParent = null;
 
+        var literal = null;
+
         if ( match instanceof Terminal ) {
             return match;
         } else if ( isFunction(match) ) {
@@ -989,19 +993,24 @@ var parse = window['parse'] = (function( window, undefined ) {
                     )
             ) {
                 if ( matchType === 'string' ) {
+                    literal = match;
+
                     if ( ! nameSupplied ) {
                         this.termName = "'" + match + "'";
                     }
 
                     match = match.charCodeAt( 0 );
                 } else {
+                    literal = String.fromCharCode( match );
+
                     if ( ! nameSupplied ) {
-                        this.termName = "'" + String.fromCharCode( match ) + "'";
+                        this.termName = "'" + literal + "'";
                     }
                 }
 
-                this.literalLength = 1;
-                this.isLiteral = true;
+                this.literalLength  = 1;
+                this.isLiteral      = true;
+                this.literal        = literal;
 
                 this.type = isWordCode(match) ?
                         TYPE_WORD_CODE :
@@ -1017,9 +1026,10 @@ var parse = window['parse'] = (function( window, undefined ) {
              * and 1 length is caught by the clause above.
              */
             } else if ( matchType === 'string' || match instanceof String ) {
-                this.literalLength = match.length;
-                this.isLiteral = true;
-                this.type = TYPE_STRING;
+                this.literalLength  = match.length;
+                this.isLiteral      = true;
+                this.literal        = match;
+                this.type           = TYPE_STRING;
 
                 if ( match.length === 0 ) {
                     throw new Error( "Empty string given for Terminal" );
@@ -1189,19 +1199,25 @@ var parse = window['parse'] = (function( window, undefined ) {
      *
      *  **  **  **  **  **  **  **  **  **  **  **  **  */
 
-    var SymbolError = function( i, str ) {
+    var SymbolError = function( i, str, sourceLines ) {
         this['isSymbol'] = true;
 
         this['offset'] = i;
-        this['match']  = str;
+        this['match' ] = str;
+        this['source'] = sourceLines;
     };
 
-    var TerminalError = function( i, terminal, match ) {
+    SymbolError.prototype['getLine'] = function() {
+        return this['source']['getLine']( this['offset'] );
+    }
+
+    var TerminalError = function( i, terminal, match, source ) {
         if ( i instanceof Symbol ) {
             return new TerminalError(
                    i.offset,
                    i.terminal,
-                   i.match
+                   i.match,
+                   i.source
             );
         } else {
             this['isTerminal']     = true;
@@ -1211,8 +1227,13 @@ var parse = window['parse'] = (function( window, undefined ) {
             this['terminalName']   = terminal.termName;
             this['match']          = match;
             this['isLiteral']      = terminal.isLiteral;
+            this['source']         = source;
         }
     };
+
+    TerminalError.prototype['getLine'] = function() {
+        return this['source']['getLine']( this['offset'] );
+    }
 
     /**
      * SourceLines deals with translations made to an original source code file.
@@ -1314,15 +1335,24 @@ var parse = window['parse'] = (function( window, undefined ) {
      * It's essentially a struct like object.
      */
     var Symbol = function( terminal, offset, sourceLines, match ) {
-        this['terminal']        = terminal;
-        this['offset']          = offset  ;
-        this['source']          = sourceLines;
-        this['match']           = match   ;
+        this['terminal']        = terminal      ;
+        this['offset']          = offset        ;
+        this['source']          = sourceLines   ;
+        this['match']           = match         ;
+        this['lower']           = null          ;
     };
 
-    Symbol.prototype.clone = function( newMatch ) {
-        return new Symbol( this.terminal, this.offset, this.source, newMatch );
+    Symbol.prototype['clone'] = function( newMatch ) {
+        return new Symbol( this['terminal'], this['offset'], this['source'], newMatch );
     };
+
+    Symbol.prototype['getLower'] = function() {
+        if ( this['lower'] === null ) {
+            return ( this['lower'] = this['match'].toLowerCase() );
+        } else {
+            return this['lower'];
+        }
+    }
 
     /**
      * Converts this to what it should be for the 'onMatch' callbacks.
@@ -1331,7 +1361,7 @@ var parse = window['parse'] = (function( window, undefined ) {
      * If there is a callback, then it is run, and the result is returned.
      */
     Symbol.prototype.onFinish = function() {
-        var onMatch = this.terminal.onMatchFun;
+        var onMatch = this['terminal'].onMatchFun;
 
         if ( onMatch !== null ) {
             return onMatch( this );
@@ -1340,8 +1370,8 @@ var parse = window['parse'] = (function( window, undefined ) {
         }
     };
 
-    Symbol.prototype.getLine = function() {
-        return this.source.getLine( this.offset );
+    Symbol.prototype['getLine'] = function() {
+        return this['source']['getLine']( this['offset'] );
     };
 
     /**
@@ -2404,25 +2434,35 @@ var parse = window['parse'] = (function( window, undefined ) {
      * found. The result array given contains the results from each of these
      * runs.
      *
-     * @param {string} displaySrc The text used when creating substrings, or for parsing.
-     * @param {string} parseSrc optional, an alternative source code used for parsing.
-     * @param callback A function to call when parsing is complete.
-     * @param debugCallback An optional debugging callback, which if provided, will be called with debugging info.
-     * @param data Optional, data to pass into every terminal's on finish.
+     * = Options =
+     * 
+     * - src The source code to parse.
+     *
+     * @param options An object listing the options to parse. Can also be a string.
      */
     ParserRule.prototype['parse'] = function( options ) {
-        var displaySrc      = options['src'];
-        var parseSrc        = options['src']        || displaySrc;
+        var displaySrc,
+            parseSrc,
+            name            = null,
+            callback        = null,
+            debugCallback   = null;
 
-        var name            = options['name']       || null;
-        var callback        = options['onFinish']   || null;
-        var debugCallback   = options['onDebug']    || null;
+        if ( typeof options === 'string' || (options instanceof String) ) {
+            displaySrc = parseSrc = options;
+        } else {
+            displaySrc      = options['src'];
+            parseSrc        = options['inputSrc']   || displaySrc;
+
+            name            = options['name']       || null;
+            callback        = options['onFinish']   || null;
+            debugCallback   = options['onDebug']    || null;
+        }
 
         this.parseInner( displaySrc, parseSrc, callback, debugCallback, name );
     };
 
     ParserRule.prototype.parseInner = function( input, parseInput, callback, debugCallback, name ) {
-        if ( typeof displaySrc !== 'string' && !(displaySrc instanceof String) ) {
+        if ( typeof input !== 'string' && !(input instanceof String) ) {
             throw new Error("Non-string source given as input");
         }
 
@@ -3121,35 +3161,36 @@ var parse = window['parse'] = (function( window, undefined ) {
     ParserRule.prototype.parseSymbolsInner = function( inputSrc, src, name ) {
         var sourceLines = new SourceLines( inputSrc, name );
 
-        var symbolI     = 0,
+        var symbolI         = 0,
 
-            len         = src.length,
+            len             = src.length,
 
-            symbols     = [],
-            symbolIDs   = [],
+            symbols         = [],
+            symbolIDs       = [],
 
-            ignores     = this.parseParent.getIgnores(),
-            literals    = this.compiled.literals,
-            terminals   = this.compiled.terminals,
+            ignores         = this.parseParent.getIgnores(),
+            literals        = this.compiled.literals,
+            terminals       = this.compiled.terminals,
 
-            allTerms    = ignores.concat( literals, terminals ),
+            allTerms        = ignores.concat( literals, terminals ),
 
-            ignoresLen  = ignores.length,
-            literalsLen = ignoresLen + literals.length,
-            termsLen    = literalsLen + terminals.length,
+            ignoresLen      = ignores.length,
+            literalsLen     = ignoresLen  + literals.length,
+            termsLen        = literalsLen + terminals.length,
 
-            ignoresTests = new Array( ignoresLen ),
-            literalsData = new Array( literalsLen ),
-            literalsType = new Array( literalsLen ),
-            termTests    = new Array( termsLen ),
+            ignoresTests    = new Array( ignoresLen  ),
+            literalsData    = new Array( literalsLen ),
+            literalsMatches = new Array( literalsLen ),
+            literalsType    = new Array( literalsLen ),
+            termTests       = new Array( termsLen    ),
 
             symbolIDToTerms = this.compiled.idToTerms,
 
-            postMatches = new Array( termsLen ),
+            postMatches     = new Array( termsLen    ),
 
-            termTests   = new Array( termsLen ),
-            termIDs     = new Array( termsLen ),
-            multipleIgnores = ( ignores.length > 1 ),
+            termTests       = new Array( termsLen    ),
+            termIDs         = new Array( termsLen    ),
+            multipleIgnores = ( ignores.length > 1   ),
 
             /**
              * An invalid index in the string, used to denote
@@ -3158,9 +3199,9 @@ var parse = window['parse'] = (function( window, undefined ) {
              * @const
              * @private
              */
-            NO_ERROR = -1,
-            errorStart = NO_ERROR,
-            errors = [];
+            NO_ERROR        = -1,
+            errorStart      = NO_ERROR,
+            errors          = [];
 
         /*
          * Move the test, id and returnMathFlag so they are on
@@ -3179,8 +3220,9 @@ var parse = window['parse'] = (function( window, undefined ) {
             if ( i < ignoresLen ) {
                 ignoresTests[i] = test;
             } else if ( i < literalsLen ) {
-                literalsData[i] = term.testData;
-                literalsType[i] = term.type;
+                literalsData[i]     = term.testData;
+                literalsMatches[i]  = term.literal;
+                literalsType[i]     = term.type;
             } else {
                 termTests[i] = test;
             }
@@ -3320,7 +3362,7 @@ var parse = window['parse'] = (function( window, undefined ) {
                                 allTerms[j],
                                 i,
                                 sourceLines,
-                                null
+                                literalsMatches[j]
                         );
 
                         // If we were in error mode,
@@ -3331,7 +3373,8 @@ var parse = window['parse'] = (function( window, undefined ) {
                         if ( errorStart !== NO_ERROR ) {
                             errors.push( new SymbolError(
                                     errorStart,
-                                    inputSrc.substring( errorStart, i )
+                                    inputSrc.substring( errorStart, i ),
+                                    sourceLines
                             ) );
 
                             errorStart = NO_ERROR;
@@ -3383,7 +3426,8 @@ var parse = window['parse'] = (function( window, undefined ) {
                         if ( errorStart !== NO_ERROR ) {
                             errors.push( new SymbolError(
                                     errorStart,
-                                    inputSrc.substring( errorStart, i )
+                                    inputSrc.substring( errorStart, i ),
+                                    sourceLines
                             ) );
 
                             errorStart = NO_ERROR;
@@ -3421,7 +3465,8 @@ var parse = window['parse'] = (function( window, undefined ) {
             if ( errorStart !== NO_ERROR && errorStart < len ) {
                 errors.push( new SymbolError(
                         errorStart,
-                        inputSrc.substring( errorStart, i )
+                        inputSrc.substring( errorStart, i ),
+                        sourceLines
                 ) );
             }
 

@@ -11,7 +11,6 @@ var quby = window['quby'] || {};
  * In many ways this is glue code, as it uses:
  *  - parse.js for parsing
  *  - quby.ast for building the AST
- *  - quby.lexer for building the symbols
  *
  * It is also built to have it's work lined across multiple time intervals. That
  * way it won't freeze the CPU.
@@ -797,72 +796,33 @@ var quby = window['quby'] || {};
     })
 
     /* The onMatch callbacks for altering the symbols when matched. */
-    terminals.keywords.RETURN.onMatch( function(symbol) {
-        return new quby.lexer.Sym( symbol.source, 'return' );
-    });
-
-    terminals.identifiers.variableName.onMatch( function(symbol) {
-        var sym = new quby.lexer.IdSym( symbol.source, symbol.match );
-        sym.terminal = terminals.identifiers.variableName;
-        return sym;
-    } );
-
     terminals.literals.TRUE.onMatch( function(symbol) {
-        return new quby.ast.Bool(
-                new quby.lexer.Sym( symbol.source, 'true' )
-        );
+        return new quby.ast.Bool( symbol );
     });
     terminals.literals.FALSE.onMatch( function(symbol) {
-        return new quby.ast.Bool(
-                new quby.lexer.Sym( symbol.source, 'false' )
-        );
+        return new quby.ast.Bool( symbol );
     });
     terminals.literals.NULL.onMatch( function(symbol) {
-        return new quby.ast.Null(
-                new quby.lexer.Sym( symbol.source, 'null' )
-        );
+        return new quby.ast.Null( symbol );
     });
     terminals.literals.NIL.onMatch( function(symbol) {
-        return new quby.ast.Null(
-                new quby.lexer.Sym( symbol.source, 'null' )
-        );
+        return new quby.ast.Null( symbol );
     });
     terminals.literals.symbol.onMatch( function(symbol) {
-        return new quby.ast.Symbol( 
-                new quby.lexer.Sym( symbol.source, symbol.match )
-        );
+        return new quby.ast.Symbol( symbol );
     });
     terminals.literals.string.onMatch( function(symbol) {
-        // escape the \n's
-        return new quby.ast.String(
-                new quby.lexer.Sym( symbol.source,  symbol.match.replace( /\n/g, "\\n" ) )
-        );
+        return new quby.ast.String( symbol );
     });
     terminals.literals.number.onMatch( function(symbol) {
-        return new quby.ast.Number(
-                new quby.lexer.Sym( symbol.source, symbol.match )
-        );
+        return new quby.ast.Number( symbol );
     });
 
     terminals.admin.inline.onMatch( function(symbol) {
-        var match = symbol.match;
-
-        return new quby.ast.Inline(
-                new quby.lexer.Sym(
-                        symbol.source,
-                        match.substring( 3, match.length-3 )
-                )
-        );
+        return new quby.ast.Inline( symbol );
     });
     terminals.admin.preInline.onMatch( function(symbol) {
-        var match = symbol.match;
-
-        return new quby.ast.PreInline(
-                new quby.lexer.Sym(
-                        symbol.source,
-                        match.substring( 6, match.length-3 )
-                )
-        );
+        return new quby.ast.PreInline( symbol );
     });
 
     var ops = terminals.ops;
@@ -914,23 +874,12 @@ var quby = window['quby'] || {};
                     case terminals.identifiers.variableName:
                         return new quby.ast.Variable( identifier );
                     case terminals.identifiers.global:
-                        return new quby.ast.GlobalVariable(
-                                new quby.lexer.IdSym(
-                                        identifier.offset,
-                                        identifier.source,
-                                        identifier.match
-                                )
-                        );
+                        return new quby.ast.GlobalVariable( identifier );
                     case terminals.identifiers.objectField:
-                        return new quby.ast.FieldVariable(
-                                new quby.lexer.IdSym(
-                                        identifier.offset,
-                                        identifier.source,
-                                        identifier.match.substring(1)
-                                )
-                        );
+                        identifier.match = identifier.match.substring(1);
+                        return new quby.ast.FieldVariable( identifier );
                     case terminals.keywords.THIS:
-                        return new quby.ast.ThisVariable( identifier.offset, null );
+                        return new quby.ast.ThisVariable( identifier );
                     default:
                         log(identifier);
                         throw new Error("Unknown terminal met for variables: " + identifier);
@@ -1012,9 +961,7 @@ var quby = window['quby'] || {};
                 if ( exprs !== null ) {
                     return new quby.ast.YieldStmt( exprs, exprs );
                 } else {
-                    return new quby.ast.YieldStmt(
-                            new quby.lexer.Sym( yld.offset, yld.source, 'yield' )
-                    );
+                    return new quby.ast.YieldStmt( yld );
                 }
             } );
 
@@ -1026,7 +973,7 @@ var quby = window['quby'] || {};
                     return new quby.ast.ReturnStmt( expr );
                 } else {
                     return new quby.ast.ReturnStmt(
-                            new quby.ast.Null(rtn)
+                            new quby.ast.Null( rtn )
                     );
                 }
             } );
@@ -1165,7 +1112,7 @@ var quby = window['quby'] || {};
             then( parameterExprs ).
             optional( block ).
             onMatch( function(name, exprs, block) {
-                if ( name.lower === quby.runtime.SUPER_KEYWORD ) {
+                if ( name.getLower() === quby.runtime.SUPER_KEYWORD ) {
                     return new quby.ast.SuperCall( name, exprs, block );
                 } else {
                     return new quby.ast.FunctionCall( name, exprs, block );
@@ -1387,11 +1334,7 @@ var quby = window['quby'] || {};
                     if ( def.terminal === terminals.keywords.DEF ) {
                         // 'new' method, class constructor
                         if ( name.terminal === terminals.keywords.NEW ) {
-                            return new quby.ast.Constructor(
-                                    new quby.lexer.Sym( name.offset, 'new' ),
-                                    params,
-                                    stmts
-                            );
+                            return new quby.ast.Constructor( name, params, stmts );
                         // normal function
                         } else {
                             return new quby.ast.Function( name, params, stmts );
@@ -1516,7 +1459,6 @@ var quby = window['quby'] || {};
                         inputSrc: preParse( src ),
 
                         onFinish: function( program, errors ) {
-                            quby.lexer.popParser( parser );
                             onFinish( program, errors );
                         },
                         onDebug: onDebug || null
