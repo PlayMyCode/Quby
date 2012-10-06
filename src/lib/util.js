@@ -220,6 +220,18 @@ var util = window['util'] = {};
             return arr;
         },
 
+        /**
+         * Sorts the array given, randomly.
+         */
+        /*
+         * Warning! This is used in core.qb
+         */
+        randomSort: function (arr) {
+            arr.sort(function () {
+                return (Math.round(Math.random()) - 0.5);
+            });
+        },
+
         remove: function (arr, arrayIndex) {
             arr.splice(arrayIndex, 1);
         },
