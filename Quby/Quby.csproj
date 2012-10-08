@@ -27,13 +27,23 @@
     <RootNamespace>Quby</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="lib\parse.ts" />
-    <Content Include="lib\util.ts" />
+    <Content Include="src\lib\parse.ts" />
+    <Content Include="src\lib\util.ts" />
+    <Content Include="license.txt" />
     <Content Include="src\compilation.ts" />
+    <Content Include="src\parser.ts" />
     <Content Include="src\runtime.ts" />
     <Content Include="test\index.html" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Content Include="build\declarations.bat" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="build\build.bat" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="lib\" />
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="'$(VSToolsPath)' != ''" />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v10.0\WebApplications\Microsoft.WebApplication.targets" Condition="false" />
