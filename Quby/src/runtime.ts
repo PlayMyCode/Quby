@@ -1,12 +1,19 @@
+"use static"
 
-/* These functions are called so often that they exist outside of the quby.runtime
+import utilTs = module('./lib/util')
+var util = utilTs.util;
+
+var exports = window['exports'] || {};
+
+/* 
+ * These functions are called so often that they exist outside of the quby.runtime
  * namespace so they can be as cheap as possible.
  */
 
 /*
  * This is called when a method is not found.
  */
-function noSuchMethodError(self:any, callName:string) {
+function noSuchMethodError(self:any, callName:string) : void {
     var args:any[] = Array.prototype.slice.call( arguments, 2 );
     var block = args.pop();
     
@@ -27,7 +34,7 @@ function noSuchMethodError(self:any, callName:string) {
  * @param block The block function to call with this function.
  * @return The result from calling the given block.
  */
-function quby_callBlock( block: { ( ...args: any[] ): any; }, args:any[]) {
+function quby_callBlock( block: { ( ...args: any[] ): any; }, args:any[]) : any {
     if (!block) {
         quby.runtime.missingBlockError();
     } else {
@@ -160,7 +167,7 @@ function quby_getCollection( collection: { get: ( key:any ) => any; }, key:any )
 * this is due to limitations in using JSON objects for
 * namespaces.
 */
-module quby.runtime {
+export module quby.runtime {
     export var FUNCTION_DEFAULT_TABLE_NAME = '_q_no_funs',
         
         FUNCTION_TABLE_NAME = '_q_funs',
@@ -253,7 +260,7 @@ module quby.runtime {
     * If it is mentioned here then Quby will add to that classes Prototype.
     * (note that Object/QubyObject isn't here because it's not prototype extended).
     */
-    var CORE_CLASSES = [
+    export var CORE_CLASSES = [
             'Number',
             'Boolean',
             'Function',
@@ -276,9 +283,9 @@ module quby.runtime {
 
     // 'this varaible' is a special variable for holding references to yourself.
     // This is so two functions can both refer to the same object.
-    var THIS_VARIABLE = "_this";
+    export var THIS_VARIABLE = "_this";
 
-    export function getThisVariable: function (isInExtension) {
+    export function getThisVariable(isInExtension) {
         if (isInExtension) {
             return 'this';
         } else {
@@ -312,12 +319,12 @@ module quby.runtime {
         if ( callback === undefined ) {
             quby.runtime.error( "Undefined given as function callback" );
         } else if ( ! callback ) {
-            quby.runtime.logCallback = null;
+            logCallback = null;
         } else if ( typeof(callback) != 'function' ) {
             quby.runtime.error( "Callback set for logging is not function, null or false." );
         }
     }
-        
+    
     /**
     * For handling logging calls from Quby.
     * 
@@ -332,8 +339,8 @@ module quby.runtime {
     */
     export function log() {
         // custom
-        if ( quby.runtime.logCallback ) {
-            quby.runtime.logCallback.apply( null, arguments );
+        if ( logCallback !== null ) {
+            logCallback.apply( null, arguments );
         } else {
             var strOut = Array.prototype.join.call( arguments, ',' );
                 
@@ -345,8 +352,8 @@ module quby.runtime {
                     
                 // Mozilla error console fallback
                 try {
-                    window.Components.classes[ "@mozilla.org/consoleservice;1" ].
-                            getService( window.Components.interfaces.nsIConsoleService ).
+                    window['Components']['classes'][ "@mozilla.org/consoleservice;1" ].
+                            getService( window['Components']['interfaces']['nsIConsoleService'] ).
                             logStringMessage( strOut );
                         
                     sent = true;
@@ -371,16 +378,16 @@ module quby.runtime {
     * @param code The JavaScript code to run.
     * @param onError the function to be called if an error occurres.
     */
-    export function runCode( code: string, onError: { ( Error ): void; } ) : void {
-        if (onError) {
-            if (typeof (onError) != 'function') {
+    export function runCode( code: string, onErr: { ( Error ): void; } ) : void {
+        if (onErr) {
+            if (typeof (onErr) != 'function') {
                 quby.runtime.error("onError", "onError must be a function.");
             }
 
-            quby.runtime.onError = onError;
+            onError = onErr;
             code = 'try { ' + code + ' } catch ( err ) { quby.runtime.handleError(err); }';
         } else {
-            quby.runtime.onError = null;
+            onError = null;
         }
 
         ( new Function( code ) ).call( null );
@@ -392,15 +399,16 @@ module quby.runtime {
     * 
     * The onError must return true to stop the error from being thrown up!
     */
-    export function handleError(err:Error) : void {
+    export function handleError( err: Error ): void;
+    export function handleError(err:any) : void {
         if ( ! err.isQuby ) {
-            err.quby_message = quby.runtime.unformatString( err.message );
+            err.quby_message = unformatString( err.message );
         } else {
             err.quby_message = err.message ;
         }
             
-        if (quby.runtime.onError != null) {
-            if (!quby.runtime.onError(err)) {
+        if (onError != null) {
+            if (!onError(err)) {
                 throw err;
             }
         } else {
@@ -470,9 +478,9 @@ module quby.runtime {
     * @param msg The message contained within the Error object thrown.
     * @return This should never return.
     */
-    export function error(name:string, msg:string) {
-        var errObj = new Error(msg);
-            
+    export function error(name:string, msg?:string) {
+        var errObj:any = new Error(msg);
+        
         errObj.isQuby = true;
         errObj.name = name;
             
@@ -495,7 +503,7 @@ module quby.runtime {
     * 
     * @param name The name of the field that was not found.
     */
-    export function fieldNotFoundError(obj:obj, name:string) {
+    export function fieldNotFoundError(obj:any, name:string) {
         var msg;
         var thisClass = quby.runtime.identifyObject( obj );
             
@@ -618,7 +626,7 @@ module quby.runtime {
     * @param str The string to remove formatting from.
     * @return The string with all internal formatting removed.
     */
-    unformatString: function( str:string ) : string {
+    function unformatString( str:string ) : string {
         str = str.replace(/\b[a-zA-Z0-9_]+\b/g, function(match:string) : string {
             // Functions
             // turn function from: '_fun_foo_1' => 'foo'
@@ -679,7 +687,7 @@ module quby.runtime {
         * @param {string} The prefix pattern for the start of the array translation.
         * @param {function({string}, {array<string>}, {string})} A function to put it all together.
         */
-        var qubyArrTranslation = function( str: string, prefixPattern: string, onFind: { ( pre: string, parts: string[], post: string ): string; } ) {
+        var qubyArrTranslation = function( str:string, prefixPattern:string, onFind: (pre: string, parts: string[], post:string) => string ) {
             /**
             * Searches for the closing bracket in the given string.
             * It presumes the bracket is already open, when it starts to search.
@@ -839,7 +847,7 @@ module quby.runtime {
     * 
     * For example: _fun_for_1, _fun_print_1, _fun_hasblock_0
     */
-    export function formatFun(strFun:string, numParameters:num) : string {
+    export function formatFun(strFun:string, numParameters:number) : string {
         return quby.runtime.FUNCTION_PREFIX + strFun.toLowerCase() + '_' + numParameters;
     }
 
@@ -885,9 +893,9 @@ function QubyObject() {
  * @constructor
  * @param values Optionally takes an array of values, set as the default values for this array.
  */
-function QubyArray( values ) {
+function QubyArray( values:any[] ) {
     if ( values === undefined ) {
-        this.values = [];
+        this.values = <any[]> [];
     } else {
         this.values = values;
     }
@@ -958,7 +966,7 @@ function QubyHash() {
 	
     return this;
 }
-QubyHash.prototype.hash = function(val) {
+QubyHash.prototype.hash = function(val:any) : number {
     if ( val == null ) {
         return 0;
     } else if ( typeof(val) == 'string' ) {
@@ -1058,11 +1066,11 @@ QubyHash.prototype.contains = function( key ) {
     
     return false;
 };
-QubyHash.prototype.remove = function( key ) {
-    var keyHash = this.hash( key );
-    var vals = this.values[ keyHash ];
+QubyHash.prototype.remove = function( key:any ) {
+    var keyHash:number = this.hash( key );
+    var vals:any[] = this.values[ keyHash ];
     
-    if ( vals != undefined ) {
+    if ( vals !== undefined ) {
         for ( var i = 0, len = vals.length; i < len; i++ ) {
             var node = vals[ i ];
             

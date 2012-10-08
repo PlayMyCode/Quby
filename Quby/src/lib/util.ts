@@ -1,5 +1,7 @@
 "use strict";
 
+var exports = window['exports'] || {};
+
 (function(Date) {
     if ( Date.now === undefined ) {
         Date.now = function() {
@@ -22,7 +24,7 @@
     }
 })(window['Object']);
 
-module util {
+export module util {
     var calculateName = function() {
         if ( navigator.appName === 'Opera' ) {
             return 'opera';
@@ -109,7 +111,7 @@ module util {
     }
 }
 
-module util.url {
+export module util.url {
     var SLASH_CHAR = '/'.charCodeAt( 0 );
 
     var anchor: HTMLAnchorElement = null;
@@ -245,7 +247,7 @@ export module util.array {
     }
 }
 
-module util.str {
+export module util.str {
     /**
      * Trims whitespace off the string given,
      * and returns the result.
@@ -489,7 +491,7 @@ export module util.future {
     }
 }
 
-module util.ajax {
+export module util.ajax {
     export function post( url, callback, data, isBlocking, timestamp ) {
         return util.ajax.call(
                 'POST',

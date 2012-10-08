@@ -1,6 +1,11 @@
 "use strict";
 
-module quby.compilation {
+import utilTS = module( './lib/util' );
+var util = utilTS.util;
+
+var exports = window['exports'] || {};
+
+export module quby.compilation {
     /**
      * Compilation contains information and utility functions for the compilation of Quby.
      */
