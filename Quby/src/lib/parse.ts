@@ -1,11 +1,6 @@
 "use strict";
 
-import utilTs = module( "./util" );
-var util = utilTs.util;
-
-var exports = window['exports'] || {};
-
-export var foo = 939;
+///<reference path='util.ts' />
 
 /*
  * TODO Optimizations:

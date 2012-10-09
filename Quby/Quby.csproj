@@ -27,10 +27,35 @@
     <RootNamespace>Quby</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="src\ast.js">
+      <DependentUpon>ast.ts</DependentUpon>
+    </Content>
+    <Content Include="src\ast.ts" />
+    <Content Include="src\core.js">
+      <DependentUpon>core.ts</DependentUpon>
+    </Content>
+    <Content Include="src\core.ts" />
+    <TypeScriptCompile Include="quby.ts" />
+    <Content Include="file1.js">
+      <DependentUpon>quby.ts</DependentUpon>
+    </Content>
+    <Content Include="src\lib\parse.js">
+      <DependentUpon>parse.ts</DependentUpon>
+    </Content>
     <Content Include="src\lib\parse.ts" />
+    <Content Include="src\lib\util.js">
+      <DependentUpon>util.ts</DependentUpon>
+    </Content>
     <Content Include="src\lib\util.ts" />
     <Content Include="license.txt" />
     <Content Include="src\compilation.ts" />
+    <Content Include="src\main.js">
+      <DependentUpon>main.ts</DependentUpon>
+    </Content>
+    <Content Include="src\main.ts" />
+    <Content Include="src\parser.js">
+      <DependentUpon>parser.ts</DependentUpon>
+    </Content>
     <Content Include="src\parser.ts" />
     <Content Include="src\runtime.ts" />
     <Content Include="test\index.html" />
