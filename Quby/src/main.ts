@@ -2,9 +2,6 @@
 
 ///<reference path='lib/util.ts' />
 
-import qubyCoreTs = module('./core');
-import qubyRuntimeTs = module('./runtime');
-
 /**
  * Main
  *
@@ -17,9 +14,6 @@ import qubyRuntimeTs = module('./runtime');
  */
 module quby {
     export module main {
-        var qubyCore = qubyCoreTs.quby.core;
-        var qubyRuntime = qubyRuntimeTs.quby.runtime;
-
         export function runScriptTagsDisplay() {
             runScriptTags(function(r) {
                 r.runOrDisplayErrors();
@@ -177,6 +171,14 @@ module quby {
                 return this;
             }
 
+            getName(): string {
+                return this.strName;
+            }
+
+            getSource(): string {
+                return this.source;
+            }
+
             /**
              * A callback to run for when *just this file*
              * has finished being parsed.
@@ -229,11 +231,11 @@ module quby {
          * It also adds errors for some common code bugs.
          */
         export class Parser {
-            private validator: qubyCoreTs.quby.core.Validator;
+            private validator: quby.core.Validator;
             private isStrict: bool = true;
 
             constructor() {
-                this.validator = new qubyCore.Validator();
+                this.validator = new quby.core.Validator();
             }
 
             private newParserInstance(src: string = null) {
@@ -267,7 +269,7 @@ module quby {
 
                 util.future.run(
                         function() {
-                            qubyCore.runParser(instance, validator);
+                            quby.core.runParser(instance, validator);
                         }
                 );
 
@@ -290,7 +292,7 @@ module quby {
                         url,
                         function(status, text) {
                             if (status >= 200 && status < 400) {
-                                qubyCore.runParser(instance, validator);
+                                quby.core.runParser(instance, validator);
                             } else {
                                 throw new Error("failed to load script: " + url);
                             }
@@ -511,7 +513,7 @@ module quby {
              */
             run() {
                 if (!this.hasErrors()) {
-                    qubyRuntime.runCode(this.getCode(), this.onErrorFun);
+                    quby.runtime.runCode(this.getCode(), this.onErrorFun);
                 }
             }
         }

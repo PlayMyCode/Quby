@@ -1,9 +1,6 @@
 "use static"
 
-import utilTs = module('./lib/util')
-var util = utilTs.util;
-
-var exports = window['exports'] || {};
+///<reference path='lib/util.ts' />
 
 /* 
  * These functions are called so often that they exist outside of the quby.runtime
@@ -167,7 +164,7 @@ function quby_getCollection( collection: { get: ( key:any ) => any; }, key:any )
 * this is due to limitations in using JSON objects for
 * namespaces.
 */
-export module quby.runtime {
+module quby.runtime {
     export var FUNCTION_DEFAULT_TABLE_NAME = '_q_no_funs',
         
         FUNCTION_TABLE_NAME = '_q_funs',
@@ -208,16 +205,16 @@ export module quby.runtime {
         FIELD_NAME_SEPERATOR = '@';
         
     /**
-        * Translates the public class name, to it's internal one.
-        * 
-        * For example it translates 'Array' into 'QubyArray',
-        * and 'Object' to 'QubyObject'.
-        * 
-        * If a mapping is not found, then the given name is returned.
-        * 
-        * @param name The name to translate.
-        * @return The same given name if no translation was found, otherwise the internal Quby name for the class used.
-        */
+     * Translates the public class name, to it's internal one.
+     * 
+     * For example it translates 'Array' into 'QubyArray',
+     * and 'Object' to 'QubyObject'.
+     * 
+     * If a mapping is not found, then the given name is returned.
+     * 
+     * @param name The name to translate.
+     * @return The same given name if no translation was found, otherwise the internal Quby name for the class used.
+     */
     export function translateClassName(name:string) : string {
         var newName = TRANSLATE_CLASSES[name.toLowerCase()];
 
@@ -229,11 +226,11 @@ export module quby.runtime {
     }
         
     /**
-    * Similar to translateClassName, but works in the opposite direction.
-    * It goes from internal name, to external display name.
-    * 
-    * @param name The class name to reverse lookup.
-    */
+     * Similar to translateClassName, but works in the opposite direction.
+     * It goes from internal name, to external display name.
+     * 
+     * @param name The class name to reverse lookup.
+     */
     export function untranslateClassName(name:string) : string {
         var searchName = name.toLowerCase();
             
@@ -252,14 +249,14 @@ export module quby.runtime {
     }
 
     /**
-    * These are the core JavaScript prototypes that can be extended.
-    *
-    * If a JavaScript prototype is not mentioned here (like Image) then
-    * Quby will make a new class instead of using it.
-    *
-    * If it is mentioned here then Quby will add to that classes Prototype.
-    * (note that Object/QubyObject isn't here because it's not prototype extended).
-    */
+     * These are the core JavaScript prototypes that can be extended.
+     *
+     * If a JavaScript prototype is not mentioned here (like Image) then
+     * Quby will make a new class instead of using it.
+     *
+     * If it is mentioned here then Quby will add to that classes Prototype.
+     * (note that Object/QubyObject isn't here because it's not prototype extended).
+     */
     export var CORE_CLASSES = [
             'Number',
             'Boolean',
@@ -300,21 +297,21 @@ export module quby.runtime {
     var logCallback: { ( ...args: any[] ): void; } = null;
         
     /**
-    * Sets the callback function for logging information from Quby.
-    * 
-    * Passing in 'null' or 'false' sets this to nothing.
-    * Otherwise this must be given a function object;
-    * any other value will raise an error.
-    * 
-    * The function is passed all of the values sent to log, unaltered.
-    * Bear in mind that log can be given any number of arguments (including 0).
-    * 
-    * Note that passing in undefined is also treated as an error.
-    * We are presuming you meant to pass something in,
-    * but got it wrong somehow.
-    * 
-    * @param callback A function to callback when 'quby.runtime.log' is called.
-    */
+     * Sets the callback function for logging information from Quby.
+     * 
+     * Passing in 'null' or 'false' sets this to nothing.
+     * Otherwise this must be given a function object;
+     * any other value will raise an error.
+     * 
+     * The function is passed all of the values sent to log, unaltered.
+     * Bear in mind that log can be given any number of arguments (including 0).
+     * 
+     * Note that passing in undefined is also treated as an error.
+     * We are presuming you meant to pass something in,
+     * but got it wrong somehow.
+     * 
+     * @param callback A function to callback when 'quby.runtime.log' is called.
+     */
     export function setLog( callback: { ( ...args: any[] ): void; } ) {
         if ( callback === undefined ) {
             quby.runtime.error( "Undefined given as function callback" );

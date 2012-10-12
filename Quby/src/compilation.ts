@@ -1,11 +1,8 @@
 "use strict";
 
-import utilTS = module( './lib/util' );
-var util = utilTS.util;
+///<reference path='lib/util.ts' />
 
-var exports = window['exports'] || {};
-
-export module quby.compilation {
+module quby.compilation {
     /**
      * Compilation contains information and utility functions for the compilation of Quby.
      */
@@ -14,8 +11,8 @@ export module quby.compilation {
         var methodMissing:bool = undefined;
 
         /**
-        * @return True if the 'noSuchMethod' method is supported, and false if not.
-        */
+         * @return True if the 'noSuchMethod' method is supported, and false if not.
+         */
         export function useMethodMissing() : bool {
             if (methodMissing === undefined) {
                 // we deliberately cause method missing to get called

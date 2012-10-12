@@ -18,12 +18,6 @@
  */
 module quby {
     export module core {
-        var util = utilTs.util;
-
-        var qubyParser = qubyParserTs.quby.parser;
-        var qubyMain = qubyMainTs.quby.main;
-        var qubyRuntime = qubyRuntimeTs.quby.runtime;
-
         var STATEMENT_END = ';\n';
 
         /**
@@ -43,10 +37,10 @@ module quby {
         export function runParser(instance, validator: Validator) {
             var callback = instance.whenFinished,
                 debugCallback = instance.debugCallback,
-                source = instance.source,
+                source = instance.getSource(),
                 name = instance.getName();
 
-            qubyParser.parse(
+            quby.parser.parse(
                     source,
                     instance,
 
@@ -86,7 +80,7 @@ module quby {
             if (error.isSymbol) {
                 strErr = "error parsing '" + error.match + "'";
             } else if (error.isTerminal) {
-                if (error.isLiteral || util.string.trim(error.match) === '') {
+                if (error.isLiteral || util.str.trim(error.match) === '') {
                     strErr = "syntax error near '" + error.terminalName + "'";
                 } else {
                     strErr = "syntax error near " + error.terminalName + " '" + error.match + "'";
@@ -101,7 +95,76 @@ module quby {
             };
         }
 
+        export interface ErrorInfo {
+            name: string;
+            line: number;
+            message: string;
+            error: string;
+        }
+
         export class Validator {
+            private errors: ErrorInfo[];
+
+            /*
+             * Used for the script name, for when reporting errors.
+             * If a node fails to provide a script name,
+             * the name from the last error will
+             * be used instead.
+             */
+            private lastErrorName: string;
+
+            private isStrict: bool;
+            private isAdminMode: bool;
+
+            private isParameters: bool;
+            private isFunParameters: bool;
+            private inConstructor: bool;
+
+            private isBlockArr: bool[];
+
+            private funCount: number;
+
+            private lateUsedFuns: LateFunctionBinder;
+            private currentFun: quby.ast.Function;
+            private currentClass: ClassValidator;
+            private rootClass: RootClassProxy;
+            private symbols: SymbolTable;
+
+            private classes: Object;
+
+            private endValidateCallbacks: { (v: Validator): void; }[];
+
+            private preInlines: quby.ast.PreInline[];
+
+            /**
+             * Stores scope of variables in general.
+             */
+            private vars: Object[];
+
+            /**
+             * Stores scope levels specifically within current function.
+             */
+            private funVars: Object[];
+
+            /**
+             * These all bind in the form:
+             *  { callname -> Function }
+             */
+            private funs: Object;
+            private calledMethods: Object;
+            private methodNames: FunctionTable;
+
+            private usedFunsStack: quby.ast.FunctionCall[];
+
+            private programs: quby.ast.ISyntax[];
+
+            /**
+             * These both hold:
+             *  { callName -> GlobalVariable }
+             */
+            private globals: Object;
+            private usedGlobals: Object;
+
             constructor() {
                 // the various program trees that have been parsed
                 this.programs = [];
@@ -118,7 +181,7 @@ module quby {
 
                 this.vars = [];
                 this.funVars = [];
-                this.isBlock = [];
+                this.isBlockArr = [];
 
                 this.globals = {};
                 this.usedGlobals = {};
@@ -134,7 +197,6 @@ module quby {
                  * for when no methods are present for a class.
                  */
                 this.methodNames = new FunctionTable();
-
                 this.lateUsedFuns = new LateFunctionBinder(this);
                 this.errors = [];
 
@@ -163,64 +225,64 @@ module quby {
                 this.pushScope();
             }
 
-            strictMode(mode) {
-                this.isStrict = !!mode;
+            strictMode( mode:bool ) {
+                this.isStrict = mode;
             }
 
-            adminMode(mode) {
-                this.isAdminMode = !!mode;
+            adminMode( mode:bool ) {
+                this.isAdminMode = mode;
             }
 
             addPreInline(inline) {
                 this.preInlines.push(inline);
             }
 
-            addSymbol(sym) {
+            addSymbol( sym:quby.ast.Symbol ) {
                 this.symbols.add(sym);
             }
 
-            setInConstructor(inC) {
+            setInConstructor( inC:bool ) {
                 this.inConstructor = inC;
             }
-            isInConstructor() {
+            isInConstructor() : bool {
                 return this.inConstructor;
             }
 
-            setClass(klass) {
+            setClass(klass:quby.ast.IClassDefinition) {
                 if (this.currentClass != null) {
-                    this.parseError(klass.offset, "Class '" + klass.name + "' is defined inside '" + this.currentClass.klass.name + "', cannot define a class within a class.");
+                    this.parseError( klass.getOffset(), "Class '" + klass.getName() + "' is defined inside '" + this.currentClass.getClass().getName() + "', cannot define a class within a class." );
                 }
 
-                var klassName = klass.callName;
-                var kVal = this.classes[klassName];
+                var klassName = klass.getCallName();
+                var kVal = <ClassValidator> this.classes[klassName];
 
                 if (!kVal) {
                     kVal = new ClassValidator(this, klass);
                     this.classes[klassName] = kVal;
                 } else {
-                    var oldKlass = kVal.klass;
-                    var oldKlassHead = oldKlass.header;
-                    var klassHead = klass.header;
+                    var oldKlass = kVal.getClass();
+                    var oldKlassHead = oldKlass.getHeader();
+                    var klassHead = klass.getHeader();
 
                     // if super relationship is set later in the app
                     if (!oldKlassHead.hasSuper() && klassHead.hasSuper()) {
-                        oldKlass.header = klassHead;
+                        oldKlass.getHeader() = klassHead;
                     } else if (oldKlassHead.hasSuper() && klassHead.hasSuper()) {
                         if (oldKlassHead.getSuperCallName() != klassHead.getSuperCallName()) {
-                            this.parseError(klass.offset, "Super class cannot be redefined for class '" + klass.name + "'.");
+                            this.parseError(klass.offset, "Super class cannot be redefined for class '" + klass.getName() + "'.");
                         }
                     }
                 }
 
-                if (klass.callName == qubyRuntime.ROOT_CLASS_CALL_NAME) {
+                if (klass.getCallName() === quby.runtime.ROOT_CLASS_CALL_NAME) {
                     this.rootClass.setClass(kVal);
                 }
                 this.lateUsedFuns.setClassVal(kVal);
 
                 return (this.currentClass = kVal);
             }
-            getClass(callName) {
-                return this.classes[callName];
+            getClass(callName:string) {
+                return <ClassValidator> this.classes[callName];
             }
             getCurrentClass() {
                 return this.currentClass;
@@ -231,11 +293,11 @@ module quby {
             unsetClass() {
                 this.currentClass = null;
             }
-            isInsideClass() {
-                return this.currentClass != null;
+            isInsideClass() : bool {
+                return this.currentClass !== null;
             }
-            isInsideExtensionClass() {
-                return this.currentClass != null && this.currentClass.klass.isExtensionClass;
+            isInsideExtensionClass() : bool {
+                return this.currentClass !== null && this.currentClass.getClass().isExtensionClass();
             }
             useField(field) {
                 this.currentClass.useField(field);
@@ -247,9 +309,9 @@ module quby {
                 this.currentClass.useFun(fun);
             }
 
-            setParameters(isParameters, isFun) {
+            setParameters(isParameters:bool, isFun:bool) {
                 this.isParameters = isParameters;
-                this.isFunParameters = !!isFun;
+                this.isFunParameters = isFun;
             }
 
             isInsideParameters() {
@@ -268,7 +330,7 @@ module quby {
 
             pushScope() {
                 this.vars.push({});
-                this.isBlock.push(false);
+                this.isBlockArr.push(false);
 
                 if (this.isInsideFun()) {
                     this.funCount++;
@@ -276,21 +338,21 @@ module quby {
             }
             pushFunScope(fun) {
                 if (this.currentFun != null) {
-                    qubyRuntime.error("Fun within Fun", "Defining a function whilst already inside another function.");
+                    quby.runtime.error("Fun within Fun", "Defining a function whilst already inside another function.");
                 }
 
                 this.currentFun = fun;
                 this.funCount++;
                 this.vars.push({});
-                this.isBlock.push(false);
+                this.isBlockArr.push(false);
             }
             pushBlockScope() {
                 this.pushScope();
-                this.isBlock[this.isBlock.length - 1] = true;
+                this.isBlockArr[this.isBlockArr.length - 1] = true;
             }
 
             popScope() {
-                this.isBlock.pop();
+                this.isBlockArr.pop();
 
                 if (this.isInsideFun()) {
                     this.funCount--;
@@ -325,7 +387,7 @@ module quby {
             *
             * @return True if the validator is within a function, somewhere.
             */
-            isInsideFun(stmt) {
+            isInsideFun() {
                 return this.currentFun != null;
             }
 
@@ -336,18 +398,18 @@ module quby {
             * @return True if the validator is inside a block, otherwise false.
             */
             isInsideBlock() {
-                return this.isBlock[this.isBlock.length - 1];
+                return this.isBlockArr[this.isBlockArr.length - 1];
             }
 
             getCurrentFun() {
                 return this.currentFun;
             }
             isConstructor() {
-                return this.currentFun != null && this.currentFun.isConstructor;
+                return this.currentFun != null && this.currentFun.isConstructor();
             }
 
-            assignVar(variable) {
-                this.vars[this.vars.length - 1][variable.callName] = variable;
+            assignVar(variable:quby.ast.Variable) {
+                this.vars[this.vars.length - 1][variable.getCallName()] = variable;
             }
             containsVar(variable) {
                 var id = variable.callName;
@@ -386,11 +448,11 @@ module quby {
                 return false;
             }
 
-            assignGlobal(global) {
-                this.globals[global.callName] = true;
+            assignGlobal(global:quby.ast.GlobalVariable) {
+                this.globals[global.getCallName()] = true;
             }
-            useGlobal(global) {
-                this.usedGlobals[global.callName] = global;
+            useGlobal(global:quby.ast.GlobalVariable) {
+                this.usedGlobals[global.getCallName()] = global;
             }
 
             /**
@@ -400,42 +462,42 @@ module quby {
              *
              * @param func
              */
-            defineFun(func) {
+            defineFun(func:quby.ast.Function) {
                 var klass = this.currentClass;
 
                 // Methods / Constructors
                 if (klass !== null) {
                     // Constructors
-                    if (func.isConstructor) {
+                    if (func.isConstructor()) {
                         klass.addNew(func);
                         // Methods
                     } else {
                         klass.addFun(func);
-                        this.methodNames.add(func.callName, func.name);
+                        this.methodNames.add(func.getCallName(), func.getName());
                     }
                     // Functions
                 } else {
-                    if (this.funs[func.callName]) {
-                        this.parseError(func.offset, "Function is already defined: '" + func.name + "', with " + func.getNumParameters() + " parameters.");
+                    if (this.funs[func.getCallName()]) {
+                        this.parseError(func.offset, "Function is already defined: '" + func.getName() + "', with " + func.getNumParameters() + " parameters.");
                     }
 
-                    this.funs[func.callName] = func;
+                    this.funs[func.getCallName()] = func;
                 }
             }
 
             /* Store any functions which have not yet been defined.
             * Note that this will include valid function calls which are defined after
             * the call, but this is sorted in the endValidate section. */
-            useFun(fun) {
-                if (fun.isMethod) {
-                    this.calledMethods[fun.callName] = fun;
+            useFun(fun:quby.ast.FunctionCall) {
+                if (fun.isMethod()) {
+                    this.calledMethods[fun.getCallName()] = fun;
                 } else if (this.isInsideClass()) {
                     if (this.currentClass.hasFun(fun)) {
                         fun.setIsMethod();
                     } else {
                         this.lateUsedFuns.addFun(fun);
                     }
-                } else if (!this.funs[fun.callName]) {
+                } else if (! this.funs[fun.getCallName()]) {
                     this.usedFunsStack.push(fun);
                 }
             }
@@ -452,22 +514,22 @@ module quby {
              * enforced as a strict error (presuming that
              * behaviour does not change).
              */
-            strictError(lineInfo, msg) {
+            strictError(lineInfo:parse.Symbol, msg:string) {
                 if (this.isStrict) {
                     this.parseError(lineInfo, msg);
                 }
             }
 
-            parseError(sym, msg) {
+            parseError(sym:parse.Symbol, msg:string) {
                 if (sym) {
-                    this.parseErrorLine(sym.getLine(), msg, sym.name);
+                    this.parseErrorLine(sym.getLine(), msg, sym.getSourceName());
                 } else {
                     this.parseErrorLine(null, msg);
                 }
             }
 
-            parseErrorLine(line, error, name) {
-                var msg;
+            parseErrorLine(line:number, error:string, name?:string) {
+                var msg:string;
 
                 if (line !== null && line !== undefined || line < 1) {
                     msg = "line " + line + ", " + error;
@@ -490,11 +552,11 @@ module quby {
                 });
             }
 
-            getErrors() {
+            getErrors() : ErrorInfo[] {
                 var errors = this.errors;
 
                 if (errors.length > 0) {
-                    errors.sort(function(a, b) {
+                    errors.sort( (a:ErrorInfo, b:ErrorInfo) => {
                         if (a.name === b.name) {
                             return a.line - b.line;
                         } else {
@@ -506,7 +568,7 @@ module quby {
                 return errors;
             }
 
-            hasErrors() {
+            hasErrors() : bool {
                 return this.errors.length > 0;
             }
 
@@ -518,7 +580,7 @@ module quby {
              * These are called in a FIFO order, but bear in mind that potentially
              * anything could have been added before your callback.
              */
-            onEndValidate(callback) {
+            onEndValidate(callback:(v:quby.core.Validator) => void) {
                 this.endValidateCallbacks.push(callback);
             }
 
@@ -618,7 +680,7 @@ module quby {
                     /* Ensure all called methods do exist (somewhere) */
                     for (var methodI in this.calledMethods) {
                         var methodFound = false;
-                        var method = this.calledMethods[methodI];
+                        var method:quby.ast.MethodCall = this.calledMethods[methodI];
 
                         for (var klassI in this.classes) {
                             if (this.classes[klassI].hasFun(method)) {
@@ -629,18 +691,18 @@ module quby {
 
                         if (!methodFound) {
                             var found = this.searchForMethodLike(method),
-                                name = method.name.toLowerCase(),
+                                name = method.getName().toLowerCase(),
                                 errMsg = null;
 
                             if (found !== null) {
                                 if (name === found.name.toLowerCase()) {
-                                    errMsg = "Method '" + method.name + "' called with incorrect number of parameters, " + method.getNumParameters() + " instead of " + found.getNumParameters();
+                                    errMsg = "Method '" + method.getName() + "' called with incorrect number of parameters, " + method.getNumParameters() + " instead of " + found.getNumParameters();
                                 } else {
-                                    errMsg = "Method '" + method.name + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.name + "'?";
+                                    errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.name + "'?";
                                 }
                             } else {
                                 // no alternative method found
-                                errMsg = "Method '" + method.name + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class.";
+                                errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class.";
                             }
 
                             this.parseError(method.offset, errMsg);
@@ -687,12 +749,13 @@ module quby {
             generateNoSuchMethodStubs(p) {
                 // generate the noSuchMethod function stubs
                 if (!quby.compilation.hints.useMethodMissing()) {
-                    var rootKlass = this.getRootClass().getClass();
-                    var callNames = [];
-                    var extensionStr = [];
-                    var ms = this.methodNames.getFuns();
+                    var
+                        rootKlass = this.getRootClass().getClass(),
+                        callNames:string[] = [],
+                        extensionStr:string[] = [],
+                        ms = this.methodNames.getFuns();
 
-                    p.append(qubyRuntime.FUNCTION_DEFAULT_TABLE_NAME, "={");
+                    p.append(quby.runtime.FUNCTION_DEFAULT_TABLE_NAME, "={");
 
                     var errFun = ":function(){quby_errFunStub(this,arguments);}";
                     var printComma = false;
@@ -711,7 +774,7 @@ module quby {
                             }
 
                             callNames[callNames.length] = callName;
-                            extensionStr[extensionStr.length] = ['.prototype.', callName, '=', qubyRuntime.FUNCTION_DEFAULT_TABLE_NAME, '.', callName].join('');
+                            extensionStr[extensionStr.length] = ['.prototype.', callName, '=', quby.runtime.FUNCTION_DEFAULT_TABLE_NAME, '.', callName].join('');
                         }
                     }
 
@@ -719,11 +782,11 @@ module quby {
                     p.endStatement();
 
                     // print empty funs for each Extension class
-                    var classes = qubyRuntime.CORE_CLASSES;
+                    var classes = quby.runtime.CORE_CLASSES;
                     var numNames = callNames.length;
                     for (var i = 0; i < classes.length; i++) {
                         var name = classes[i];
-                        var transName = qubyRuntime.translateClassName(name);
+                        var transName = quby.runtime.translateClassName(name);
                         var thisKlass = this.getClass(name);
 
                         for (var j = 0; j < callNames.length; j++) {
@@ -750,7 +813,7 @@ module quby {
                 this.generateNoSuchMethodStubs(p);
 
                 // print the Object functions for each of the extension classes
-                var classes = qubyRuntime.CORE_CLASSES;
+                var classes = quby.runtime.CORE_CLASSES;
                 var stmts = this.rootClass.getPrintStmts();
                 for (var i = 0; i < classes.length; i++) {
                     var name = classes[i];
@@ -793,7 +856,7 @@ module quby {
             ensureInFunParameters(syn, errorMsg) {
                 return this.ensureTest(!this.isInsideFunParameters(), syn, errorMsg);
             }
-            ensureTest(errCondition, syn, errorMsg) {
+            ensureTest(errCondition: bool, syn:quby.ast.ISyntax, errorMsg:string) {
                 if (errCondition) {
                     this.parseError(syn.offset, errorMsg);
                     return false;
@@ -809,13 +872,13 @@ module quby {
              * @param method The method to search for one similar too.
              * @param klassVal An optional ClassValidator to restrict the search, otherwise searches through all classes.
              */
-            searchForMethodLike(method, klassVal) {
+            searchForMethodLike(method:quby.ast.MethodCall, klassVal?:ClassValidator) {
                 if (klassVal) {
-                    return this.searchMissingFun(method, klassVal.funs);
+                    return this.searchMissingFun(method, klassVal.getFunctions());
                 } else {
                     var searchKlassVals = this.classes,
                         altMethod = null,
-                        methodName = method.name.toLowerCase();
+                        methodName = method.getName().toLowerCase();
                     // check for same method, but different number of parameters
 
                     for (var i in searchKlassVals) {
@@ -934,7 +997,7 @@ module quby {
             }
 
             addFun(fun) {
-                var callName = this.currentClassV.klass.callName;
+                var callName = this.currentClassV.getClass().getCallName();
                 var funs = this.classFuns[callName];
 
                 if (!funs) {
@@ -1002,7 +1065,7 @@ module quby {
             print(p: Printer) {
                 var fs = this.funs;
 
-                p.append(qubyRuntime.FUNCTION_TABLE_NAME, '={');
+                p.append(quby.runtime.FUNCTION_TABLE_NAME, '={');
 
                 // We print a comma between each entry
                 // and we achieve this by always printing it before the next item,
@@ -1039,15 +1102,13 @@ module quby {
                 this.symbols = {};
             }
 
-            add(sym: qubyAst.quby.ast.Symbol) {
-                this.symbols[sym.callName] = sym.match;
+            add(sym: quby.ast.Symbol) {
+                this.symbols[sym.getCallName()] = sym.getMatch();
             }
 
             print(p: Printer) {
-                var symbolsLength: number = this.symbols.length;
-
                 for (var callName in this.symbols) {
-                    var sym: qubyAst.quby.ast.Symbol = this.symbols[callName];
+                    var sym:string = this.symbols[callName];
 
                     p.append('var ', callName, " = '", sym, "'");
                     p.endStatement();
@@ -1063,12 +1124,12 @@ module quby {
          * This allows us to set the root class later.
          */
         class RootClassProxy {
-            private rootClass = null;
+            private rootClass: ClassValidator;
 
             constructor() {
             }
 
-            setClass(klass) {
+            setClass(klass:ClassValidator) {
                 if (this.rootClass == null) {
                     this.rootClass = klass;
                 }
@@ -1080,21 +1141,23 @@ module quby {
 
             /**
              * Should only be called after validation (during printing).
+             * 
+             * todo: this should be moved so it's neater
              */
-            getPrintStmts(p, className) {
+            getPrintStmts() {
                 if (this.rootClass == null) {
                     return [];
                 } else {
-                    return this.rootClass.klass.statements.getStmts();
+                    return this.rootClass.getClass().getStatements().getStmts();
                 }
             }
         }
 
-        class ClassValidator {
+        export class ClassValidator {
             private isPrinted: bool = false;
 
             private validator: Validator;
-            private klass;
+            private klass:quby.ast.IClassDefinition;
 
             private funs;
             private usedFuns;
@@ -1102,6 +1165,8 @@ module quby {
 
             private usedFields;
             private assignedFields;
+
+            private noMethPrintFuns: string[];
 
             constructor(validator: Validator, klass) {
                 this.validator = validator;
@@ -1113,6 +1178,16 @@ module quby {
 
                 this.usedFields = {};
                 this.assignedFields = {};
+
+                this.noMethPrintFuns = null;
+            }
+
+            getFunctions() {
+                return this.funs;
+            }
+
+            getClass() {
+                return this.klass;
             }
 
             useField(field) {
@@ -1122,8 +1197,8 @@ module quby {
                 this.assignedFields[field.callName] = field;
             }
             hasField(field) {
-                var fieldCallName = qubyRuntime.formatField(
-                        this.klass.name,
+                var fieldCallName = quby.runtime.formatField(
+                        this.klass.getName(),
                         field.identifier
                 );
 
@@ -1137,24 +1212,26 @@ module quby {
                 var index = fun.callName;
 
                 if (this.funs.hasOwnProperty(index)) {
-                    this.validator.parseError(fun.offset, "Duplicate method '" + fun.name + "' definition in class '" + this.klass.name + "'.");
+                    this.validator.parseError(fun.offset, "Duplicate method '" + fun.name + "' definition in class '" + this.klass.getName() + "'.");
                 }
 
                 this.funs[index] = fun;
             }
-            hasFunInHierarchy(fun) {
+            hasFunInHierarchy(fun): bool {
                 if (this.hasFun(fun)) {
                     return true;
                 } else {
                     var parentName = this.klass.getSuperCallName();
-                    var parentVal;
 
                     // if has a parent class, pass the call on to that
-                    if (
-                        parentName != null &&
-                        (parentVal = this.validator.getClass(parentName)) != undefined
-                    ) {
-                        return parentVal.hasFunInHierarchy(fun);
+                    if ( parentName !== null ) {
+                        var parentVal = this.validator.getClass( parentName );
+
+                        if ( parentVal !== undefined ) {
+                            return parentVal.hasFunInHierarchy(fun);
+                        } else {
+                            return false;
+                        }
                     } else {
                         return false;
                     }
@@ -1193,7 +1270,7 @@ module quby {
                 var index = fun.getNumParameters();
 
                 if (this.news[index] != undefined) {
-                    this.validator.parseError(fun.offset, "Duplicate constructor for class '" + this.klass.name + "' with " + index + " parameters.");
+                    this.validator.parseError(fun.offset, "Duplicate constructor for class '" + this.klass.getName() + "' with " + index + " parameters.");
                 }
 
                 this.news[index] = fun;
@@ -1224,11 +1301,11 @@ module quby {
                 return this.news.length == 0;
             }
 
-            setNoMethPrintFuns(callNames) {
+            setNoMethPrintFuns(callNames:string[]) {
                 this.noMethPrintFuns = callNames;
             }
 
-            printOnce(p: Printer) {
+            printOnce(p: quby.core.Printer) {
                 if (!this.isPrinted) {
                     this.isPrinted = true;
                     this.print(p);
@@ -1238,10 +1315,10 @@ module quby {
             /**
             * In practice, this is only ever called by non-extension classes.
             */
-            print(p: Printer) {
+            print(p: quby.core.Printer) {
                 p.setCodeMode(false);
 
-                var klassName = this.klass.callName;
+                var klassName = this.klass.getCallName();
                 var superKlass = this.klass.getSuperCallName();
 
                 // class definition itself
@@ -1250,13 +1327,13 @@ module quby {
                     p.append(superKlass, '.apply(this);');
                 }
                 // set 'this' to '_this'
-                p.append('var ', qubyRuntime.THIS_VARIABLE, ' = this;');
+                p.append('var ', quby.runtime.THIS_VARIABLE, ' = this;');
 
                 if (this.noMethPrintFuns) {
                     for (var i = 0; i < this.noMethPrintFuns.length; i++) {
                         var callName = this.noMethPrintFuns[i];
 
-                        p.append('this.', callName, '=', qubyRuntime.FUNCTION_DEFAULT_TABLE_NAME, '.', callName);
+                        p.append('this.', callName, '=', quby.runtime.FUNCTION_DEFAULT_TABLE_NAME, '.', callName);
                         p.endStatement();
                     }
                 }
@@ -1300,10 +1377,10 @@ module quby {
                 // Travel up the inheritance tree marking all classes we've seen.
                 // If we see one we've already seen, then we break with a parse error.
                 var seenClasses = {};
-                seenClasses[thisKlass.callName] = true;
+                seenClasses[thisKlass.getCallName()] = true;
 
-                var head = thisKlass.header;
-                var superClassVs = []; // cache the order of super classes
+                var head = thisKlass.getHeader();
+                var superClassVs:ClassValidator[] = []; // cache the order of super classes
 
                 var validator = this.validator;
 
@@ -1311,31 +1388,31 @@ module quby {
                     var superKlassV = validator.getClass(head.getSuperCallName());
 
                     if (!superKlassV) {
-                        if (!qubyRuntime.isCoreClass(head.getSuperName().toLowerCase())) {
+                        if (!quby.runtime.isCoreClass(head.getSuperName().toLowerCase())) {
                             validator.parseError(thisKlass.offset,
                                     "Super class not found: '" +
                                     head.getSuperName() +
                                     "', for class '" +
-                                    thisKlass.name +
+                                    thisKlass.getName() +
                                     "'."
                             );
                         }
 
                         break;
                     } else {
-                        var superKlass = superKlassV.klass;
+                        var superKlass = superKlassV.getClass();
 
-                        if (seenClasses[superKlass.callName]) {
+                        if (seenClasses[superKlass.getCallName()]) {
                             validator.parseError(
                                     thisKlass.offset,
-                                    "Circular inheritance tree is found for class '" + thisKlass.name + "'."
+                                    "Circular inheritance tree is found for class '" + thisKlass.getName() + "'."
                             );
 
                             break;
                         } else {
                             superClassVs.push(superKlassV);
-                            seenClasses[superKlass.callName] = true;
-                            head = superKlass.header;
+                            seenClasses[superKlass.getCallName()] = true;
+                            head = superKlass.getHeader();
                         }
                     }
                 }
@@ -1347,7 +1424,7 @@ module quby {
                         var fieldErrorHandled = false;
 
                         // search up the super class tree for a field of the same name
-                        if (thisKlass.header.hasSuper()) {
+                        if (thisKlass.getHeader().hasSuper()) {
                             for (var i = 0; i < superClassVs.length; i++) {
                                 var superClassV = superClassVs[i];
 
@@ -1356,9 +1433,9 @@ module quby {
                                             "Field '@" +
                                             field.identifier +
                                             "' from class '" +
-                                            superClassV.klass.name +
+                                            superClassV.klass.getName() +
                                             "' is accessd in sub-class '" +
-                                            thisKlass.name +
+                                            thisKlass.getName() +
                                             "', however fields are private to each class."
                                     );
 
@@ -1373,7 +1450,7 @@ module quby {
                                     "Field '@" +
                                     field.identifier +
                                     "' is used in class '" +
-                                    thisKlass.name +
+                                    thisKlass.getName() +
                                     "' without ever being assigned to."
                             );
                         }
@@ -1389,7 +1466,7 @@ module quby {
 
                         if (!this.hasFunInHierarchy(fun)) {
                             validator.searchMissingFunAndError(
-                                    fun, this.funs, thisKlass.name + ' method'
+                                    fun, this.funs, thisKlass.getName() + ' method'
                             );
                         }
                     }
@@ -1422,7 +1499,7 @@ module quby {
          *         ~:               , =+            
          */
 
-        class Printer {
+        export class Printer {
             private tempVarCounter = 0;
 
             private isCode = true;
@@ -1446,7 +1523,7 @@ module quby {
             }
 
             getTempVariable(): string {
-                return qubyRuntime.TEMP_VARIABLE + (this.tempVarCounter++);
+                return quby.runtime.TEMP_VARIABLE + (this.tempVarCounter++);
             }
 
             setCodeMode(isCode: bool) {
@@ -1462,12 +1539,12 @@ module quby {
             }
 
             appendExtensionClassStmts(name: string, stmts) {
-                var stmtsStart = qubyRuntime.translateClassName(name) + '.prototype.';
+                var stmtsStart = quby.runtime.translateClassName(name) + '.prototype.';
 
                 for (var key in stmts) {
                     var fun = stmts[key];
 
-                    if (fun.isConstructor) {
+                    if (fun.isConstructor()) {
                         fun.print(this);
                     } else {
                         this.append(stmtsStart);
@@ -1478,7 +1555,7 @@ module quby {
                 }
             }
 
-            printArray(arr: { print: (p: Printer) =>void; }[]) {
+            printArray(arr: { print: (p: quby.core.Printer) =>void; }[]) {
                 for (
                         var i = 0, len = arr.length;
                         i < len;
@@ -1487,11 +1564,6 @@ module quby {
                     arr[i].print(this);
                     this.endStatement();
                 }
-            }
-
-            addStatement(...strs: string[]);
-            addStatement() {
-                this.stmts.push(arguments.join(''));
             }
 
             flush() {
@@ -1516,8 +1588,43 @@ module quby {
             }
 
             appendPre(...strs: string[]);
+            appendPre(a: string) {
+                if (arguments.length === 1) {
+                    this.current.appendPre(a);
+                } else {
+                    for (var i = 0; i < arguments.length; i++) {
+                        this.current.appendPre(arguments[i]);
+                    }
+                }
+
+                return this;
+            }
+
             append(...strs: string[]);
+            append(a: string) {
+                if (arguments.length === 1) {
+                    this.current.appendNow(a);
+                } else {
+                    for (var i = 0; i < arguments.length; i++) {
+                        this.current.appendNow(arguments[i]);
+                    }
+                }
+
+                return this;
+            }
+
             appendPost(...strs: string[]);
+            appendPost(a: string) {
+                if (arguments.length === 1) {
+                    this.current.appendPost(a);
+                } else {
+                    for (var i = 0; i < arguments.length; i++) {
+                        this.current.appendPost(arguments[i]);
+                    }
+                }
+
+                return this;
+            }
         }
 
         // Chrome is much faster at iterating over the arguments array,
@@ -1546,39 +1653,7 @@ module quby {
                 return this;
             };
         } else {
-            Printer.prototype.appendPre = function(a: string) {
-                if (arguments.length === 1) {
-                    this.current.appendPre(a);
-                } else {
-                    for (var i = 0; i < arguments.length; i++) {
-                        this.current.appendPre(arguments[i]);
-                    }
-                }
-
-                return this;
-            };
-            Printer.prototype.append = function(a: string) {
-                if (arguments.length === 1) {
-                    this.current.appendNow(a);
-                } else {
-                    for (var i = 0; i < arguments.length; i++) {
-                        this.current.appendNow(arguments[i]);
-                    }
-                }
-
-                return this;
-            };
-            Printer.prototype.appendPost = function(a: string) {
-                if (arguments.length === 1) {
-                    this.current.appendPost(a);
-                } else {
-                    for (var i = 0; i < arguments.length; i++) {
-                        this.current.appendPost(arguments[i]);
-                    }
-                }
-
-                return this;
-            };
+            
         }
 
         class PrinterStatement {

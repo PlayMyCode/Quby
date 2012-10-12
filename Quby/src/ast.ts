@@ -2,7 +2,7 @@
 
 ///<reference path='../quby.ts' />
 
-export module quby.ast {
+module quby.ast {
     /**
      * AST
      *
@@ -44,9 +44,38 @@ export module quby.ast {
      */
     var qubyAst = ast;
 
-    interface AstNode {
+    export interface ISyntax {
+        offset: parse.Symbol;
+
         validate: (v: quby.core.Validator) => void;
         print: (p: quby.core.Printer) => void;
+        getOffset: () => parse.Symbol;
+    }
+
+    export interface IExpr extends ISyntax {
+    }
+
+    export interface IStatements extends ISyntax {
+        length: number;
+    }
+
+    export interface IClassDefinition extends ISyntax {
+        getHeader(): ClassHeader;
+        getName(): string;
+        getCallName(): string;
+        getSuperCallName(): string;
+
+        getStatements(): SyntaxList;
+
+        isExtensionClass(): bool;
+    }
+
+    export interface IAssignable extends IExpr {
+        setAssignment(v?:quby.core.Validator, parent?:Assignment): void;
+    }
+
+    interface IPrecedence {
+        getPrecedence: () => number;
     }
 
     /**
@@ -59,13 +88,18 @@ export module quby.ast {
      *
      * Do not extend this! Extend the Syntax one instead.
      */
-    class EmptyStub implements AstNode {
-        constructor(offset) {
-            this.offst = offset;
+    class EmptyStub implements ISyntax {
+        public offset: parse.Symbol;
+
+        constructor (offset?: parse.Symbol = null) {
+            this.offset = offset;
         }
 
-        validate(v) { }
-        print(p) { }
+        validate(v: quby.core.Validator) { }
+        print(p: quby.core.Printer) { }
+        getOffset() {
+            return this.offset;
+        }
     }
 
     /*
@@ -78,24 +112,24 @@ export module quby.ast {
      */
     var functionGeneratorFactories = {
         // prefix hard coded into these functions
-        get: function(v, fun, param) {
-            return new qubyAst.FunctionReadGenerator(fun, 'get', param);
+        "get": function (v, fun, param) {
+            return new FunctionReadGenerator(fun, 'get', param);
         },
-        set: function(v, fun, param) {
-            return new qubyAst.FunctionWriteGenerator(fun, 'set', param);
+        "set": function (v, fun, param) {
+            return new FunctionWriteGenerator(fun, 'set', param);
         },
-        getset: function(v, fun, param) {
-            return new qubyAst.FunctionReadWriteGenerator(fun, 'get', 'set', param);
+        "getset": function (v, fun, param) {
+            return new FunctionReadWriteGenerator(fun, 'get', 'set', param);
         },
 
-        read: function(v, fun, param) {
-            return new qubyAst.FunctionReadGenerator(fun, '', param);
+        "read": function (v, fun, param) {
+            return new FunctionReadGenerator(fun, '', param);
         },
-        write: function(v, fun, param) {
-            return new qubyAst.FunctionWriteGenerator(fun, '', param);
+        "write": function (v, fun, param) {
+            return new FunctionWriteGenerator(fun, '', param);
         },
-        attr: function(v, fun, param) {
-            return new qubyAst.FunctionReadWriteGenerator(fun, '', '', param);
+        "attr": function (v, fun, param) {
+            return new FunctionReadWriteGenerator(fun, '', '', param);
         }
     };
 
@@ -107,7 +141,7 @@ export module quby.ast {
      * Lookup the function generator, and then expand the given function into multiple function generators.
      * So get x, y, z becomes three 'get' generators; getX, getY and getZ.
      */
-    var getFunctionGenerator = function(v, fun) {
+    var getFunctionGenerator = function (v, fun) {
         var name = fun.name.toLowerCase();
         var modifierFactory = functionGeneratorFactories[name];
 
@@ -118,16 +152,16 @@ export module quby.ast {
             if (params.length === 1) {
                 return modifierFactory(v, fun, params.getStmts()[0]);
             } else {
-                var generators = [];
+                var generators: ISyntax[] = [];
 
                 // sort the good parameters from the bad
                 // they must all be Varaibles
-                params.each(function(p) {
-                    generators.push(modifierFactory(v, fun, p));
+                params.each((param) => {
+                    generators.push(modifierFactory(v, fun, param));
                 });
 
                 if (generators.length > 0) {
-                    return new qubyAst.TransparentList(generators);
+                    return new TransparentList(generators);
                 } else {
                     return new EmptyStub();
                 }
@@ -141,602 +175,637 @@ export module quby.ast {
      * ### PUBLIC ###
      */
 
-    qubyAst.Syntax = util.klass(
-            function(offset) {
-                this.offset = offset;
-                this.isJSLiteralFlag = false;
-            },
+    class Syntax implements ISyntax {
+        public offset: parse.Symbol;
+        private isJSLiteralFlag = false;
 
-            {
-                print: function(printer) {
-                    quby.runtime.error("Internal", "Error, print has not been overridden");
-                },
+        constructor (offset) {
+            this.offset = offset;
+            this.isJSLiteralFlag = false;
+        }
 
-                /**
-                 * Helper print function, for printing values in an if, while or loop condition.
-                 * When called, this will store the result in a temporary variable, and test against
-                 * Quby's idea of false ('false' and 'null').
-                 */
-                printAsCondition: function(p) {
-                    p.appendPre('var ', quby.runtime.TEMP_VARIABLE, ';');
+        print(printer: quby.core.Printer) {
+            quby.runtime.error("Internal", "Error, print has not been overridden");
+        }
 
-                    p.append('((', quby.runtime.TEMP_VARIABLE, '=');
-                    this.print(p);
-                    p.append(') !== null && ', quby.runtime.TEMP_VARIABLE, ' !== false)');
+        /**
+         * Helper print function, for printing values in an if, while or loop condition.
+         * When called, this will store the result in a temporary variable, and test against
+         * Quby's idea of false ('false' and 'null').
+         */
+        printAsCondition(p: quby.core.Printer) {
+            p.appendPre('var ', quby.runtime.TEMP_VARIABLE, ';');
 
-                    // needed to prevent memory leaks
-                    p.appendPost('delete ', quby.runtime.TEMP_VARIABLE, ';');
-                },
+            p.append('((', quby.runtime.TEMP_VARIABLE, '=');
+            this.print(p);
+            p.append(') !== null && ', quby.runtime.TEMP_VARIABLE, ' !== false)');
 
-                validate: function(v) {
-                    quby.runtime.error("Internal", "Error, validate has not been overridden");
-                },
+            // needed to prevent memory leaks
+            p.appendPost('delete ', quby.runtime.TEMP_VARIABLE, ';');
+        }
 
-                setOffset: function(offset) {
-                    this.offset = offset;
-                },
-                getOffset: function() {
-                    return this.offset;
-                },
+        validate(v: quby.core.Validator) {
+            quby.runtime.error("Internal", "Error, validate has not been overridden");
+        }
 
-                isJSLiteral: function() {
-                    return this.isJSLiteralFlag;
-                },
+        setOffset(offset: parse.Symbol) {
+            this.offset = offset;
+        }
+        getOffset() {
+            return this.offset;
+        }
 
-                setJSLiteral: function() {
-                    this.isJSLiteralFlag = true;
-                }
-            }
-    );
+        isJSLiteral(): bool {
+            return this.isJSLiteralFlag;
+        }
+
+        setJSLiteral() {
+            this.isJSLiteralFlag = true;
+        }
+    }
 
     /**
      * The most basic type of statement list.
      * Just wraps an array of statements,
      * and passes the calls to validate and print on to them.
      */
-    qubyAst.TransparentList = util.klass(
-            function(stmts) {
-                this.stmts = stmts;
-            },
+    class TransparentList implements ISyntax {
+        public offset: parse.Symbol;
 
-            {
-                getStmts: function() {
-                    return this.stmts;
-                },
+        private stmts: ISyntax[];
 
-                validate: function(v) {
-                    var stmts = this.stmts;
+        constructor (stmts: ISyntax[]) {
+            this.stmts = stmts;
+            this.offset = null;
 
-                    for (var i = 0; i < stmts.length; i++) {
-                        stmts[i].validate(v);
-                    }
-                },
+            for (var i = 0; i < stmts.length; i++) {
+                var off = stmts[i].getOffset();
 
-                print: function(p) {
-                    var stmts = this.stmts;
-
-                    for (var i = 0; i < stmts.length; i++) {
-                        stmts[i].print(p);
-                        p.endStatement();
-                    }
+                if (off !== null) {
+                    this.offset = off;
+                    break;
                 }
             }
-    );
+        }
 
-    qubyAst.SyntaxList = util.klass(
-            function(strSeperator, appendToLast) {
-                this.stmts = [];
-                this.seperator = strSeperator;
-                this.offset = null;
-                this.length = 0;
-                this.appendToLast = appendToLast;
-            },
-            {
-                add: function(stmt) {
-                    this.ensureOffset(stmt);
-                    this.stmts.push(stmt);
-                    this.length++;
+        getStmts(): ISyntax[] {
+            return this.stmts;
+        }
 
-                    return this;
-                },
-                unshift: function(stmt) {
-                    this.ensureOffset(stmt);
-                    this.stmts.unshift(stmt);
-                    this.length++;
+        getOffset() {
+            return this.offset;
+        }
 
-                    return this;
-                },
-                ensureOffset: function(stmt) {
-                    if (!this.offset) {
-                        this.offset = stmt.offset;
-                    }
-                },
-                print: function(p) {
-                    var length = this.stmts.length;
+        validate(v: quby.core.Validator) {
+            var stmts = this.stmts;
 
-                    for (var i = 0; i < length; i++) {
-                        this.stmts[i].print(p);
+            for (var i = 0; i < stmts.length; i++) {
+                stmts[i].validate(v);
+            }
+        }
 
-                        if (this.appendToLast || i < length - 1) {
-                            p.append(this.seperator);
-                        }
-                    }
-                },
+        print(p: quby.core.Printer) {
+            var stmts = this.stmts;
 
-                set: function(arr) {
-                    this.stmts = arr;
-                    this.length = arr.length;
+            for (var i = 0; i < stmts.length; i++) {
+                stmts[i].print(p);
+                p.endStatement();
+            }
+        }
+    }
 
-                    if (arr.length > 0) {
-                        this.ensureOffset(arr[0]);
-                    }
+    class SyntaxList implements IStatements {
+        public length: number;
+        public offset: parse.Symbol;
 
-                    return this;
-                },
+        private seperator: string;
+        private appendToLast: bool;
+        private stmts: ISyntax[];
 
-                validate: function(v) {
-                    for (var i = 0; i < this.stmts.length; i++) {
-                        this.stmts[i].validate(v);
-                    }
-                },
+        constructor (strSeperator: string, appendToLast: bool) {
+            this.stmts = [];
+            this.seperator = strSeperator;
+            this.offset = null;
+            this.length = 0;
+            this.appendToLast = appendToLast;
+        }
 
-                each: function(fun) {
-                    for (var i = 0; i < this.stmts.length; i++) {
-                        fun(this.stmts[i]);
-                    }
-                },
+        add(stmt: ISyntax) {
+            this.ensureOffset(stmt);
+            this.stmts.push(stmt);
+            this.length++;
 
-                getStmts: function() {
-                    return this.stmts;
+            return this;
+        }
+        unshift(stmt: ISyntax) {
+            this.ensureOffset(stmt);
+            this.stmts.unshift(stmt);
+            this.length++;
+
+            return this;
+        }
+        ensureOffset(stmt: ISyntax) {
+            if (!this.offset) {
+                this.offset = stmt.offset;
+            }
+        }
+        print(p: quby.core.Printer) {
+            var length = this.stmts.length;
+
+            for (var i = 0; i < length; i++) {
+                this.stmts[i].print(p);
+
+                if (this.appendToLast || i < length - 1) {
+                    p.append(this.seperator);
                 }
             }
-    );
+        }
 
-    qubyAst.Statements = util.klass(
-            function(stmtsArray) {
-                qubyAst.SyntaxList.call(this, '', false);
+        setArr(arr: ISyntax[]): SyntaxList {
+            this.stmts = arr;
+            this.length = arr.length;
 
-                if (stmtsArray !== undefined) {
-                    this.set(stmtsArray);
-                }
-            },
+            if (arr.length > 0) {
+                this.ensureOffset(arr[0]);
+            }
 
-            qubyAst.SyntaxList,
-            {
-                print: function(p) {
-                    p.printArray(this.getStmts());
+            return this;
+        }
+
+        validate(v: quby.core.Validator) {
+            for (var i = 0; i < this.stmts.length; i++) {
+                this.stmts[i].validate(v);
+            }
+        }
+
+        each(fun: (stmt: ISyntax) => void ) {
+            for (var i = 0; i < this.stmts.length; i++) {
+                fun(this.stmts[i]);
+            }
+        }
+
+        getStmts() {
+            return this.stmts;
+        }
+
+        getOffset() {
+            return this.offset;
+        }
+    }
+
+    export class Statements extends SyntaxList {
+        constructor (stmtsArray?: ISyntax[]) {
+            super('', false);
+
+            if (stmtsArray !== undefined) {
+                this.setArr(stmtsArray);
+            }
+        }
+
+        print(p: quby.core.Printer) {
+            p.printArray(this.getStmts());
+        }
+    }
+
+    export class Parameters extends SyntaxList {
+        private blockParam: ParameterBlockVariable;
+        private errorParam: ParameterBlockVariable;
+        private blockParamPosition: number;
+
+        constructor () {
+            super(',', false);
+
+            this.blockParam = null;
+            this.errorParam = null;
+            this.blockParamPosition = -1;
+
+            for (var i = 0; i < arguments.length; i++) {
+                this.add(arguments[i]);
+            }
+        }
+
+        /**
+         * Adds to the ends of the parameters.
+         */
+        /*
+         * Override the add so that block parameters are stored seperately from
+         * other parameters.
+         */
+        add(param: IAssignable) {
+            if (param instanceof ParameterBlockVariable) {
+                this.setBlockParam(<ParameterBlockVariable>param);
+            } else {
+                SyntaxList.call(this, param);
+            }
+
+            return this;
+        }
+
+        /**
+         * Adds to the beginning of the parameters.
+         */
+        addFirst(param: IAssignable) {
+            if (param instanceof ParameterBlockVariable) {
+                this.setBlockParam(<ParameterBlockVariable>param);
+            } else {
+                SyntaxList.call(this, param);
+
+                this.getStmts().pop();
+                this.getStmts().unshift(param);
+            }
+
+            return this;
+        }
+
+        setArr(params: IAssignable[]) {
+            for (var i = 0; i < params.length; i++) {
+                if (params[i] instanceof ParameterBlockVariable) {
+                    this.setBlockParam( <ParameterBlockVariable>params[i] );
+                    params.splice(i, 1);
                 }
             }
-    );
 
-    qubyAst.Parameters = util.klass(
-            function() {
-                qubyAst.SyntaxList.call(this, ',', false);
+            return super.setArr(params);
+        }
 
-                this.blockParam = null;
-                this.errorParam = null;
-                this.blockParamPosition = -1;
+        /**
+         * Sets the block parameter for this set of parameters.
+         * This can only be set once, and no more parameters should be set after
+         * this has been called.
+         *
+         * @param blockParam A block parameter for this set of parameters.
+         */
+        setBlockParam(blockParam: ParameterBlockVariable) {
+            // You can only have 1 block param.
+            // If a second is given, store it later for a validation error.
+            if (this.blockParam !== null) {
+                this.errorParam = blockParam;
+            } else {
+                this.blockParam = blockParam;
+                // Record the position so we can check if it's the last parameter or not.
+                this.blockParamPosition = this.getStmts().length;
+            }
+        }
 
-                for (var i = 0; i < arguments.length; i++) {
-                    this.add(arguments[i]);
-                }
-            },
+        getBlockParam(): ParameterBlockVariable {
+            return this.blockParam;
+        }
 
-            qubyAst.SyntaxList,
-            {
-                /**
-                 * Adds to the ends of the parameters.
-                 */
-                /*
-                 * Override the add so that block parameters are stored seperately from
-                 * other parameters.
-                 */
-                add: function(param) {
-                    if (param.isBlockParam) {
-                        this.setBlockParam(param);
-                    } else {
-                        qubyAst.SyntaxList.call(this, param);
-                    }
-
-                    return this;
-                },
-
-                /**
-                 * Adds to the beginning of the parameters.
-                 */
-                addFirst: function(param) {
-                    if (param.isBlockParam) {
-                        this.setBlockParam(param);
-                    } else {
-                        qubyAst.SyntaxList.call(this, param);
-
-                        this.getStmts().pop();
-                        this.getStmts().unshift(param);
-                    }
-
-                    return this;
-                },
-
-                set: function(params) {
-                    for (var i = 0; i < params.length; i++) {
-                        if (params[i].isBlockParam) {
-                            this.setBlockParam(params[i]);
-                            params.splice(i, 1);
-                        }
-                    }
-
-                    return qubyAst.SyntaxList.prototype.set.call(this, params);
-                },
-
-                /**
-                 * Sets the block parameter for this set of parameters.
-                 * This can only be set once, and no more parameters should be set after
-                 * this has been called.
-                 *
-                 * @param blockParam A block parameter for this set of parameters.
-                 */
-                setBlockParam: function(blockParam) {
-                    // You can only have 1 block param.
-                    // If a second is given, store it later for a validation error.
-                    if (this.blockParam !== null) {
-                        this.errorParam = blockParam;
-                    } else {
-                        this.blockParam = blockParam;
-                        // Record the position so we can check if it's the last parameter or not.
-                        this.blockParamPosition = this.getStmts().length;
-                    }
-                },
-
-                getBlockParam: function() {
-                    return this.blockParam;
-                },
-
-                validate: function(v) {
-                    if (this.blockParam != null) {
-                        if (this.errorParam != null) {
-                            v.parseError(this.errorParam.offset, "Only one block parameter is allowed.");
-                        } else if (this.blockParamPosition < this.getStmts().length) {
-                            v.parseError(this.blockParam.offset, "Block parameter must be the last parameter.");
-                        }
-                    }
-
-                    qubyAst.SyntaxList.prototype.validate.call(this, v);
-
-                    if (this.blockParam != null) {
-                        this.blockParam.validate(v);
-                    }
+        validate(v: quby.core.Validator) {
+            if (this.blockParam != null) {
+                if (this.errorParam != null) {
+                    v.parseError(this.errorParam.offset, "Only one block parameter is allowed.");
+                } else if (this.blockParamPosition < this.getStmts().length) {
+                    v.parseError(this.blockParam.offset, "Block parameter must be the last parameter.");
                 }
             }
-    );
 
-    qubyAst.Mappings = util.klass(
-            function(mappings) {
-                qubyAst.SyntaxList.call(this, ',', false);
+            super.validate(v);
 
-                this.set(mappings);
-            },
-            qubyAst.SyntaxList
-    );
-
-    qubyAst.StmtBlock = util.klass(
-            function(condition, stmts) {
-                if (condition != null) {
-                    qubyAst.Syntax.call(this, condition.offset);
-                } else {
-                    qubyAst.Syntax.call(this, stmts.offset);
-                }
-
-                this.condition = condition;
-                this.stmts = stmts;
-            },
-
-            qubyAst.Syntax,
-            {
-                validate: function(v) {
-                    if (this.condition !== null) {
-                        this.condition.validate(v);
-                    }
-
-                    this.stmts.validate(v);
-                },
-
-                getCondition: function() {
-                    return this.condition;
-                },
-                getStmts: function() {
-                    return this.stmts;
-                },
-
-                printBlockWrap: function(p, preCondition, postCondition, postBlock) {
-                    p.append(preCondition);
-                    this.getCondition().printAsCondition(p)
-                    p.append(postCondition).flush();
-                    this.getStmts().print(p);
-                    p.append(postBlock);
-                }
+            if (this.blockParam != null) {
+                this.blockParam.validate(v);
             }
-    );
+        }
+    }
 
-    qubyAst.IfStmt = util.klass(
-            function(ifs, elseIfs, elseBlock) {
-                qubyAst.Syntax.call(this, ifs.offset);
+    export class Mappings extends SyntaxList {
+        constructor (mappings: ISyntax[]) {
+            super(',', false);
 
-                this.ifStmts = ifs;
-                this.elseIfStmts = elseIfs;
-                this.elseStmt = elseBlock;
-            },
+            this.setArr(mappings);
+        }
+    }
 
-            qubyAst.Syntax,
-            {
-                validate: function(v) {
-                    this.ifStmts.validate(v);
+    class StmtBlock extends Syntax {
+        private condition: IExpr;
+        private stmts: Statements;
 
-                    if (this.elseIfStmts !== null) {
-                        this.elseIfStmts.validate(v);
-                    }
-
-                    if (this.elseStmt !== null) {
-                        this.elseStmt.validate(v);
-                    }
-                },
-
-                print: function(p) {
-                    this.ifStmts.print(p);
-
-                    if (this.elseIfStmts !== null) {
-                        p.append('else ');
-                        this.elseIfStmts.print(p);
-                    }
-
-                    if (this.elseStmt !== null) {
-                        p.append('else{');
-                        this.elseStmt.print(p);
-                        p.append('}');
-                    }
-                }
+        constructor (condition: IExpr, stmts: Statements) {
+            if (condition !== null) {
+                super(condition.offset);
+            } else {
+                super(stmts.offset);
             }
-    );
 
-    qubyAst.IfElseIfs = util.klass(
-            function() {
-                qubyAst.SyntaxList.call(this, 'else ', false);
-            },
+            this.condition = condition;
+            this.stmts = stmts;
+        }
 
-            qubyAst.SyntaxList
-    );
-
-    qubyAst.IfBlock = util.klass(
-            function(condition, stmts) {
-                qubyAst.StmtBlock.call(this, condition, stmts);
-            },
-
-            qubyAst.StmtBlock,
-            {
-                print: function(p) {
-                    this.printBlockWrap(p, 'if(', '){', '}');
-                }
+        validate(v: quby.core.Validator) {
+            if (this.condition !== null) {
+                this.condition.validate(v);
             }
-    );
 
-    qubyAst.WhileLoop = util.klass(
-            function(condition, stmts) {
-                qubyAst.StmtBlock.call(this, condition, stmts);
-            },
+            this.stmts.validate(v);
+        }
 
-            qubyAst.StmtBlock,
-            {
-                print: function(p) {
-                    this.printBlockWrap(p, 'while(', '){', '}');
-                }
+        getCondition(): IExpr {
+            return this.condition;
+        }
+        getStmts() {
+            return this.stmts;
+        }
+
+        printBlockWrap(p: quby.core.Printer, preCondition: string, postCondition: string, postBlock: string) {
+            p.append(preCondition);
+            this.getCondition().printAsCondition(p)
+            p.append(postCondition).flush();
+            this.getStmts().print(p);
+            p.append(postBlock);
+        }
+    }
+
+    export class IfStmt extends Syntax {
+        private ifStmts: Statements;
+        private elseIfStmts: Statements;
+        private elseStmt: Statements;
+
+        constructor (ifs: Statements, elseIfs: Statements, elseBlock: Statements) {
+            super(ifs.getOffset());
+
+            this.ifStmts = ifs;
+            this.elseIfStmts = elseIfs;
+            this.elseStmt = elseBlock;
+        }
+
+        validate(v: quby.core.Validator) {
+            this.ifStmts.validate(v);
+
+            if (this.elseIfStmts !== null) {
+                this.elseIfStmts.validate(v);
             }
-    );
 
-    qubyAst.UntilLoop = util.klass(
-            function(condition, stmts) {
-                qubyAst.StmtBlock.call(this, condition, stmts);
-            },
-
-            qubyAst.StmtBlock,
-            {
-                print: function(p) {
-                    this.printBlockWrap(p, 'while(!(', ')){', '}');
-                }
+            if (this.elseStmt !== null) {
+                this.elseStmt.validate(v);
             }
-    );
+        }
 
-    qubyAst.LoopWhile = util.klass(
-            function(condition, stmts) {
-                qubyAst.StmtBlock.call(this, condition, stmts);
-            },
+        print(p: quby.core.Printer) {
+            this.ifStmts.print(p);
 
-            qubyAst.StmtBlock,
-            {
-                print: function(p) {
-                    // flush isn't needed here,
-                    // because statements on the first line will always take place
-                    p.append('do{');
-                    this.getStmts().print(p);
-                    p.append('}while(');
-                    this.getCondition().printAsCondition(p);
-                    p.append(')');
-                }
+            if (this.elseIfStmts !== null) {
+                p.append('else ');
+                this.elseIfStmts.print(p);
             }
-    );
 
-    qubyAst.LoopUntil = util.klass(
-            function(condition, stmts) {
-                qubyAst.StmtBlock.call(this, condition, stmts);
-            },
-
-            qubyAst.StmtBlock,
-            {
-                print: function(p) {
-                    p.append('do{');
-                    this.getStmts().print(p);
-                    p.append('}while(!(');
-                    this.getCondition().printAsCondition(p);
-                    p.append('))');
-                }
+            if (this.elseStmt !== null) {
+                p.append('else{');
+                this.elseStmt.print(p);
+                p.append('}');
             }
-    );
+        }
+    }
+
+    export class IfElseIfs extends SyntaxList {
+        constructor () {
+            super('else ', false);
+        }
+    }
+
+    export class IfBlock extends StmtBlock {
+        constructor (condition: IExpr, stmts: Statements) {
+            super(condition, stmts);
+        }
+
+        print(p: quby.core.Printer) {
+            this.printBlockWrap(p, 'if(', '){', '}');
+        }
+    }
+
+    export class WhileLoop extends StmtBlock {
+        constructor (condition: IExpr, stmts: Statements) {
+            super(condition, stmts);
+        }
+
+        print(p: quby.core.Printer) {
+            this.printBlockWrap(p, 'while(', '){', '}');
+        }
+    }
+
+    export class UntilLoop extends StmtBlock {
+        constructor (condition: IExpr, stmts: Statements) {
+            super(condition, stmts);
+        }
+
+        print(p: quby.core.Printer) {
+            this.printBlockWrap(p, 'while(!(', ')){', '}');
+        }
+    }
+
+    export class LoopWhile extends StmtBlock {
+        constructor (condition: IExpr, stmts: Statements) {
+            super(condition, stmts);
+        }
+
+        print(p: quby.core.Printer) {
+            // flush isn't needed here,
+            // because statements on the first line will always take place
+            p.append('do{');
+            this.getStmts().print(p);
+            p.append('}while(');
+            this.getCondition().printAsCondition(p);
+            p.append(')');
+        }
+    }
+
+    export class LoopUntil extends StmtBlock {
+        constructor (condition: IExpr, stmts: Statements) {
+            super(condition, stmts);
+        }
+
+        print(p: quby.core.Printer) {
+            p.append('do{');
+            this.getStmts().print(p);
+            p.append('}while(!(');
+            this.getCondition().printAsCondition(p);
+            p.append('))');
+        }
+    }
 
     /**
      * This describes the signature of a class. This includes information
      * such as this classes identifier and it's super class identifier.
      */
-    qubyAst.ClassHeader = util.klass(
-            function(identifier, extendsId) {
-                qubyAst.Syntax.call(this, identifier);
+    export class ClassHeader extends Syntax {
+        private classId: parse.Symbol;
+        private extendId: parse.Symbol;
+        private match: string;
 
-                if (extendsId == null) {
-                    this.extendsCallName = quby.runtime.ROOT_CLASS_CALL_NAME;
-                    this.extendsName = quby.runtime.ROOT_CLASS_NAME;
-                } else {
-                    this.extendsCallName = quby.runtime.formatClass(extendsId.match);
-                    this.extendsName = extendsId.match;
-                }
+        private extendsCallName: string;
+        private extendsName: string;
 
-                this.classId = identifier;
-                this.extendId = extendsId;
-                this.match = identifier.match;
-            },
+        constructor (identifier: parse.Symbol, extendsId: parse.Symbol) {
+            super(identifier);
 
-            qubyAst.Syntax,
-            {
-                validate: function(v) {
-                    var name = this.classId.getLower();
+            if (extendsId == null) {
+                this.extendsCallName = quby.runtime.ROOT_CLASS_CALL_NAME;
+                this.extendsName = quby.runtime.ROOT_CLASS_NAME;
+            } else {
+                this.extendsCallName = quby.runtime.formatClass(extendsId.match);
+                this.extendsName = extendsId.match;
+            }
 
-                    if (this.hasSuper()) {
-                        var extendName = this.extendId.getLower();
-                        var extendStr = this.extendId.match;
+            this.classId = identifier;
+            this.extendId = extendsId;
+            this.match = identifier.match;
+        }
 
-                        if (name == extendName) {
-                            v.parseError(this.offset, "Class '" + this.match + "' is extending itself.");
-                        } else if (quby.runtime.isCoreClass(name)) {
-                            v.parseError(this.offset, "Core class '" + this.match + "' cannot extend alternate class '" + extendStr + "'.");
-                        } else if (quby.runtime.isCoreClass(extendName)) {
-                            v.parseError(this.offset, "Class '" + this.match + "' cannot extend core class '" + extendStr + "'.");
-                        }
-                    }
-                },
+        getName() {
+            return this.match;
+        }
 
-                /**
-                 * Returns true if there is a _declared_ super class.
-                 *
-                 * Note that if this returns false then 'getSuperCallName' and
-                 * 'getSuperName' will return the name of the root class (i.e.
-                 * Object).
-                 */
-                hasSuper: function() {
-                    return this.extendId !== null;
-                },
+        /**
+         * Returns the call name for the super class to this class header.
+         */
+        getSuperCallName() {
+            return this.extendsCallName;
+        }
 
-                /**
-                 * Returns the call name for the super class to this class header.
-                 */
-                getSuperCallName: function() {
-                    return this.extendsCallName;
-                },
+        /**
+         * Returns the name of the super class to this class header.
+         */
+        getSuperName() {
+            return this.extendsName;
+        }
 
-                /**
-                 * Returns the name of the super class to this class header.
-                 */
-                getSuperName: function() {
-                    return this.extendsName;
+        validate(v: quby.core.Validator) {
+            var name = this.classId.getLower();
+
+            if (this.hasSuper()) {
+                var extendName = this.extendId.getLower();
+                var extendStr = this.extendId.match;
+
+                if (name == extendName) {
+                    v.parseError(this.offset, "Class '" + this.match + "' is extending itself.");
+                } else if (quby.runtime.isCoreClass(name)) {
+                    v.parseError(this.offset, "Core class '" + this.match + "' cannot extend alternate class '" + extendStr + "'.");
+                } else if (quby.runtime.isCoreClass(extendName)) {
+                    v.parseError(this.offset, "Class '" + this.match + "' cannot extend core class '" + extendStr + "'.");
                 }
             }
-    );
+        }
+
+        /**
+         * Returns true if there is a _declared_ super class.
+         *
+         * Note that if this returns false then 'getSuperCallName' and
+         * 'getSuperName' will return the name of the root class (i.e.
+         * Object).
+         */
+        hasSuper() {
+            return this.extendId !== null;
+        }
+    }
 
     /**
      * TODO
      */
-    qubyAst.ModuleDefinition = util.klass(
-            function(symName, statements) {
-                qubyAst.Syntax.call(this, symName);
-            },
+    export class ModuleDefinition extends Syntax {
+        constructor (symName, statements) {
+            super(symName);
+        }
 
-            qubyAst.Syntax,
-            {
-                print: function(p) {
-                    // TODO
-                },
-                validate: function(v) {
-                    // TODO
-                }
-            }
-    );
+        print(p: quby.core.Printer) {
+            // TODO
+        }
+        validate(v: quby.core.Validator) {
+            // TODO
+        }
+    }
 
-    qubyAst.ClassDefinition = util.klass(
-            function(classHeader, statements) {
+    export class ClassDefinition extends Syntax implements IClassDefinition {
+        private classValidator: quby.core.ClassValidator;
+
+        private header: ClassHeader;
+        private statements: Statements;
+
+        private name: string;
+        private callName: string;
+
+        constructor (classHeader: ClassHeader, statements: Statements) {
+            /*
+             * Extension Class
+             *
+             * A real JS prototype, or existing type, which we are adding stuff
+             * to.
+             */
+            if (quby.runtime.isCoreClass(classHeader.getName().toLowerCase())) {
+                return new ExtensionClassDefinition(classHeader, statements);
                 /*
-                 * Extension Class
+                 * Quby class
                  *
-                 * A real JS prototype, or existing type, which we are adding stuff
-                 * to.
+                 * Entirely user declared and created.
                  */
-                if (quby.runtime.isCoreClass(classHeader.classId.getLower())) {
-                    return new qubyAst.ExtensionClassDefinition(classHeader, statements);
-                    /*
-                     * Quby class
-                     *
-                     * Entirely user declared and created.
-                     */
-                } else {
-                    qubyAst.Syntax.call(this, classHeader.offset);
+            } else {
+                super(classHeader.offset);
 
-                    this.header = classHeader;
-                    this.name = classHeader.match;
-                    this.statements = statements;
-                    this.callName = quby.runtime.formatClass(classHeader.match);
+                this.name = classHeader.getName();
+                this.callName = quby.runtime.formatClass(classHeader.getName());
 
-                    this.classValidator = null;
-                }
-            },
+                this.header = classHeader;
+                this.statements = statements;
 
-            qubyAst.Syntax,
-            {
-                validate: function(v) {
-                    v.ensureOutFun(this, "Class '" + this.name + "' defined within a function, this is not allowed.");
-                    v.ensureOutBlock(this, "Class '" + this.name + "' defined within a block, this is not allowed.");
-
-                    // validator stored for printing later (validation check made inside)
-                    this.classValidator = v.setClass(this);
-                    this.header.validate(v);
-
-                    if (this.statements !== null) {
-                        this.statements.validate(v);
-                    }
-
-                    v.unsetClass();
-                },
-
-                print: function(p) {
-                    return this.classValidator.printOnce(p);
-                },
-
-                getHeader: function() {
-                    return this.header;
-                },
-
-                /**
-                 * This returns it's parents callName, unless this does not have
-                 * a parent class (such as if this is the root class).
-                 *
-                 * Then it will return null.
-                 *
-                 * @return The callName for the parent class of this class.
-                 */
-                getSuperCallName: function() {
-                    var superCallName = this.header.getSuperCallName();
-
-                    if (superCallName == this.callName) {
-                        return null;
-                    } else {
-                        return superCallName;
-                    }
-                }
+                this.classValidator = null;
             }
-    );
+        }
+
+        getStatements() {
+            return this.statements;
+        }
+
+        isExtensionClass() {
+            return false;
+        }
+
+        getName() {
+            return this.name;
+        }
+
+        getCallName() {
+            return this.callName;
+        }
+
+        getHeader() {
+            return this.header;
+        }
+
+        validate(v: quby.core.Validator) {
+            v.ensureOutFun(this, "Class '" + this.name + "' defined within a function, this is not allowed.");
+            v.ensureOutBlock(this, "Class '" + this.name + "' defined within a block, this is not allowed.");
+
+            // validator stored for printing later (validation check made inside)
+            this.classValidator = v.setClass(this);
+            this.header.validate(v);
+
+            if (this.statements !== null) {
+                this.statements.validate(v);
+            }
+
+            v.unsetClass();
+        }
+
+        print(p: quby.core.Printer) {
+            return this.classValidator.printOnce(p);
+        }
+
+        /**
+         * This returns it's parents callName, unless this does not have
+         * a parent class (such as if this is the root class).
+         *
+         * Then it will return null.
+         *
+         * @return The callName for the parent class of this class.
+         */
+        getSuperCallName() {
+            var superCallName = this.header.getSuperCallName();
+
+            if (superCallName == this.callName) {
+                return null;
+            } else {
+                return superCallName;
+            }
+        }
+    }
 
     /**
      * Extension Classes are ones that extend an existing prototype.
@@ -745,306 +814,394 @@ export module quby.ast {
      * This also includes the extra Quby prototypes such as Array (really QubyArray)
      * and Hash (which is really a QubyHash).
      */
-    qubyAst.ExtensionClassDefinition = util.klass(
-            function(classHeader, statements) {
-                qubyAst.Syntax.call(this, classHeader.offset);
+    export class ExtensionClassDefinition extends Syntax implements IClassDefinition {
+        private header: ClassHeader;
+        private statements: Statements;
 
-                this.name = classHeader.match;
-                this.header = classHeader;
-                this.callName = quby.runtime.formatClass(classHeader.match);
-                this.statements = statements;
-                this.isExtensionClass = true;
-            },
+        private name: string;
+        private callName: string;
 
-            qubyAst.Syntax,
-            {
-                print: function(p) {
-                    p.setCodeMode(false);
+        constructor (classHeader: ClassHeader, statements: Statements) {
+            super(classHeader.offset);
 
-                    if (this.statements !== null) {
-                        p.appendExtensionClassStmts(this.name, this.statements.getStmts());
-                    }
+            this.name = classHeader.getName();
+            this.callName = quby.runtime.formatClass( this.name );
 
-                    p.setCodeMode(true);
-                },
+            this.header = classHeader;
+            this.statements = statements;
+        }
 
-                validate: function(v) {
-                    v.ensureOutClass(this, "Classes cannot be defined within another class.");
+        getStatements() {
+            return this.statements;
+        }
 
-                    v.setClass(this);
-                    this.header.validate(v);
+        isExtensionClass() {
+            return true;
+        }
 
-                    if (this.statements !== null) {
-                        this.statements.validate(v);
-                    }
+        getName() {
+            return this.name;
+        }
 
-                    v.unsetClass();
-                },
+        getCallName() {
+            return this.callName;
+        }
 
-                /*
-                 * The parent class of all extension classes is the root class,
-                 * always.
-                 */
-                getSuperCallName: function() {
-                    return quby.runtime.ROOT_CLASS_CALL_NAME;
-                }
+        getHeader() {
+            return this.header;
+        }
+
+        print(p: quby.core.Printer) {
+            p.setCodeMode(false);
+
+            if (this.statements !== null) {
+                p.appendExtensionClassStmts(this.name, this.statements.getStmts());
             }
-    );
 
-    qubyAst.ClassIdentifier = util.klass(
-            function(symName) {
-            },
-            {
-                validate: function(v) {
-                    // todo, look up this class!
-                },
-                print: function(v) {
-                    // todo print out a '_class_function' or whatever is needed for the check
-                }
+            p.setCodeMode(true);
+        }
+
+        validate(v: quby.core.Validator) {
+            v.ensureOutClass(this, "Classes cannot be defined within another class.");
+
+            v.setClass(this);
+            this.header.validate(v);
+
+            if (this.statements !== null) {
+                this.statements.validate(v);
             }
-    );
+
+            v.unsetClass();
+        }
+
+        /*
+         * The parent class of all extension classes is the root class,
+         * always.
+         */
+        getSuperCallName() {
+            return quby.runtime.ROOT_CLASS_CALL_NAME;
+        }
+    }
+
+    /**
+     * Incomplete!
+     * 
+     * This is for 'Foo.class' identifiers.
+     */
+    export class ClassIdentifier extends Syntax {
+        constructor (sym: parse.Symbol) {
+            super(sym);
+        }
+
+        validate(v: quby.core.Validator) {
+            // todo, look up this class!
+        }
+        print(p: quby.core.Printer) {
+            // todo print out a '_class_function' or whatever is needed for the check
+        }
+    }
 
     /**
      * Defines a function or method definition.
      */
-    qubyAst.Function = util.klass(
-            function(symName, parameters, stmtBody) {
-                qubyAst.Syntax.call(this, symName);
+    export class Function extends Syntax {
+        static FUNCTION = 0;
+        static METHOD = 1;
+        static CONSTRUCTOR = 2;
 
-                this.isMethod = false;
-                this.name = symName.match;
-                this.parameters = parameters;
+        private type: number;
 
-                if (parameters !== null) {
-                    this.blockParam = parameters.getBlockParam();
-                    this.callName = quby.runtime.formatFun(symName.match, parameters.length);
-                } else {
-                    this.blockParam = null;
-                    this.callName = quby.runtime.formatFun(symName.match, 0);
-                }
+        private name: string;
+        private callName: string;
+        private parameters: Parameters;
 
-                this.stmtBody = stmtBody;
+        private blockParam: ParameterBlockVariable;
 
-                this.preVariables = [];
-            },
+        private stmtBody: Statements;
 
-            qubyAst.Syntax,
-            {
-                addPreVariable: function(variable) {
-                    this.preVariables.push(variable);
-                },
+        /**
+         * These are the variables initialized at the start
+         * of a function call, to ensure they are not undefined.
+         */
+        private preVariables: Identifier[];
 
-                validate: function(v) {
-                    this.isMethod = v.isInsideClass();
+        constructor(symName: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
+            super(symName);
 
-                    var isOutFun = true;
-                    if (v.isInsideFun()) {
-                        var otherFun = v.getCurrentFun();
-                        var strOtherType = (otherFun.isMethod ? "method" : "function");
+            this.type = Function.FUNCTION;
 
-                        v.parseError(this.offset, "Function '" + this.name + "' is defined within " + strOtherType + " '" + otherFun.name + "', this is not allowed.");
-                        isOutFun = false;
-                    } else {
-                        var strType = (this.isMethod ? "Method" : "Function");
+            this.name = symName.match;
+            this.parameters = parameters;
 
-                        v.ensureOutBlock(this, strType + " '" + this.name + "' is within a block, this is not allowed.");
-                    }
+            if (parameters !== null) {
+                this.blockParam = parameters.getBlockParam();
+                this.callName = quby.runtime.formatFun(symName.match, parameters.length);
+            } else {
+                this.blockParam = null;
+                this.callName = quby.runtime.formatFun(symName.match, 0);
+            }
 
-                    if (isOutFun) {
-                        v.defineFun(this);
-                        v.pushFunScope(this);
-                    }
+            this.stmtBody = stmtBody;
 
-                    v.setParameters(true, true);
-                    if (this.parameters !== null) {
-                        this.parameters.validate(v);
-                    }
-                    v.setParameters(false);
+            this.preVariables = [];
+        }
 
-                    if (this.stmtBody !== null) {
-                        this.stmtBody.validate(v);
-                    }
+        getCallName() {
+            return this.callName;
+        }
 
-                    if (isOutFun) {
-                        v.popScope();
-                    }
-                },
+        setCallName( name:string ) {
+            this.callName = name;
+        }
 
-                print: function(p) {
-                    if (!this.isMethod) {
-                        p.setCodeMode(false);
-                    }
+        getName() {
+            return this.name;
+        }
 
-                    if (this.isMethod && !this.isConstructor) {
-                        p.append(this.callName, '=function');
-                    } else {
-                        p.append('function ', this.callName);
-                    }
+        hasParameters() {
+            return this.parameters !== null && this.parameters.length > 0;
+        }
 
-                    this.printParameters(p);
-                    this.printBody(p);
+        getParameters() {
+            return this.parameters;
+        }
 
-                    if (!this.isMethod) {
-                        p.setCodeMode(true);
-                    }
-                },
+        getStatements() {
+            return this.stmtBody;
+        }
 
-                printParameters: function(p) {
-                    p.append('(');
+        isMethod() {
+            return this.type !== Function.METHOD;
+        }
 
-                    if (this.getNumParameters() > 0) {
-                        this.parameters.print(p);
+        isConstructor() {
+            return this.type === Function.CONSTRUCTOR;
+        }
+
+        isFunction() {
+            return this.type === Function.FUNCTION;
+        }
+
+        setType(type: number) {
+            this.type = type;
+        }
+
+        addPreVariable(variable: Identifier) {
+            this.preVariables.push(variable);
+        }
+
+        validate(v: quby.core.Validator) {
+            if (this.isFunction() && v.isInsideClass()) {
+                this.setType(Function.METHOD);
+            }
+
+            var isOutFun = true;
+            if (v.isInsideFun()) {
+                var otherFun = v.getCurrentFun();
+                var strOtherType = (otherFun.isMethod() ? "method" : "function");
+
+                v.parseError(this.offset, "Function '" + this.name + "' is defined within " + strOtherType + " '" + otherFun.name + "', this is not allowed.");
+                isOutFun = false;
+            } else {
+                var strType = (this.isMethod() ? "Method" : "Function");
+
+                v.ensureOutBlock(this, strType + " '" + this.name + "' is within a block, this is not allowed.");
+            }
+
+            if (isOutFun) {
+                v.defineFun(this);
+                v.pushFunScope(this);
+            }
+
+            v.setParameters(true, true);
+            if (this.parameters !== null) {
+                this.parameters.validate(v);
+            }
+            v.setParameters(false, false);
+
+            if (this.stmtBody !== null) {
+                this.stmtBody.validate(v);
+            }
+
+            if (isOutFun) {
+                v.popScope();
+            }
+        }
+
+        print(p: quby.core.Printer) {
+            if (!this.isMethod()) {
+                p.setCodeMode(false);
+            }
+
+            if (this.isMethod() && !this.isConstructor()) {
+                p.append(this.callName, '=function');
+            } else {
+                p.append('function ', this.callName);
+            }
+
+            this.printParameters(p);
+            this.printBody(p);
+
+            if (!this.isMethod()) {
+                p.setCodeMode(true);
+            }
+        }
+
+        printParameters(p: quby.core.Printer) {
+            p.append('(');
+
+            if (this.getNumParameters() > 0) {
+                this.parameters.print(p);
+                p.append(',');
+            }
+
+            p.append(quby.runtime.BLOCK_VARIABLE, ')');
+        }
+
+        printBody(p: quby.core.Printer) {
+            p.append('{');
+
+            this.printPreVars(p);
+            p.flush();
+
+            if (this.stmtBody !== null) {
+                this.stmtBody.print(p);
+            }
+
+            // all functions must guarantee they return something...
+            p.append('return null;', '}');
+        }
+
+        printPreVars(p: quby.core.Printer) {
+            /*
+             * Either pre-print all local vars + the block var,
+             * or print just the block var.
+             */
+            if (this.preVariables.length > 0) {
+                p.append('var ');
+
+                for (var i = 0; i < this.preVariables.length; i++) {
+                    if (i > 0) {
                         p.append(',');
                     }
 
-                    p.append(quby.runtime.BLOCK_VARIABLE, ')');
-                },
-
-                printBody: function(p) {
-                    p.append('{');
-
-                    this.printPreVars(p);
-                    p.flush();
-
-                    if (this.stmtBody !== null) {
-                        this.stmtBody.print(p);
-                    }
-
-                    // all functions must guarantee they return something...
-                    p.append('return null;', '}');
-                },
-
-                printPreVars: function(p) {
-                    /*
-                     * Either pre-print all local vars + the block var,
-                     * or print just the block var.
-                     */
-                    if (this.preVariables.length > 0) {
-                        p.append('var ');
-
-                        for (var i = 0; i < this.preVariables.length; i++) {
-                            if (i > 0) {
-                                p.append(',');
-                            }
-
-                            var variable = this.preVariables[i];
-                            p.append(variable.callName, '=null');
-                        }
-
-                        if (this.blockParam != null) {
-                            p.append(',');
-                            this.blockParam.print(p);
-                            p.append('=', quby.runtime.BLOCK_VARIABLE, ';');
-                        }
-
-                        p.endStatement();
-                    } else if (this.blockParam != null) {
-                        p.append('var ');
-                        this.blockParam.print(p);
-                        p.append('=', quby.runtime.BLOCK_VARIABLE, ';');
-                    }
-                },
-
-                getNumParameters: function() {
-                    return (this.parameters !== null) ?
-                            this.parameters.length :
-                            0;
+                    var variable = this.preVariables[i];
+                    p.append( variable.getCallName(), '=null' );
                 }
+
+                if (this.blockParam != null) {
+                    p.append(',');
+                    this.blockParam.print(p);
+                    p.append('=', quby.runtime.BLOCK_VARIABLE, ';');
+                }
+
+                p.endStatement();
+            } else if (this.blockParam != null) {
+                p.append('var ');
+                this.blockParam.print(p);
+                p.append('=', quby.runtime.BLOCK_VARIABLE, ';');
             }
-    );
+        }
+
+        getNumParameters() {
+            return (this.parameters !== null) ?
+                    this.parameters.length :
+                    0;
+        }
+    }
 
     /**
      * Defines a constructor for a class.
      */
-    qubyAst.Constructor = util.klass(
-            function(sym, parameters, stmtBody) {
-                qubyAst.Function.call(this, sym, parameters, stmtBody);
+    export class Constructor extends Function {
+        private className: string;
+        private klass: ClassDefinition;
+        private isExtensionClass: bool;
 
-                this.isConstructor = true;
-                this.className = '';
-                this.klass = null;
-            },
+        constructor (sym: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
+            super(sym, parameters, stmtBody);
 
-            qubyAst.Function,
-            {
-                setClass: function(klass) {
-                    this.klass = klass;
+            this.className = '';
+            this.klass = null;
+            this.isExtensionClass = false;
 
-                    this.callName = quby.runtime.formatNew(klass.name, this.getNumParameters());
+            this.setType(Function.CONSTRUCTOR);
+        }
 
-                    this.className = klass.callName;
-                },
+        setClass(klass) {
+            this.klass = klass;
 
-                validate: function(v) {
-                    if (v.ensureInClass(this, "Constructors must be defined within a class.")) {
-                        this.setClass(v.getCurrentClass().klass);
+            this.setCallName( quby.runtime.formatNew(klass.name, this.getNumParameters()) );
 
-                        this.isExtensionClass = v.isInsideExtensionClass();
-                        if (this.isExtensionClass) {
-                            v.ensureAdminMode(this, "Cannot add constructor to core class: '" + v.getCurrentClass().klass.name + "'");
-                        }
+            this.className = klass.callName;
+        }
 
-                        v.setInConstructor(true);
-                        qubyAst.Function.prototype.validate.call(this, v);
-                        v.setInConstructor(false);
-                    }
-                },
+        validate(v: quby.core.Validator) {
+            if (v.ensureInClass(this, "Constructors must be defined within a class.")) {
+                this.setClass( v.getCurrentClass().getClass() );
 
-                printParameters: function(p) {
-                    p.append('(');
-
-                    if (!this.isExtensionClass) {
-                        p.append(quby.runtime.THIS_VARIABLE, ',');
-                    }
-
-                    if (
-                            this.parameters !== null &&
-                            this.parameters.length > 0
-                    ) {
-                        this.parameters.print(p);
-                        p.append(',');
-                    }
-
-                    p.append(quby.runtime.BLOCK_VARIABLE, ')');
-                },
-
-                printBody: function(p) {
-                    p.append('{');
-
-                    this.printPreVars(p);
-                    p.endStatement();
-
-                    if (this.stmtBody !== null) {
-                        this.stmtBody.print(p);
-                    }
-
-                    if (!this.isExtensionClass) {
-                        p.append('return ', quby.runtime.THIS_VARIABLE, ';');
-                    }
-
-                    p.append('}');
+                this.isExtensionClass = v.isInsideExtensionClass();
+                if (this.isExtensionClass) {
+                    v.ensureAdminMode(this, "Cannot add constructor to core class: '" + v.getCurrentClass().getClass().getName() + "'");
                 }
+
+                v.setInConstructor(true);
+                super.validate(v);
+                v.setInConstructor(false);
             }
-    );
+        }
 
-    qubyAst.AdminMethod = util.klass(
-            function(name, parameters, stmtBody) {
-                qubyAst.Function.call(this, name, parameters, stmtBody);
+        printParameters(p: quby.core.Printer) {
+            p.append('(');
 
-                this.callName = this.name;
-            },
-
-            qubyAst.Function,
-            {
-                validate: function(v) {
-                    v.ensureAdminMode(this, "Admin (or hash) methods cannot be defined without admin rights.");
-
-                    if (v.ensureInClass(this, "Admin methods can only be defined within a class.")) {
-                        qubyAst.Function.prototype.validate.call(this, v);
-                    }
-                }
+            if (!this.isExtensionClass) {
+                p.append(quby.runtime.THIS_VARIABLE, ',');
             }
-    );
+
+            if ( this.hasParameters() ) {
+                this.getParameters().print(p);
+                p.append(',');
+            }
+
+            p.append(quby.runtime.BLOCK_VARIABLE, ')');
+        }
+
+        printBody(p: quby.core.Printer) {
+            p.append('{');
+
+            this.printPreVars(p);
+            p.endStatement();
+
+            var stmts = this.getStatements();
+            if (stmts !== null) {
+                stmts.print(p);
+            }
+
+            if (!this.isExtensionClass) {
+                p.append('return ', quby.runtime.THIS_VARIABLE, ';');
+            }
+
+            p.append('}');
+        }
+    }
+
+    export class AdminMethod extends Function {
+        private callName: string;
+
+        constructor (name: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
+            super(name, parameters, stmtBody);
+
+            this.setCallName(name.match);
+        }
+
+        validate(v: quby.core.Validator) {
+            v.ensureAdminMode(this, "Admin (or hash) methods cannot be defined without admin rights.");
+
+            if (v.ensureInClass(this, "Admin methods can only be defined within a class.")) {
+                super.validate(v);
+            }
+        }
+    }
 
     /*
     * If this is used from within a class, then it doesn't know if it's a
@@ -1059,489 +1216,531 @@ export module quby.ast {
     * There is also a third case. It could be a special class function,
     * such as 'get x, y' or 'getset img' for generating accessors (and other things).
     */
-    qubyAst.FunctionCall = util.klass(
-            function(sym, parameters, block) {
-                qubyAst.Syntax.call(this, sym);
+    export class FunctionCall extends Syntax {
+        private isMethodFlag: bool;
 
-                this.name = sym.match;
-                this.parameters = parameters;
+        private parameters: Parameters;
+        private block: FunctionBlock;
 
-                var numParams = (parameters !== null) ? parameters.length : 0;
-                this.callName = quby.runtime.formatFun(sym.match, numParams);
+        private name: string;
+        private callName: string;
 
-                this.block = block;
-                this.functionGenerator = null;
-            },
+        private functionGenerator: FunctionGenerator;
 
-            qubyAst.Syntax,
-            {
-                print: function(p) {
-                    if (this.functionGenerator) {
-                        this.functionGenerator.print(p);
-                    } else {
-                        if (this.isMethod) {
-                            p.append(quby.runtime.getThisVariable(this.isInsideExtensionClass), '.');
+        private isInsideExtensionClass: bool;
+
+        constructor (sym: parse.Symbol, parameters: Parameters, block: FunctionBlock) {
+            super(sym);
+
+            this.name = sym.match;
+            this.parameters = parameters;
+
+            this.callName = quby.runtime.formatFun(
+                    sym.match,
+                    (parameters !== null) ?
+                            parameters.length :
+                            0
+            );
+
+            this.block = block;
+            this.functionGenerator = null;
+
+            this.isMethodFlag = false;
+
+            this.isInsideExtensionClass = false;
+        }
+
+        getParameters() {
+            return this.parameters;
+        }
+
+        getBlock() {
+            return this.block;
+        }
+
+        getName() {
+            return this.name;
+        }
+
+        getCallName() {
+            return this.callName;
+        }
+
+        setCallName(name: string) {
+            this.callName = name;
+        }
+
+        print(p: quby.core.Printer) {
+            if (this.functionGenerator) {
+                this.functionGenerator.print(p);
+            } else {
+                if (this.isMethodFlag) {
+                    p.append(quby.runtime.getThisVariable(this.isInsideExtensionClass), '.');
+                }
+
+                this.printFunCall(p);
+            }
+        }
+
+        printFunCall(p: quby.core.Printer) {
+            p.append(this.callName, '(');
+            this.printParams(p);
+            p.append(')');
+        }
+
+        printParams(p: quby.core.Printer) {
+            // parameters
+            if (this.getNumParameters() > 0) {
+                this.parameters.print(p);
+                p.append(',');
+            }
+
+            // block parameter
+            if (this.block !== null) {
+                this.block.print(p);
+            } else {
+                p.append('null');
+            }
+        }
+
+        setIsMethod() : void {
+            this.isMethodFlag = true;
+        }
+
+        isMethod() : bool {
+            return this.isMethodFlag;
+        }
+
+        /**
+         * This FunctionCall needs to declare it's self to the Validator,
+         * so the Validator knows it exists. This is done in this call,
+         * so it's detached from validating parameters and blocks.
+         *
+         * In practice, this means you can put your call to validate this as a method,
+         * a 'this.method', or something else, by changing this method.
+         *
+         * By default, this states this is a function.
+         */
+        validateThis(v: quby.core.Validator) {
+            v.useFun(this);
+        }
+
+        validate(v: quby.core.Validator) {
+            var generator = null;
+
+            if (v.isInsideClassDefinition()) {
+                this.functionGenerator = generator = getFunctionGenerator(v, this);
+
+                if (generator === null) {
+                    v.parseError(this.offset, "Function '" + this.name + "' called within definition of class '" + v.getCurrentClass().getClass().getName() + "', this is not allowed.");
+                } else if (this.block !== null) {
+                    v.parseError(this.offset, "'" + this.name + "' modifier of class '" + v.getCurrentClass().getClass().getName() + "', cannot use a block.");
+                } else {
+                    generator.validate(v);
+                }
+            } else {
+                if (this.parameters !== null) {
+                    this.parameters.validate(v);
+                }
+
+                this.isInsideExtensionClass = v.isInsideExtensionClass();
+
+                this.validateThis(v);
+
+                if (this.block != null) {
+                    this.block.validate(v);
+                }
+            }
+        }
+
+        getNumParameters() {
+            return (this.parameters !== null) ?
+                    this.parameters.length :
+                    0;
+        }
+    }
+
+    export class MethodCall extends FunctionCall {
+        private expr: IExpr;
+
+        constructor (expr: IExpr, name: parse.Symbol, parameters: Parameters, block: FunctionBlock) {
+            super(name, parameters, block);
+
+            this.expr = expr;
+            this.setIsMethod();
+        }
+
+        print(p: quby.core.Printer) {
+            if (this.expr instanceof ThisVariable) {
+                super.print(p);
+            } else {
+                this.printExpr(p);
+                p.append('.');
+                this.printFunCall(p);
+            }
+        }
+
+        printExpr(p: quby.core.Printer) {
+            p.append('(');
+            this.expr.print(p);
+            p.append(')');
+        }
+
+        validateThis(v: quby.core.Validator) {
+            if ((this.expr instanceof ThisVariable) && v.isInsideClass()) {
+                v.useThisClassFun(this);
+            } else {
+                v.useFun(this);
+            }
+        }
+
+        validate(v: quby.core.Validator) {
+            this.expr.validate(v);
+
+            super.validate(v);
+        }
+
+        appendLeft(expr: IExpr) {
+            if (this.expr !== null) {
+                this.expr.appendLeft(expr);
+            } else {
+                this.expr = expr;
+            }
+
+            return this;
+        }
+    }
+
+    export class SuperCall extends FunctionCall {
+        private superKlassVal: quby.core.ClassValidator;
+        private klassVal: quby.core.ClassValidator;
+
+        constructor (name: parse.Symbol, parameters: Parameters, block: FunctionBlock) {
+            super(name, parameters, block);
+
+            this.klassVal = null;
+            this.superKlassVal = null;
+        }
+
+        validate(v: quby.core.Validator) {
+            if (v.ensureInConstructor(this, "Super can only be called from within a constructor.")) {
+                this.klassVal = v.getCurrentClass();
+
+                v.onEndValidate((v: quby.core.Validator) => {
+                    var header = this.klassVal.getClass().getHeader();
+                    var superCallName = header.getSuperCallName();
+                    this.superKlassVal = v.getClass(superCallName);
+
+                    if (this.superKlassVal == undefined) {
+                        if (!quby.runtime.isCoreClass(header.getSuperName().toLowerCase())) {
+                            v.parseError(this.offset, "Calling super to a non-existant super class: '" + header.getSuperName() + "'.");
                         }
+                    } else if (!this.superKlassVal.hasNew(this)) {
+                        var superName = this.superKlassVal.getClass().getName();
 
-                        this.printFunCall(p);
+                        v.parseError(this.offset, "No constructor found with " + this.getNumParameters() + " parameters for super class: '" + superName + "'.");
                     }
-                },
+                });
+            }
 
-                printFunCall: function(p) {
-                    p.append(this.callName, '(');
-                    this.printParams(p);
-                    p.append(')');
-                },
+            var parameters = this.getParameters(),
+                block = this.getBlock();
 
-                printParams: function(p) {
-                    // parameters
-                    if (this.getNumParameters() > 0) {
-                        this.parameters.print(p);
-                        p.append(',');
-                    }
+            if ( parameters !== null) {
+                parameters.validate(v);
+            }
 
-                    // block parameter
-                    if (this.block !== null) {
-                        this.block.print(p);
-                    } else {
-                        p.append('null');
-                    }
-                },
+            if ( block !== null) {
+                block.validate(v);
+            }
+        }
 
-                setIsMethod: function() {
-                    this.isMethod = true;
-                },
+        print(p: quby.core.Printer) {
+            if (this.superKlassVal !== undefined) {
+                var superKlass = this.superKlassVal.getClass().getName();
+                var superConstructor = quby.runtime.formatNew(superKlass, this.getNumParameters());
 
-                /**
-                 * This FunctionCall needs to declare it's self to the Validator,
-                 * so the Validator knows it exists. This is done in this call,
-                 * so it's detached from validating parameters and blocks.
-                 *
-                 * In practice, this means you can put your call to validate this as a method,
-                 * a 'this.method', or something else, by changing this method.
-                 *
-                 * By default, this states this is a function.
-                 */
-                validateThis: function(v) {
-                    v.useFun(this);
-                },
+                p.append(superConstructor, '(', quby.runtime.THIS_VARIABLE, ',');
+                this.printParams(p);
+                p.append(')');
+            }
+        }
+    }
 
-                validate: function(v) {
-                    var generator = null;
+    export class NewJSInstance extends Syntax implements IExpr {
+        private expr: IExpr;
+        private block: FunctionBlock;
+        private parameters: Parameters;
 
-                    if (v.isInsideClassDefinition()) {
-                        this.functionGenerator = generator = getFunctionGenerator(v, this);
+        constructor( expr:IExpr, parameters: Parameters, block: FunctionBlock) {
+            super(expr);
 
-                        if (generator === null) {
-                            v.parseError(this.offset, "Function '" + this.name + "' called within definition of class '" + v.getCurrentClass().klass.name + "', this is not allowed.");
-                        } else if (block !== null) {
-                            v.parseError(this.offset, "'" + this.name + "' modifier of class '" + v.getCurrentClass().klass.name + "', cannot use a block.");
+            this.expr = expr;
+            this.block = block;
+            this.parameters = parameters;
+        }
+
+        validate(v: quby.core.Validator) {
+            if (v.ensureAdminMode(this, "cannot create JS instances in Sandbox mode")) {
+                this.expr.setJSLiteral();
+                this.expr.validate(v);
+            }
+
+            if (this.parameters !== null) {
+                this.parameters.validate(v);
+            }
+
+            if (this.block !== null) {
+                this.block.validate(v);
+            }
+        }
+
+        print(p: quby.core.Printer) {
+            p.append('new ');
+            this.expr.print(p)
+            p.append('(');
+
+            if (this.parameters !== null) {
+                this.parameters.print(p);
+
+                if (this.block !== null) {
+                    p.append(',');
+                    this.block.print(p);
+                }
+            } else {
+                this.block.print(p);
+            }
+
+            p.append(')');
+        }
+    }
+
+    export class NewInstance extends FunctionCall {
+        private isExtensionClass: bool;
+        private className: string;
+
+        constructor (name, parameters, block) {
+            super(name, parameters, block);
+
+            this.isExtensionClass = false;
+            this.className = quby.runtime.formatClass(name.match);
+
+            this.setCallName(
+                    quby.runtime.formatNew(name.match, this.getNumParameters())
+            );
+        }
+
+        print(p: quby.core.Printer) {
+            p.append(this.getCallName(), '(');
+
+            // if a standard class,
+            // make a new empty object and pass it in as the first parameter
+            if ( ! this.isExtensionClass ) {
+                p.append('new ', this.className, '(),');
+            }
+
+            this.printParams(p);
+
+            p.append(')');
+        }
+
+        validate(v: quby.core.Validator) {
+            var parameters = this.getParameters(),
+                block = this.getBlock();
+
+            if (parameters !== null) {
+                parameters.validate(v);
+            }
+
+            if (block !== null) {
+                block.validate(v);
+            }
+
+            // this can only be validated after the classes have been fully defined
+            v.onEndValidate((v: quby.core.Validator) => {
+                var klassVal = v.getClass(this.className);
+
+                if (klassVal) {
+                    var klass = klassVal.getClass();
+
+                    if (
+                           (!klassVal.hasNew(this))
+                        || (klassVal.noNews() && this.getNumParameters() > 0)
+                    ) {
+                        if (klassVal.noNews() && klass.isExtensionClass) {
+                            v.parseError(this.offset, "Cannot manually create new instances of '" + klass.getName() + "', it doesn't have a constructor.");
                         } else {
-                            generator.validate(v);
-                        }
-
-                        return false;
-                    } else {
-                        if (this.parameters !== null) {
-                            this.parameters.validate(v);
-                        }
-
-                        this.isInsideExtensionClass = v.isInsideExtensionClass();
-
-                        this.validateThis(v);
-
-                        if (this.block != null) {
-                            this.block.validate(v);
-                        }
-                    }
-                },
-
-                getNumParameters: function() {
-                    return (this.parameters !== null) ? this.parameters.length : 0;
-                }
-            }
-    );
-
-    qubyAst.MethodCall = util.klass(
-            function(expr, name, parameters, block) {
-                qubyAst.FunctionCall.call(this, name, parameters, block);
-
-                this.isMethod = true;
-                this.expr = expr;
-            },
-
-            qubyAst.FunctionCall,
-            {
-                print: function(p) {
-                    if (this.expr instanceof qubyAst.ThisVariable) {
-                        qubyAst.FunctionCall.prototype.print.call(this, p);
-                    } else {
-                        this.printExpr(p);
-                        p.append('.');
-                        this.printFunCall(p);
-                    }
-                },
-
-                printExpr: function(p) {
-                    var e = this.expr;
-
-                    if (e.isLiteral) {
-                        p.append('(');
-                        e.print(p);
-                        p.append(')');
-                    } else {
-                        e.print(p);
-                    }
-                },
-
-                validateThis: function(v) {
-                    if ((this.expr instanceof qubyAst.ThisVariable) && v.isInsideClass()) {
-                        v.useThisClassFun(this);
-                    } else {
-                        v.useFun(this);
-                    }
-                },
-
-                validate: function(v) {
-                    this.expr.validate(v);
-
-                    qubyAst.FunctionCall.prototype.validate.call(this, v);
-                },
-
-                appendLeft: function(expr) {
-                    if (this.expr !== null) {
-                        this.expr.appendLeft(expr);
-                    } else {
-                        this.expr = expr;
-                    }
-
-                    return this;
-                }
-            }
-    );
-
-    qubyAst.SuperCall = util.klass(
-            function(name, parameters, block) {
-                qubyAst.FunctionCall.call(this, name, parameters, block);
-            },
-
-            qubyAst.FunctionCall,
-            {
-                print: function(p) {
-                    if (this.superKlassVal !== undefined) {
-                        var superKlass = this.superKlassVal.klass.name;
-                        var superConstructor = quby.runtime.formatNew(superKlass, this.getNumParameters());
-
-                        p.append(superConstructor, '(', quby.runtime.THIS_VARIABLE, ',');
-                        this.printParams(p);
-                        p.append(')');
-                    }
-                },
-
-                validate: function(v) {
-                    if (v.ensureInConstructor(this, "Super can only be called from within a constructor.")) {
-                        this.klassVal = v.getCurrentClass();
-
-                        // _this fixes alias issues within the callback
-                        var _this = this;
-
-                        v.onEndValidate(function(v) {
-                            var header = _this.klassVal.klass.getHeader();
-                            var superCallName = header.getSuperCallName();
-                            _this.superKlassVal = v.getClass(superCallName);
-
-                            if (_this.superKlassVal == undefined) {
-                                if (!quby.runtime.isCoreClass(header.getSuperName().toLowerCase())) {
-                                    v.parseError(_this.offset, "Calling super to a non-existant super class: '" + _this.klassVal.klass.getHeader().getSuperName() + "'.");
-                                }
-                            } else if (!_this.superKlassVal.hasNew(_this)) {
-                                var superName = _this.superKlassVal.klass.name;
-                                v.parseError(_this.offset, "No constructor found with " + _this.getNumParameters() + " parameters for super class: '" + superName + "'.");
-                            }
-                        });
-                    }
-
-                    if (this.parameters !== null) {
-                        this.parameters.validate(v);
-                    }
-
-                    if (this.block !== null) {
-                        this.block.validate(v);
-                    }
-                }
-            }
-    );
-
-    qubyAst.NewJSInstance = util.klass(
-            function(name, parameters, block) {
-                qubyAst.Syntax.call(this, expr);
-
-                this.expr = expr;
-                this.block = block;
-                this.parameters = parameters;
-            },
-            {
-                validate: function(v) {
-                    if (v.ensureAdminMode(this, "cannot create JS instances in Sandbox mode")) {
-                        this.expr.setJSLiteral();
-                        this.expr.validate(v);
-                    }
-
-                    if (this.parameters !== null) {
-                        this.parameters.validate(v);
-                    }
-
-                    if (block !== null) {
-                        this.block.validate(v);
-                    }
-                },
-
-                print: function(p) {
-                    p.append('new ');
-                    this.expr.print(p)
-                    p.append('(');
-
-                    if (this.parameters !== null) {
-                        this.parameters.print(p);
-
-                        if (this.block !== null) {
-                            p.append(',');
-                            this.block.print(p);
+                            v.parseError(this.offset, "Called constructor for class '" + klass.getName() + "' with wrong number of parameters: " + this.getNumParameters());
                         }
                     } else {
-                        this.block.print(p);
+                        this.isExtensionClass = ( klass instanceof ExtensionClassDefinition );
                     }
-
-                    p.append(')');
+                } else {
+                    v.parseError( this.offset, "Making new instance of undefined class: '" + this.getName() );
                 }
+            });
+        }
+    }
+
+    export class ReturnStmt extends Syntax {
+        private expr: IExpr;
+
+        constructor (expr: IExpr) {
+            super(expr.offset);
+
+            this.expr = expr;
+        }
+
+        print(p: quby.core.Printer) {
+            p.append('return ');
+
+            this.expr.print(p);
+        }
+        validate(v: quby.core.Validator) {
+            if (!v.isInsideFun() && !v.isInsideBlock()) {
+                v.parseError(this.offset, "Return cannot be used outside a function or a block.");
             }
-    );
 
-    qubyAst.NewInstance = util.klass(
-            function(name, parameters, block) {
-                qubyAst.FunctionCall.call(this, name, parameters, block);
+            this.expr.validate(v);
+        }
+    }
 
-                this.className = quby.runtime.formatClass(name.match);
-                this.callName = quby.runtime.formatNew(name.match, this.getNumParameters());
-            },
+    export class YieldStmt extends Syntax {
+        private parameters: Parameters;
 
-            qubyAst.FunctionCall,
-            {
-                print: function(p) {
-                    p.append(this.callName, '(');
+        constructor (offsetObj, args?: Parameters = null) {
+            super(offsetObj);
 
-                    // if a standard class,
-                    // make a new empty object and pass it in as the first parameter
-                    if (!this.isExtensionClass) {
-                        p.append('new ', this.className, '(),');
-                    }
+            this.parameters = args;
+        }
 
-                    this.printParams(p);
+        validate(v: quby.core.Validator) {
+            v.ensureInFun(this, "Yield can only be used from inside a function.");
 
-                    p.append(')');
-                },
-
-                validate: function(v) {
-                    if (this.parameters !== null) {
-                        this.parameters.validate(v);
-                    }
-
-                    if (this.block !== null) {
-                        this.block.validate(v);
-                    }
-
-                    // this can only be validated after the classes have been fully defined
-                    var _this = this;
-                    v.onEndValidate(function(v) {
-                        var klassVal = v.getClass(_this.className);
-
-                        if (klassVal) {
-                            if (
-                                   (!klassVal.hasNew(_this))
-                                || (klassVal.noNews() && _this.getNumParameters() > 0)
-                            ) {
-                                var klass = klassVal.klass;
-
-                                if (klassVal.noNews() && klass.isExtensionClass) {
-                                    v.parseError(_this.offset, "Cannot manually create new instances of '" + klass.name + "', it doesn't have a constructor.");
-                                } else {
-                                    v.parseError(_this.offset, "Called constructor for class '" + klass.name + "' with wrong number of parameters: " + _this.getNumParameters());
-                                }
-                            } else {
-                                _this.isExtensionClass = klassVal.klass.isExtensionClass;
-                            }
-                        } else {
-                            v.parseError(_this.offset, "Making new instance of undefined class: '" + _this.name);
-                        }
-                    });
-                }
+            if (this.parameters !== null) {
+                this.parameters.validate(v);
             }
-    );
+        }
 
-    qubyAst.ReturnStmt = util.klass(
-            function(expr) {
-                qubyAst.Syntax.call(this, expr.offset);
+        print(p: quby.core.Printer) {
+            var paramsLen = (this.parameters !== null) ?
+                    this.parameters.length :
+                    0;
 
-                this.expr = expr;
-            },
+            p.appendPre('quby_ensureBlock(', quby.runtime.BLOCK_VARIABLE, ', ', ''+paramsLen, ');');
+            p.append(quby.runtime.BLOCK_VARIABLE, '(');
 
-            qubyAst.Syntax,
-            {
-                print: function(p) {
-                    p.append('return ');
-
-                    this.expr.print(p);
-                },
-                validate: function(v) {
-                    if (!v.isInsideFun() && !v.isInsideBlock()) {
-                        v.parseError(this.offset, "Return cannot be used outside a function or a block.");
-                    }
-
-                    this.expr.validate(v);
-                }
+            if (this.parameters !== null) {
+                this.parameters.print(p);
             }
-    );
 
-    qubyAst.YieldStmt = util.klass(
-            function(offsetObj, args) {
-                qubyAst.Syntax.call(this, offsetObj);
+            p.append(')');
+        }
+    }
 
-                this.parameters = args || null;
-            },
+    export class FunctionBlock extends Syntax {
+        private parameters: Parameters;
+        private statements: Statements;
+        private mismatchedBraceWarning: bool;
 
-            qubyAst.Syntax,
-            {
-                validate: function(v) {
-                    v.ensureInFun(this, "Yield can only be used from inside a function.");
+        constructor (parameters: Parameters, statements: Statements) {
+            // only pass in the offset if we have it,
+            // otherwise a null value
+            var offset = parameters !== null ?
+                    parameters.offset :
+                    null;
 
-                    if (this.parameters !== null) {
-                        this.parameters.validate(v);
-                    }
-                },
+            super(offset);
 
-                print: function(p) {
-                    var paramsLen = (this.parameters !== null) ?
-                            this.parameters.length :
-                            0;
+            this.parameters = parameters;
+            this.statements = statements;
 
-                    p.appendPre('quby_ensureBlock(', quby.runtime.BLOCK_VARIABLE, ', ', paramsLen, ');');
-                    p.append(quby.runtime.BLOCK_VARIABLE, '(');
+            this.mismatchedBraceWarning = false;
+        }
 
-                    if (this.parameters !== null) {
-                        this.parameters.print(p);
-                    }
+        setMismatchedBraceWarning() {
+            this.mismatchedBraceWarning = true;
+        }
 
-                    p.append(')');
-                }
+        print(p: quby.core.Printer) {
+            p.append('function(');
+
+            if (this.parameters !== null) {
+                this.parameters.print(p);
             }
-    );
 
-    qubyAst.FunctionBlock = util.klass(
-            function(parameters, statements) {
-                qubyAst.Syntax.call(this,
-                        // only pass in the offset if we have it,
-                        // otherwise a null value
-                        (parameters !== null) ?
-                                parameters.offset :
-                                null
-                );
+            p.append('){').flush();
 
-                this.parameters = parameters;
-                this.stmtBody = statements;
-
-                this.mismatchedBraceWarning = false;
-            },
-
-            qubyAst.Syntax,
-            {
-                setMismatchedBraceWarning: function() {
-                    this.mismatchedBraceWarning = true;
-                },
-
-                print: function(p) {
-                    p.append('function(');
-
-                    if (this.parameters !== null) {
-                        this.parameters.print(p);
-                    }
-
-                    p.append('){').flush();
-
-                    if (this.stmtBody !== null) {
-                        this.stmtBody.print(p);
-                    }
-
-                    p.append(
-                            'return null;',
-                            '}'
-                    );
-                },
-
-                validate: function(v) {
-                    if (this.mismatchedBraceWarning) {
-                        v.strictError(this.getOffset(), "mismatched do-block syntax (i.e. 'do something() }')");
-                    }
-
-                    v.pushBlockScope();
-
-                    if (this.parameters !== null) {
-                        v.setParameters(true, false);
-                        this.parameters.validate(v);
-                        v.setParameters(false);
-                    }
-
-                    if (this.stmtBody !== null) {
-                        this.stmtBody.validate(v);
-                    }
-
-                    v.popScope();
-                },
-
-                getNumParameters: function() {
-                    return (this.parameters !== null) ?
-                            this.parameters.length :
-                            0;
-                }
+            if (this.statements !== null) {
+                this.statements.print(p);
             }
-    );
 
-    qubyAst.Lambda = util.klass(
-            function(parameters, statements) {
-                qubyAst.FunctionBlock.call(this, parameters, statements);
-            },
+            p.append(
+                    'return null;',
+                    '}'
+            );
+        }
 
-            qubyAst.FunctionBlock,
-            {
-                print: function(p) {
-                    p.append('(');
-                    qubyAst.FunctionBlock.prototype.print.call(this, p);
-                    p.append(')');
-                }
+        validate(v: quby.core.Validator) {
+            if (this.mismatchedBraceWarning) {
+                v.strictError(this.getOffset(), "mismatched do-block syntax (i.e. 'do something() }')");
             }
-    );
+
+            v.pushBlockScope();
+
+            if (this.parameters !== null) {
+                v.setParameters(true, false);
+                this.parameters.validate(v);
+                v.setParameters(false, false);
+            }
+
+            if (this.statements !== null) {
+                this.statements.validate(v);
+            }
+
+            v.popScope();
+        }
+
+        getNumParameters(): number {
+            return (this.parameters !== null) ?
+                    this.parameters.length :
+                    0;
+        }
+    }
+
+    export class Lambda extends FunctionBlock {
+        constructor (parameters: Parameters, statements: Statements) {
+            super(parameters, statements);
+        }
+
+        print(p: quby.core.Printer) {
+            p.append('(');
+            super.print(p);
+            p.append(')');
+        }
+    }
 
     /**
      * @param offset The source code offset for this Expr.
      * @param isResultBool An optimization flag. Pass in true if the result of this Expression will always be a 'true' or 'false'. Optional, and defaults to false.
      */
-    qubyAst.Expr = util.klass(
-            function(offset, isResultBool) {
-                qubyAst.Syntax.call(this, offset);
+    class Expr extends Syntax {
+        private isResultBool: bool;
 
-                this.isResultBool = (!!isResultBool);
-            },
+        constructor (offset: parse.Symbol, isResultBool?: bool = false) {
+            super(offset);
 
-            qubyAst.Syntax,
-            {
-                printAsCondition: function(p) {
-                    if (this.isResultBool) {
-                        this.print(p);
-                    } else {
-                        qubyAst.Syntax.prototype.printAsCondition.call(this, p);
-                    }
-                }
+            this.isResultBool = isResultBool;
+        }
+
+        printAsCondition(p: quby.core.Printer) {
+            if (this.isResultBool) {
+                this.print(p);
+            } else {
+                super.printAsCondition(p);
             }
-    );
+        }
+    }
 
     /**
      * This is to allow an expression, mostly an operation, to swap it's
@@ -1551,178 +1750,182 @@ export module quby.ast {
      * into the expression tree, and this then referenced the expression
      * tree now references the top of the tree.
      */
-    qubyAst.BalancingExpr = util.klass(
-            function(offset, isResultBool) {
-                qubyAst.Expr.call(this, offset, isResultBool);
+    class BalancingExpr extends Expr {
+        private balanceDone: bool;
+        private proxyExpr: IExpr;
 
-                this.balanceDone = false;
-                this.proxyExpr = null;
-            },
+        constructor (offset: parse.Symbol, isResultBool) {
+            super(offset, isResultBool);
 
-            qubyAst.Expr,
-            {
-                isBalanced: function(v) {
-                    if (this.balanceDone) {
-                        return true;
-                    } else {
-                        var newExpr = this.rebalance();
+            this.balanceDone = false;
+            this.proxyExpr = null;
+        }
 
-                        if (newExpr !== this) {
-                            newExpr.validate(v);
+        isBalanced(v: quby.core.Validator): bool {
+            if (this.balanceDone) {
+                return true;
+            } else {
+                var newExpr = this.rebalance();
 
-                            return false;
-                        } else {
-                            return true;
-                        }
-                    }
-                },
+                if (newExpr !== this) {
+                    newExpr.validate(v);
 
-                validate: function(v) {
-                    if (this.proxyExpr !== null) {
-                        this.proxyExpr.validate(v);
-                    } else {
-                        qubyAst.Expr.prototype.validate.call(this, v);
-                    }
-                },
-                print: function(v) {
-                    if (this.proxyExpr !== null) {
-                        this.proxyExpr.print(v);
-                    } else {
-                        qubyAst.Expr.prototype.print.call(this, v);
-                    }
-                },
-                printAsCondition: function(v) {
-                    if (this.proxyExpr !== null) {
-                        this.proxyExpr.printAsCondition(v);
-                    } else {
-                        qubyAst.Expr.prototype.printAsCondition.call(this, v);
-                    }
-                },
-
-                rebalance: function() {
-                    this.balanceDone = true;
-
-                    var expr = this.onRebalance();
-
-                    if (expr !== this) {
-                        this.proxyExpr = expr;
-
-                        return this;
-                    } else {
-                        return this;
-                    }
-                },
-
-                onRebalance: function() {
-                    throw new Error("rebalance is not implemented");
+                    return false;
+                } else {
+                    return true;
                 }
             }
-    );
+        }
 
-    qubyAst.ExprParenthesis = util.klass(
-            function(expr) {
-                qubyAst.Syntax.call(this, expr.offset);
-
-                this.expr = expr;
-            },
-
-            qubyAst.Syntax,
-            {
-                validate: function(v) {
-                    this.expr.validate(v);
-                },
-
-                print: function(p) {
-                    p.append('(');
-                    this.expr.print(p);
-                    p.append(')');
-                },
-
-                printAsCondition: function(p) {
-                    p.append('(');
-                    this.expr.printAsCondition(p);
-                    p.append(')');
-                }
+        validate(v: quby.core.Validator) {
+            if (this.proxyExpr !== null) {
+                this.proxyExpr.validate(v);
+            } else {
+                super.validate(v);
             }
-    );
+        }
+        print(p: quby.core.Printer) {
+            if (this.proxyExpr !== null) {
+                this.proxyExpr.print(p);
+            } else {
+                super.print(p);
+            }
+        }
+        printAsCondition(p: quby.core.Printer) {
+            if (this.proxyExpr !== null) {
+                this.proxyExpr.printAsCondition(p);
+            } else {
+                super.printAsCondition(p);
+            }
+        }
+
+        rebalance(): IExpr {
+            this.balanceDone = true;
+
+            var expr = this.onRebalance();
+
+            if (expr !== this) {
+                this.proxyExpr = expr;
+
+                return this;
+            } else {
+                return this;
+            }
+        }
+
+        onRebalance(): IExpr {
+            throw new Error("rebalance is not implemented");
+        }
+    }
+
+    export class ExprParenthesis extends Syntax implements IExpr {
+        private expr: IExpr;
+
+        constructor (expr: IExpr) {
+            super(expr.offset);
+
+            this.expr = expr;
+        }
+
+        validate(v: quby.core.Validator) {
+            this.expr.validate(v);
+        }
+
+        print(p: quby.core.Printer) {
+            p.append('(');
+            this.expr.print(p);
+            p.append(')');
+        }
+
+        printAsCondition(p: quby.core.Printer) {
+            p.append('(');
+            this.expr.printAsCondition(p);
+            p.append(')');
+        }
+    }
 
     /*
      * All single operations have precedence of 1.
      */
-    qubyAst.SingleOp = util.klass(
-            function(expr, strOp, isResultBool) {
-                qubyAst.BalancingExpr.call(this, expr.offset, isResultBool);
+    class SingleOp extends BalancingExpr implements IPrecedence {
+        private expr : IExpr;
+        private strOp: string;
 
-                this.expr = expr;
-                this.strOp = strOp;
-            },
+        constructor (expr: IExpr, strOp: string, isResultBool: bool) {
+            super(expr.offset, isResultBool);
 
-            qubyAst.BalancingExpr,
-            {
-                validate: function(v) {
-                    if (this.isBalanced(v)) {
-                        this.expr.validate(v);
-                    }
-                },
+            this.expr = expr;
+            this.strOp = strOp;
+        }
 
-                print: function(p) {
-                    p.append('(', this.strOp);
-                    this.expr.print(p);
-                    p.append(')');
-                },
+        getPrecedence() {
+            return 1;
+        }
 
-                onRebalance: function() {
-                    // swap if expr has higher precedence then this
-                    var expr = this.expr,
-                        exprPrecedence = expr.precedence;
+        getExpr() {
+            return this.expr;
+        }
 
-                    if (expr.rebalance !== undefined) {
-                        expr = expr.rebalance();
-                    }
-
-                    if (
-                            exprPrecedence !== undefined &&
-                            exprPrecedence > 1
-                    ) {
-                        var copy = util.clone(this);
-                        copy.expr = expr.performBalanceSwap(copy, 1);
-                        return expr;
-                    } else {
-                        return this;
-                    }
-                }
+        validate(v: quby.core.Validator) {
+            if (this.isBalanced(v)) {
+                this.expr.validate(v);
             }
-    );
+        }
 
-    qubyAst.SingleSub = util.klass(
-            function(expr) {
-                qubyAst.SingleOp.call(this, expr, "-", false);
-            },
+        print(p: quby.core.Printer) {
+            p.append('(', this.strOp);
+            this.expr.print(p);
+            p.append(')');
+        }
 
-            qubyAst.SingleOp
-    );
+        onRebalance(): IExpr {
+            // swap if expr has higher precedence then this
+            var expr = this.expr;
 
-    qubyAst.Not = util.klass(
-            function(expr) {
-                qubyAst.SingleOp.call(this, expr, "!", true);
-            },
-
-            qubyAst.SingleOp,
-            {
-                print: function(p) {
-                    var temp = p.getTempVariable();
-
-                    p.appendPre('var ', temp, ';');
-
-                    p.append('(((', temp, '=');
-                    this.expr.print(p);
-                    p.append(') === null || ', temp, ' === false) ? true : false)');
-
-                    // needed to prevent memory leaks
-                    p.appendPost('delete ', temp, ';');
-                }
+            if (expr instanceof BalancingExpr) {
+                expr = (<BalancingExpr>expr).rebalance();
             }
-    );
+
+            if ( expr['getPrecedence'] ) {
+                var pExpr = <IPrecedence> pExpr;
+
+                if (pExpr.getPrecedence() > 1) {
+                    var copy: SingleOp = util.clone(this);
+
+                    copy.expr = pExpr.performBalanceSwap(copy, 1);
+
+                    return expr;
+                }
+            } else {
+                return this;
+            }
+        }
+    }
+
+    export class SingleSub extends SingleOp {
+        constructor (expr: IExpr) {
+            super(expr, "-", false);
+        }
+    }
+
+    export class Not extends SingleOp {
+        constructor (expr) {
+            super(expr, "!", true);
+        }
+
+        print(p: quby.core.Printer) {
+            var temp = p.getTempVariable();
+
+            p.appendPre('var ', temp, ';');
+
+            p.append('(((', temp, '=');
+            this.getExpr().print(p);
+            p.append(') === null || ', temp, ' === false) ? true : false)');
+
+            // needed to prevent memory leaks
+            p.appendPost('delete ', temp, ';');
+        }
+    }
 
     /**
      * 0 is the tightest, most binding precendence, often
@@ -1743,122 +1946,137 @@ export module quby.ast {
      * @param isResultBool
      * @param precedence Lower is higher, must be a number.
      */
-    qubyAst.Op = util.klass(
-            function(left, right, strOp, isResultBool, precedence) {
-                var offset = left ? left.offset : null;
-                qubyAst.BalancingExpr.call(this, offset, isResultBool);
+    class Op extends BalancingExpr implements IPrecedence {
+        private left: IExpr;
+        private right: IExpr;
+        private strOp: string;
+        private precedence: number;
 
-                if (precedence === undefined) {
-                    throw new Error("undefined precedence given.");
-                }
-                this.precedence = precedence;
+        constructor (left: IExpr, right: IExpr, strOp: string, isResultBool: bool, precedence: number) {
+            var offset = left ? left.offset : null;
 
-                this.left = left;
-                this.right = right;
+            super(offset, isResultBool);
 
-                this.strOp = strOp;
-            },
-
-            qubyAst.BalancingExpr,
-            {
-                print: function(p) {
-                    var bracket = quby.compilation.hints.doubleBracketOps();
-
-                    if (bracket) {
-                        p.append('((');
-                    } else {
-                        p.append('(');
-                    }
-                    this.left.print(p);
-                    if (bracket) {
-                        p.append(')');
-                    }
-
-                    p.append(this.strOp);
-
-                    if (bracket) {
-                        p.append('(');
-                    }
-                    this.right.print(p);
-                    if (bracket) {
-                        p.append('))');
-                    } else {
-                        p.append(')');
-                    }
-                },
-
-                validate: function(v) {
-                    if (this.isBalanced(v)) {
-                        this.right.validate(v);
-                        this.left.validate(v);
-                    }
-                },
-
-                onRebalance: function() {
-                    var right = this.right;
-
-                    if (right.rebalance !== undefined) {
-                        right = right.rebalance();
-                    }
-
-                    var rightPrecedence = right.precedence,
-                        precedence = this.precedence;
-
-                    if (
-                            rightPrecedence !== undefined &&
-                            rightPrecedence > precedence
-                    ) {
-                        var copy = util.clone(this);
-                        copy.right = right.performBalanceSwap(copy, precedence);
-
-                        return right;
-                    } else {
-                        return this;
-                    }
-                },
-
-                performBalanceSwap: function(newLeft, precedence) {
-                    var leftP = this.left.precedence,
-                        oldLeft;
-
-                    /*
-                     * Left is either an node,
-                     * or it has higher precedence.
-                     */
-                    if (leftP !== undefined) {
-                        if (leftP <= precedence) {
-                            oldLeft = this.left;
-                            this.left = newLeft;
-
-                            return oldLeft;
-                        } else {
-                            return this.left.performBalanceSwap(newLeft, precedence);
-                        }
-                    } else {
-                        oldLeft = this.left;
-                        this.left = newLeft;
-
-                        return oldLeft;
-                    }
-
-                    return null;
-                },
-
-                appendLeft: function(left) {
-                    if (this.left !== null) {
-                        this.left.appendLeft(left);
-                    } else if (left) {
-                        this.setOffset(left.offset);
-                        this.left = left;
-                    }
-
-                    return this;
-                }
+            if (precedence === undefined) {
+                throw new Error("undefined precedence given.");
             }
-    );
+            this.precedence = precedence;
+
+            this.left = left;
+            this.right = right;
+
+            this.strOp = strOp;
+        }
+
+        getLeft() {
+            return this.left;
+        }
+
+        getRight() {
+            return this.right;
+        }
+
+        print(p: quby.core.Printer) {
+            var bracket = quby.compilation.hints.doubleBracketOps();
+
+            if (bracket) {
+                p.append('((');
+            } else {
+                p.append('(');
+            }
+            this.left.print(p);
+            if (bracket) {
+                p.append(')');
+            }
+
+            p.append(this.strOp);
+
+            if (bracket) {
+                p.append('(');
+            }
+            this.right.print(p);
+            if (bracket) {
+                p.append('))');
+            } else {
+                p.append(')');
+            }
+        }
+
+        validate(v: quby.core.Validator) {
+            if (this.isBalanced(v)) {
+                this.right.validate(v);
+                this.left.validate(v);
+            }
+        }
+
+        onRebalance(): IExpr {
+            var right = this.right;
+
+            if (right.rebalance !== undefined) {
+                right = right.rebalance();
+            }
+
+            var rightPrecedence = right.precedence,
+                precedence = this.precedence;
+
+            if (
+                    rightPrecedence !== undefined &&
+                    rightPrecedence > precedence
+            ) {
+                var copy = <Op> util.clone(this);
+                copy.right = right.performBalanceSwap(copy, precedence);
+
+                return right;
+            } else {
+                return this;
+            }
+        }
+
+        performBalanceSwap(newLeft: IExpr, precedence: number): IExpr {
+            var leftP = this.left.precedence,
+                oldLeft;
+
+            /*
+             * Left is either an node,
+             * or it has higher precedence.
+             */
+            if (leftP !== undefined) {
+                if (leftP <= precedence) {
+                    oldLeft = this.left;
+                    this.left = newLeft;
+
+                    return oldLeft;
+                } else {
+                    return this.left.performBalanceSwap(newLeft, precedence);
+                }
+            } else {
+                oldLeft = this.left;
+                this.left = newLeft;
+
+                return oldLeft;
+            }
+
+            return null;
+        }
+
+        getPrecedence() {
+            return this.precedence;
+        }
+
+        appendLeft(left: IExpr) {
+            if (this.left !== null) {
+                this.left.appendLeft(left);
+            } else if (left) {
+                this.setOffset(left.offset);
+                this.left = left;
+            }
+
+            return this;
+        }
+    }
 
     /**
-     * Most of the operators just extend quby.syntax.Op,
+     *_ Most of the operators just extend quby.syntax.Op,
      * without adding anything to it.
      *
      * This is a helper function to make that shorthand.
@@ -1867,19 +2085,13 @@ export module quby.ast {
      * @param {number} precedence The precendence for this operator.
      * @param isResultBool Optional, true if the result is a boolean, otherwise it defaults to false.
      */
-    var newShortOp = function(symbol, precedence, isResultBool) {
-        if (isResultBool === undefined) {
-            isResultBool = false;
+    var newShortOp = function (symbol: string, precedence: number, isResultBool: bool)
+            : new (left: IExpr, right: IExpr) => Op
+    {
+        return <new (left: IExpr, right: IExpr) => Op> <any> function (left: IExpr, right: IExpr) {
+            return new Op(left, right, symbol, isResultBool, precedence);
         }
-
-        return util.klass(
-                function(left, right) {
-                    qubyAst.Op.call(this, left, right, symbol, isResultBool, precedence);
-                },
-
-                qubyAst.Op
-        );
-    };
+    }
 
     /*
      * These are in order of precedence,
@@ -1889,147 +2101,138 @@ export module quby.ast {
      */
 
     /* Shifting Operations */
-    qubyAst.ShiftLeft = newShortOp("<<", 5);
-    qubyAst.ShiftRight = newShortOp(">>", 5);
+    export var ShiftLeft  = newShortOp("<<", 5, false);
+    export var ShiftRight = newShortOp(">>", 5, false);
 
     /* Greater/Less Comparison */
-    qubyAst.LessThan = newShortOp("<", 6, true);
-    qubyAst.LessThanEqual = newShortOp("<=", 6, true);
-    qubyAst.GreaterThan = newShortOp(">", 6, true);
-    qubyAst.GreaterThanEqual = newShortOp(">=", 6, true);
+    export var LessThan = newShortOp("<", 6, true);
+    export var LessThanEqual = newShortOp("<=", 6, true);
+    export var GreaterThan = newShortOp(">", 6, true);
+    export var GreaterThanEqual = newShortOp(">=", 6, true);
 
-    qubyAst.IsInstanceOf = util.klass(
-            function(left, right) {
-                qubyAst.Op.call(this, left, right, 'instanceof', true, 7);
+    export class IsInstanceOf extends Op {
+        constructor(left, right) {
+            super( left, right, 'instanceof', true, 7);
 
-                if (this.right.isJSLiteral()) {
-                    this.setJSLiteral();
-                }
-            },
-            {
-                validate: function(v) {
-                    if (this.isJSLiteral()) {
-                        if (v.ensureAdminMode('JS inlining for instance check, is not allowed in Sandbox mode')) {
-                            // todo, check if the class exists
-                            this.right.validate(v);
-                            this.left.validate(v);
-                        }
-                    } else if (this.right instanceof qubyAst.Variable) {
-                        this.right = new qubyAst.ClassIdentifier(this.right.offset);
-                        this.right.validate(v);
-                        this.left.validate(v);
-                    } else {
-                        v.parseError(this.offset, "expecting a class name for instance check");
-                    }
-                }
+            if (this.getRight().isJSLiteral()) {
+                this.setJSLiteral();
             }
-    );
+        }
+
+        validate(v:quby.core.Validator) {
+            if (this.isJSLiteral()) {
+                if (v.ensureAdminMode( this, 'JS inlining for instance check, is not allowed in Sandbox mode') ) {
+                    // todo, check if the class exists
+                    this.getRight().validate(v);
+                    this.getLeft().validate(v);
+                }
+
+            // todo : if a Foo.class class literal, then just do the test
+            // also add 'foo.class' to the literals list in the parser
+            // otherwise if an IExpr, ensure it results in a class, and then test
+            } else if (this.getRight() instanceof Variable) {
+                // todo, no need for any side swapping here
+            } else {
+                v.parseError(this.offset, "expecting a class name for instance check");
+            }
+        }
+    }
 
     /* Equality Comparison */
-    qubyAst.Equality = newShortOp("==", 8, true);
-    qubyAst.NotEquality = newShortOp("!=", 8, true);
+    export var Equality = newShortOp("==", 8, true);
+    export var NotEquality = newShortOp("!=", 8, true);
 
     /* Bit Functions */
-    qubyAst.BitAnd = newShortOp('&', 9);
-    qubyAst.BitOr = newShortOp('|', 9);
+    export var BitAnd = newShortOp('&', 9, false);
+    export var BitOr = newShortOp('|', 9, false);
 
-    qubyAst.BoolOp = util.klass(
-            function(left, right, syntax, precedence) {
-                qubyAst.Op.call(this, left, right, syntax, false, precedence);
+    class BoolOp extends Op {
+        private useSuperPrint:bool;
 
+        constructor(left:IExpr, right:IExpr, syntax:string, precedence:number) {
+            super( left, right, syntax, false, precedence );
+
+            this.useSuperPrint = false;
+        }
+
+        /**
+         * Temporarily swap to the old print, then print as a condition,
+         * then swap back.
+         */
+        print(p:quby.core.Printer) {
+            if (this.useSuperPrint) {
+                super.print( p );
+            } else {
+                this.useSuperPrint = true;
+                this.printAsCondition( p );
                 this.useSuperPrint = false;
-            },
-
-            qubyAst.Op,
-            {
-                /**
-                 * Temporarily swap to the old print, then print as a condition,
-                 * then swap back.
-                 */
-                print: function(p) {
-                    if (this.useSuperPrint) {
-                        qubyAst.Op.prototype.print.call(this, p);
-                    } else {
-                        this.useSuperPrint = true;
-                        this.printAsCondition();
-                        this.useSuperPrint = false;
-                    }
-                }
             }
-    );
+        }
+    }
 
-    qubyAst.BoolOr = util.klass(
-            function(left, right) {
-                qubyAst.BoolOp.call(this, left, right, "||", 12);
-            },
+    export class BoolOr extends BoolOp {
+        constructor(left:IExpr, right:IExpr) {
+            super( left, right, '||', 12 );
+        }
 
-            qubyAst.BoolOp,
-            {
-                print: function(p) {
-                    var temp = p.getTempVariable();
+        print(p:quby.core.Printer) {
+            var temp = p.getTempVariable();
 
-                    p.appendPre('var ', temp, ';');
+            p.appendPre('var ', temp, ';');
 
-                    p.append('(((', temp, '=');
-                    this.left.print(p);
-                    p.append(') === null || ', temp, ' === false) ? (');
-                    this.right.print(p);
-                    p.append(') : ', temp, ')');
+            p.append('(((', temp, '=');
+            this.getLeft().print(p);
+            p.append(') === null || ', temp, ' === false) ? (');
+            this.getRight().print(p);
+            p.append(') : ', temp, ')');
 
-                    // needed to prevent memory leaks
-                    p.appendPost('delete ', temp, ';');
-                }
-            }
-    );
+            // needed to prevent memory leaks
+            p.appendPost('delete ', temp, ';');
+        }
+    }
 
-    qubyAst.BoolAnd = util.klass(
-            function(left, right) {
-                qubyAst.BoolOp.call(this, left, right, "&&", 11);
-            },
+    export class BoolAnd extends BoolOp {
+        constructor(left:IExpr, right:IExpr) {
+            super( left, right, '&&', 11 );
+        }
 
-            qubyAst.BoolOp,
-            {
-                print: function(p) {
-                    var temp = p.getTempVariable();
+        print(p:quby.core.Printer) {
+            var temp = p.getTempVariable();
 
-                    p.appendPre('var ', temp, ';');
+            p.appendPre('var ', temp, ';');
 
-                    p.append('(((', temp, '=');
-                    this.left.print(p);
-                    p.append(') === null || ', temp, ' === false) ? ', temp, ' : (');
-                    this.right.print(p);
-                    p.append('))');
+            p.append('(((', temp, '=');
+            this.getLeft().print(p);
+            p.append(') === null || ', temp, ' === false) ? ', temp, ' : (');
+            this.getRight().print(p);
+            p.append('))');
 
-                    // needed to prevent memory leaks
-                    p.appendPost('delete ', temp, ';');
-                }
-            }
-    );
+            // needed to prevent memory leaks
+            p.appendPost('delete ', temp, ';');
+        }
+    }
 
     /* ### Maths ### */
 
-    qubyAst.Divide = newShortOp("/", 3);
-    qubyAst.Mult = newShortOp("*", 3);
-    qubyAst.Mod = newShortOp("%", 3);
-    qubyAst.Add = newShortOp("+", 4);
-    qubyAst.Sub = newShortOp("-", 4);
+    export var Divide = newShortOp("/", 3, false);
+    export var Mult = newShortOp("*", 3, false);
+    export var Mod = newShortOp("%", 3, false);
+    export var Add = newShortOp("+", 4, false);
+    export var Sub = newShortOp("-", 4, false);
 
-    qubyAst.Power = util.klass(
-            function(left, right) {
-                qubyAst.Op.call(this, left, right, '**', false, 2);
-            },
+    export class Power extends Op {
+        constructor(left:IExpr, right:IExpr) {
+            super( left, right, "**", false, 2 );
+        }
 
-            qubyAst.Op,
-            {
-                print: function(p) {
-                    p.append('Math.pow(');
-                    this.left.print(p);
-                    p.append(',');
-                    this.right.print(p);
-                    p.append(')');
-                }
-            }
-    ),
+        print(p:quby.core.Printer) {
+            p.append('Math.pow(');
+            this.getLeft().print(p);
+            p.append(',');
+            this.getRight().print(p);
+            p.append(')');
+        }
+    }
 
     /*
      * ### Assignments ###
@@ -2038,531 +2241,533 @@ export module quby.ast {
     /*
      * Has the highest precedence, giving it the lowest priority.
      */
-    qubyAst.Mapping = util.klass(
-            function(left, right) {
-                qubyAst.Op.call(this, left, right, ":", false, 100);
-            },
+    export class Mapping extends Op {
+        constructor(left:IExpr, right:IExpr) {
+            super( left, right, ':', false, 100 );
+        }
 
-            qubyAst.Op,
-            {
-                print: function(p) {
-                    this.left.print(p);
-                    p.append(',');
-                    this.right.print(p);
-                }
+        print(p:quby.core.Printer) {
+            this.getLeft().print(p);
+            p.append(',');
+            this.getRight().print(p);
+        }
+    }
+
+    export class Assignment extends Op {
+        private isCollectionAssignment:bool;
+
+        constructor(left:IExpr, right:IExpr) {
+            super( left, right, '=', false, 14 );
+
+            this.isCollectionAssignment = false;
+        }
+
+        setCollectionMode() {
+            this.isCollectionAssignment = true;
+        }
+
+        validate( v:quby.core.Validator ) {
+            var left = this.getLeft();
+
+            if ( left['setAssignment'] === undefined ) {
+                v.parseError( left.getOffset() || this.getOffset(), "Illegal assignment" );
+            } else {
+                (<IAssignable>left).setAssignment(v, this);
+
+                super.validate(v);
             }
-    );
+        }
 
-    qubyAst.Assignment = util.klass(
-            function(left, right) {
-                qubyAst.Op.call(this, left, right, '=', false, 14);
-
-                this.isCollectionAssignment = false;
-            },
-
-            qubyAst.Op,
-            {
-                setCollectionMode: function() {
-                    this.isCollectionAssignment = true;
-                },
-
-                validate: function(v) {
-                    if (this.left.setAssignment === undefined) {
-                        v.parseError(this.left.getOffset() || this.getOffset(), "Illegal assignment");
-                    } else {
-                        if (this.left.setAssignment(v, this) !== false) {
-                            qubyAst.Op.prototype.validate.call(this, v);
-                        }
-                    }
-                },
-
-                print: function(p) {
-                    if (this.isCollectionAssignment) {
-                        p.append('quby_setCollection(');
-                        this.left.print(p);
-                        p.append(',');
-                        this.right.print(p);
-                        p.append(')');
-                    } else {
-                        this.left.print(p);
-                        p.append('=');
-                        this.right.print(p);
-                    }
-                }
+        print( p:quby.core.Printer ) {
+            if ( this.isCollectionAssignment ) {
+                p.append('quby_setCollection(');
+                this.getLeft().print(p);
+                p.append(',');
+                this.getRight().print(p);
+                p.append(')');
+            } else {
+                this.getLeft().print(p);
+                p.append('=');
+                this.getRight().print(p);
             }
-    );
+        }
+    }
 
-    qubyAst.Identifier = util.klass(
-            function(identifier, callName) {
-                qubyAst.Expr.call(this, identifier);
+    class Identifier extends Expr implements IAssignable {
+        private name: string;
+        private callName: string;
+        private isAssignmentFlag: bool;
 
-                this.identifier = identifier.match;
-                this.callName = callName;
-            },
+        constructor (identifier: parse.Symbol, callName: string) {
+            super(identifier);
 
-            qubyAst.Expr,
-            {
-                setCallName: function(newCallName) {
-                    this.callName = newCallName;
-                },
+            this.name = identifier.match;
+            this.callName = callName;
+            this.isAssignmentFlag = false;
+        }
 
-                print: function(p) {
-                    p.append(this.callName);
-                }
-            }
-    );
+        isAssignment(): bool {
+            return this.isAssignmentFlag;
+        }
+
+        setCallName(newCallName: string) {
+            this.callName = newCallName;
+        }
+
+        print(p: quby.core.Printer) {
+            p.append(this.callName);
+        }
+
+        setAssignment(v?:quby.core.Validator, parent?:Assignment): void {
+            this.isAssignmentFlag = true;
+        }
+
+        getName(): string {
+            return this.name;
+        }
+
+        getCallName(): string {
+            return this.callName;
+        }
+    }
 
     /*
      * ### Variables ###
      */
 
-    qubyAst.Variable = util.klass(
-            function(identifier) {
-                qubyAst.Identifier.call(this, identifier, quby.runtime.formatVar(identifier.match));
+    export class Variable extends Identifier {
+        private useVar:bool;
 
-                this.isAssignment = false;
-                this.useVar = false;
-            },
+        constructor(identifier) {
+            super( identifier, quby.runtime.formatVar(identifier.match) );
 
-            qubyAst.Identifier,
-            {
-                validate: function(v) {
-                    // assigning to this variable
-                    if (this.isAssignment) {
-                        v.assignVar(this);
-                        // blocks can alter local variables, allowing var prevents this.
-                        this.useVar = !v.isInsideBlock();
-                        // reading from this variable
-                    } else {
-                        if (v.isInsideParameters()) {
-                            // it presumes scope has already been pushed by the function it's within
-                            if (v.containsLocalVar(this)) {
-                                v.parseError(this.offset, "parameter variable name used multiple times '" + this.identifier + "'");
-                            }
+            this.useVar = false;
+        }
 
-                            v.assignVar(this);
-                        } else {
-                            if (!v.containsVar(this)) {
-                                if (!this.isJSLiteral()) {
-                                    v.parseError(this.offset, "variable used before it's assigned to '" + this.identifier + "'");
-                                } else if (window[this.callName] === undefined) {
-                                    v.parseError(this.offset, "JS variable used before it's assigned to, '" + this.identifier + "'");
-                                }
-                            }
+        validate(v:quby.core.Validator) {
+            // assigning to this variable
+            if (this.isAssignment()) {
+                v.assignVar(this);
+                // blocks can alter local variables, allowing var prevents this.
+                this.useVar = !v.isInsideBlock();
+                // reading from this variable
+            } else {
+                if (v.isInsideParameters()) {
+                    // it presumes scope has already been pushed by the function it's within
+                    if (v.containsLocalVar(this)) {
+                        v.parseError(this.offset, "parameter variable name used multiple times '" + this.getName() + "'");
+                    }
+
+                    v.assignVar(this);
+                } else {
+                    if (!v.containsVar(this)) {
+                        if (!this.isJSLiteral()) {
+                            v.parseError(this.offset, "variable used before it's assigned to '" + this.getName() + "'");
+                        } else if (window[this.getCallName()] === undefined) {
+                            v.parseError(this.offset, "JS variable used before it's assigned to, '" + this.getName() + "'");
                         }
                     }
-                },
-
-                print: function(p) {
-                    if (this.isAssignment && this.useVar) {
-                        p.append('var ');
-                    }
-
-                    qubyAst.Identifier.prototype.print.call(this, p);
-                },
-
-                setAssignment: function(v) {
-                    this.isAssignment = true;
                 }
             }
-    );
+        }
 
-    qubyAst.GlobalVariable = util.klass(
-            function(identifier) {
-                qubyAst.Identifier.call(this, identifier, quby.runtime.formatGlobal(identifier.match));
+        print(p:quby.core.Printer) {
+            if (this.isAssignment() && this.useVar) {
+                p.append('var ');
+            }
 
-                this.isGlobal = true;
-                this.isAssignment = false;
-            },
+            super.print(p);
+        }
+    }
 
-            qubyAst.Identifier,
-            {
-                print: function(p) {
-                    if (this.isAssignment) {
-                        qubyAst.Identifier.prototype.print.call(this, p);
-                    } else {
-                        p.append('quby_checkGlobal(', this.callName, ',\'', this.identifier, '\')');
-                    }
-                },
+    export class GlobalVariable extends Identifier {
+        constructor(identifier) {
+            super( identifier, quby.runtime.formatGlobal(identifier.match) );
+        }
 
-                validate: function(v) {
-                    if (this.isAssignment) {
-                        // check if the name is blank, i.e. $
-                        if (this.identifier.length === 0) {
-                            v.parseError(this.offset, "Global variable name is blank");
-                        } else {
-                            v.assignGlobal(this);
-                        }
-                    } else {
-                        if (
-                                v.ensureOutFunParameters(this, "global variable '" + this.identifier + "' used as function parameter") &&
-                                v.ensureOutParameters(this, "global variable '" + this.identifier + "' used as block parameter")
-                        ) {
-                            v.useGlobal(this);
-                        }
-                    }
-                },
+        print(p:quby.core.Printer) {
+            if (this.isAssignment) {
+                super.print(p);
+            } else {
+                p.append('quby_checkGlobal(', this.getCallName(), ',\'', this.getName(), '\')');
+            }
+        }
 
-                setAssignment: function(v) {
-                    this.isAssignment = true;
+        validate(v:quby.core.Validator) {
+            var name = this.getName();
+
+            if (this.isAssignment) {
+                // check if the name is blank, i.e. $
+                if (name.length === 0) {
+                    v.parseError(this.offset, "Global variable name is blank");
+                } else {
+                    v.assignGlobal(this);
+                }
+            } else {
+                if (
+                        v.ensureOutFunParameters(this, "global variable '" + name + "' used as function parameter") &&
+                        v.ensureOutParameters(this, "global variable '" + name + "' used as block parameter")
+                ) {
+                    v.useGlobal(this);
                 }
             }
-    );
+        }
+    }
 
-    qubyAst.ParameterBlockVariable = util.klass(
-            function(identifier) {
-                qubyAst.Variable.call(this, identifier);
+    export class ParameterBlockVariable extends Variable {
+        constructor( identifier:parse.Symbol ) {
+            super( identifier );
+        }
 
-                this.isBlockParam = true;
-            },
+        validate(v:quby.core.Validator) {
+            v.ensureInFunParameters(this, "Block parameters must be defined within a functions parameters.");
 
-            qubyAst.Variable,
-            {
-                validate: function(v) {
-                    v.ensureInFunParameters(this, "Block parameters must be defined within a functions parameters.");
-                    qubyAst.Variable.prototype.validate.call(this, v);
-                }
-            }
-    );
-    qubyAst.FieldVariable = util.klass(
-            function(identifier) {
-                qubyAst.Identifier.call(this, identifier, identifier.match.substring(1));
+            super.validate( v );
+        }
+    }
 
-                this.klass = null;
-                this.isAssignment = false;
-            },
+    export class FieldVariable extends Identifier {
+        private klass:IClassDefinition;
+        private isInsideExtensionClass: bool;
 
-            qubyAst.Identifier,
-            {
-                validate: function(v) {
-                    if (
-                            v.ensureOutFunParameters(this, "class field '" + this.identifier + "' used as function parameter.") &&
-                            v.ensureOutParameters(this, "object field '" + this.identifier + "' used as block parameter") &&
-                            v.ensureInClass(this, "field '" + this.identifier + "' is used outside of a class, they can only be used inside.") &&
-                            v.ensureInMethod(this, "class field '" + this.identifier + "' is used outside of a method.")
-                    ) {
-                        var klass = v.getCurrentClass().klass;
-                        this.klass = klass;
+        constructor(identifier:parse.Symbol) {
+            super( identifier, identifier.match.substring(1) );
 
-                        // set the correct field callName
-                        this.callName = quby.runtime.formatField(
-                                klass.name,
-                                this.identifier
-                        );
+            this.klass = null;
+            this.isInsideExtensionClass = false;
+        }
 
-                        if (this.identifier.length === 0) {
-                            v.parseError(this.offset, "no name provided for field of class " + klass.name);
-                        } else {
-                            this.isInsideExtensionClass = v.isInsideExtensionClass();
+        validate(v:quby.core.Validator) {
+            var name = this.getName();
 
-                            this.validateField(v);
-                        }
-                    }
-                },
+            if (
+                    v.ensureOutFunParameters(this, "class field '" + name + "' used as function parameter.") &&
+                    v.ensureOutParameters(this, "object field '" + name + "' used as block parameter") &&
+                    v.ensureInClass(this, "field '" + name + "' is used outside of a class, they can only be used inside.") &&
+                    v.ensureInMethod(this, "class field '" + name + "' is used outside of a method.")
+            ) {
+                var klass = v.getCurrentClass().getClass();
+                this.klass = klass;
 
-                validateField: function(v) {
-                    if (this.isAssignment) {
-                        v.assignField(this);
-                    } else {
-                        v.useField(this);
-                        this.isConstructor = v.isConstructor();
-                    }
-                },
+                // set the correct field callName
+                this.setCallName( 
+                        quby.runtime.formatField( klass.getName(), name )
+                );
 
-                print: function(p) {
-                    if (this.klass) {
-                        if (this.isAssignment) {
-                            p.append(quby.runtime.getThisVariable(this.isInsideExtensionClass), '.', this.callName);
-                        } else {
-                            var strName = this.identifier +
-                                    quby.runtime.FIELD_NAME_SEPERATOR +
-                                    this.klass.name;
-
-                            // this is about doing essentially either:
-                            //     ( this.field == undefined ? error('my_field') : this.field )
-                            //  ... or ...
-                            //     getField( this.field, 'my_field' );
-                            var thisVar = quby.runtime.getThisVariable(this.isInsideExtensionClass);
-                            if (quby.compilation.hints.useInlinedGetField()) {
-                                p.append(
-                                        '(',
-                                            thisVar, ".", this.callName,
-                                            '===undefined?quby.runtime.fieldNotFoundError(' + thisVar + ',"', strName, '"):',
-                                            thisVar, ".", this.callName,
-                                        ')'
-                                );
-                            } else {
-                                p.append(
-                                        "quby_getField(",
-                                            thisVar, ".", this.callName, ',',
-                                            thisVar, ",'",
-                                            strName,
-                                        "')"
-                                );
-                            }
-                        }
-                    }
-                },
-
-                setAssignment: function(v) {
-                    this.isAssignment = true;
-                }
-            }
-    );
-
-    qubyAst.ThisVariable = util.klass(
-            function(sym) {
-                qubyAst.Syntax.call(this, sym);
-            },
-
-            qubyAst.Syntax,
-            {
-                validate: function(v) {
-                    if (
-                            v.ensureOutFunParameters(this, "'this' used as function parameter") &&
-                            v.ensureOutParameters(this, "'this' used as a block parameter")
-                    ) {
-                        v.ensureInMethod(this, "'this' is referenced outside of a class method (or you've named a variable 'this')");
-                    }
-
+                if (name.length === 0) {
+                    v.parseError( this.offset, "no name provided for field of class " + klass.getName() );
+                } else {
                     this.isInsideExtensionClass = v.isInsideExtensionClass();
-                    this.isConstructor = v.isConstructor();
-                },
-                print: function(p) {
-                    p.append(quby.runtime.getThisVariable(this.isInsideExtensionClass));
-                },
 
-                setAssignment: function(v) {
-                    v.parseError(this.offset, "cannot assign a value to 'this'");
-
-                    return false;
+                    this.validateField(v);
                 }
             }
-    );
+        }
 
-    qubyAst.JSVariable = util.klass(
-            function(identifier) {
-                qubyAst.Variable.call(this, identifier);
-                this.setCallName(identifier.match);
-            },
+        validateField(v:quby.core.Validator) {
+            if (this.isAssignment) {
+                v.assignField(this);
+            } else {
+                v.useField(this);
+            }
+        }
 
-            qubyAst.Variable,
-            {
-                validate: function(v) {
-                    this.setJSLiteral();
+        print(p:quby.core.Printer) {
+            if (this.klass) {
+                var callName = this.getCallName();
 
-                    if (
-                            v.ensureOutBlock(this, "JS variable used as block parameter") &&
-                            v.ensureAdminMode(this, "inlining JS values not allowed in sandboxed mode")
-                    ) {
-                        qubyAst.Variable.prototype.validate.call(this, v);
+                if (this.isAssignment) {
+                    p.append(quby.runtime.getThisVariable(this.isInsideExtensionClass), '.', callName);
+                } else {
+                    var strName = this.getName() +
+                            quby.runtime.FIELD_NAME_SEPERATOR +
+                            this.klass.getName();
+
+                    // this is about doing essentially either:
+                    //     ( this.field == undefined ? error('my_field') : this.field )
+                    //  ... or ...
+                    //     getField( this.field, 'my_field' );
+                    var thisVar = quby.runtime.getThisVariable(this.isInsideExtensionClass);
+                    if (quby.compilation.hints.useInlinedGetField()) {
+                        p.append(
+                                '(',
+                                    thisVar, ".", callName,
+                                    '===undefined?quby.runtime.fieldNotFoundError(' + thisVar + ',"', strName, '"):',
+                                    thisVar, ".", callName,
+                                ')'
+                        );
+                    } else {
+                        p.append(
+                                "quby_getField(",
+                                    thisVar, ".", callName, ',',
+                                    thisVar, ",'",
+                                    strName,
+                                "')"
+                        );
                     }
                 }
             }
-    );
+        }
+    }
+
+    export class ThisVariable extends Syntax {
+        private isInsideExtensionClass: bool;
+
+        constructor(sym:parse.Symbol) {
+            super( sym );
+
+            this.isInsideExtensionClass = false;
+        }
+
+        validate(v:quby.core.Validator) {
+            if (
+                    v.ensureOutFunParameters(this, "'this' used as function parameter") &&
+                    v.ensureOutParameters(this, "'this' used as a block parameter")
+            ) {
+                v.ensureInMethod(this, "'this' is referenced outside of a class method (or you've named a variable 'this')");
+            }
+
+            this.isInsideExtensionClass = v.isInsideExtensionClass();
+        }
+
+        print(p:quby.core.Printer) {
+            p.append(quby.runtime.getThisVariable(this.isInsideExtensionClass));
+        }
+
+        setAssignment(v:quby.core.Validator) {
+            v.parseError( this.getOffset(), "cannot assign a value to 'this'" );
+        }
+    }
+
+    export class JSVariable extends Variable {
+        constructor(identifier:parse.Symbol) {
+            super( identifier );
+
+            this.setCallName(identifier.match);
+        }
+
+        validate(v:quby.core.Validator) {
+            this.setJSLiteral();
+
+            if (
+                    v.ensureOutBlock(this, "JS variable used as block parameter") &&
+                    v.ensureAdminMode(this, "inlining JS values not allowed in sandboxed mode")
+            ) {
+                super.validate( v );
+            }
+        }
+    }
 
     /*
      * ### Arrays ###
      */
 
-    qubyAst.ArrayAccess = util.klass(
-            function(array, index) {
-                qubyAst.Syntax.call(
-                        this,
-                        (array !== null ? array.offset : null)
-                )
+    export class ArrayAccess extends Syntax {
+        private array:IExpr;
+        private index:IExpr;
 
+        private isAssignment:bool;
+
+        constructor(array:IExpr, index:IExpr) {
+            var offset = array !== null ?
+                    array.offset :
+                    null;
+
+            super( offset )
+
+            this.array = array;
+            this.index = index;
+
+            this.isAssignment = false;
+        }
+
+        print(p:quby.core.Printer) {
+            if (this.isAssignment) {
+                this.array.print(p);
+                p.append(',');
+                this.index.print(p);
+            } else {
+                p.append('quby_getCollection(');
+                this.array.print(p);
+                p.append(',');
+                this.index.print(p);
+                p.append(')');
+            }
+        }
+
+        validate(v:quby.core.Validator) {
+            this.index.validate(v);
+            this.array.validate(v);
+        }
+
+        appendLeft(array) {
+            if (this.array !== null) {
+                this.array.appendLeft(array);
+            } else if (array) {
+                this.setOffset(array.offset);
                 this.array = array;
-                this.index = index;
-
-                this.isAssignment = false;
-            },
-
-            qubyAst.Syntax,
-            {
-                print: function(p) {
-                    if (this.isAssignment) {
-                        this.array.print(p);
-                        p.append(',');
-                        this.index.print(p);
-                    } else {
-                        p.append('quby_getCollection(');
-                        this.array.print(p);
-                        p.append(',');
-                        this.index.print(p);
-                        p.append(')');
-                    }
-                },
-
-                validate: function(v) {
-                    this.index.validate(v);
-                    this.array.validate(v);
-                },
-
-                appendLeft: function(array) {
-                    if (this.array !== null) {
-                        this.array.appendLeft(array);
-                    } else if (array) {
-                        this.setOffset(array.offset);
-                        this.array = array;
-                    }
-
-                    return this;
-                },
-
-                setAssignment: function(v, parentAss) {
-                    this.isAssignment = true;
-                    parentAss.setCollectionMode();
-                }
             }
-    );
 
-    qubyAst.ArrayDefinition = util.klass(
-            function(parameters) {
-                var offset;
-                if (parameters) {
-                    offset = parameters.offset;
-                } else {
-                    parameters = null;
-                    offset = null;
-                }
+            return this;
+        }
 
-                qubyAst.Syntax.call(this, offset);
+        setAssignment(v:quby.core.Validator, parentAss:Assignment) {
+            this.isAssignment = true;
 
-                this.parameters = parameters;
-            },
+            parentAss.setCollectionMode();
+        }
+    }
 
-            qubyAst.Syntax,
-            {
-                print: function(p) {
-                    p.append('(new QubyArray([');
+    export class ArrayDefinition extends Syntax {
+        private parameters:IStatements;
 
-                    if (this.parameters !== null) {
-                        this.parameters.print(p);
-                    }
-
-                    p.append(']))');
-                },
-
-                validate: function(v) {
-                    if (this.parameters !== null) {
-                        this.parameters.validate(v);
-                    }
-                }
+        constructor(parameters?:IStatements) {
+            var offset;
+            if (parameters) {
+                offset = parameters.offset;
+            } else {
+                parameters = null;
+                offset = null;
             }
-    );
 
-    qubyAst.HashDefinition = util.klass(
-            function(parameters) {
-                qubyAst.ArrayDefinition.call(this, parameters);
-            },
+            super( offset );
 
-            qubyAst.ArrayDefinition,
-            {
-                print: function(p) {
-                    p.append('(new QubyHash(');
+            this.parameters = parameters;
+        }
 
-                    if (this.parameters !== null) {
-                        this.parameters.print(p);
-                    }
+        getParameters() {
+            return this.parameters;
+        }
 
-                    p.append('))');
-                }
+        print(p:quby.core.Printer) {
+            p.append('(new QubyArray([');
+
+            if (this.parameters !== null) {
+                this.parameters.print(p);
             }
-    );
+
+            p.append(']))');
+        }
+
+        validate(v:quby.core.Validator) {
+            if (this.parameters !== null) {
+                this.parameters.validate(v);
+            }
+        }
+    }
+
+    export class HashDefinition extends ArrayDefinition {
+        constructor(parameters?:Mappings) {
+            super(parameters);
+        }
+
+        print(p:quby.core.Printer) {
+            p.append('(new QubyHash(');
+
+            var parameters = this.getParameters();
+
+            if ( parameters !== null) {
+                parameters.print(p);
+            }
+
+            p.append('))');
+        }
+    }
 
     /* Literals */
-    qubyAst.Literal = util.klass(
-            function(sym, isTrue) {
-                qubyAst.Expr.call(this, sym);
+    class Literal extends Expr {
+        private isTrue:bool;
+        private match:string;
 
-                this.isLiteral = true;
-                this.isTrue = (!!isTrue);
+        constructor(sym:parse.Symbol, isTrue:bool, altMatch?:string) {
+            super(sym);
 
-                this.match = sym.match;
-            },
+            this.isTrue = isTrue;
 
-            qubyAst.Expr,
-            {
-                validate: function(v) {
-                    // do nothing
-                },
-                print: function(p) {
-                    p.append(this.match);
-                },
+            this.match = altMatch ?
+                    altMatch  :
+                    sym.match ;
+        }
 
-                /**
-                 * If this literal evaluates to true, then 'true' is printed.
-                 * Otherwise 'false'.
-                 */
-                printAsCondition: function(p) {
-                    if (this.isTrue) {
-                        p.append('true');
-                    } else {
-                        p.append('false');
-                    }
-                }
+        getMatch() {
+            return this.match;
+        }
+
+        validate(v:quby.core.Validator) {
+            // do nothing
+        }
+
+        print(p:quby.core.Printer) {
+            p.append(this.match);
+        }
+
+        /**
+         * If this literal evaluates to true, then 'true' is printed.
+         * Otherwise 'false'.
+         */
+        printAsCondition(p:quby.core.Printer) {
+            if (this.isTrue) {
+                p.append('true');
+            } else {
+                p.append('false');
             }
-    );
+        }
+    }
 
-    qubyAst.Symbol = util.klass(
-            function(sym) {
-                qubyAst.Literal.call(this, sym);
-                this.callName = quby.runtime.formatSymbol(this.match);
-            },
+    export class Symbol extends Literal {
+        private callName: string;
 
-            qubyAst.Literal,
-            {
-                validate: function(v) {
-                    v.addSymbol(this);
-                },
-                print: function(p) {
-                    p.append(this.callName);
-                }
-            }
-    );
+        constructor(sym:parse.Symbol) {
+            super( sym, true );
 
-    qubyAst.Number = util.klass(
-            function(sym) {
-                qubyAst.Literal.call(this, sym, true);
-            },
+            this.callName = quby.runtime.formatSymbol( sym.match );
+        }
 
-            qubyAst.Literal,
-            {
-                validate: function(v) {
-                    var origNum = this.match,
-                        num = origNum.replace(/_+/g, ''),
-                        decimalCount = 0;
+        getCallName() {
+            return this.callName;
+        }
 
-                    // TODO validate num
+        validate(v:quby.core.Validator) {
+            v.addSymbol(this);
+        }
+    }
 
-                    if (num.indexOf('.') === -1) {
-                        this.match = String(num | 0);
-                    } else {
-                        this.match = String(parseFloat(num));
-                    }
-                }
-            }
-    );
+    export class Number extends Literal {
+        constructor(sym:parse.Symbol) {
+            var matchStr:string;
 
-    qubyAst.String = function(sym) {
-        var ast = new qubyAst.Literal(sym, true);
+            var origNum = sym.match,
+                num = origNum.replace(/_+/g, ''),
+                decimalCount = 0;
 
-        // escape the \n's
-        ast.match = sym.match.replace(/\n/g, "\\n");
+            // TODO validate num
 
-        return ast;
-    };
+            var matchStr:string = (num.indexOf('.') === -1) ?
+                    "" + ((<number><any>num) | 0) :
+                    "" + (parseFloat(num)) ;
 
-    qubyAst.Bool = function(sym) {
-        return new qubyAst.Literal(sym, (sym.match === 'true'));
-    };
+            super( sym, true, matchStr );
+        }
+    }
 
-    qubyAst.Null = function(sym) {
-        var ast = new qubyAst.Literal(sym, false);
-        ast.match = 'null';
-        return ast;
-    };
+    export class String extends Literal {
+        constructor( sym:parse.Symbol ) {
+            // escape the \n's
+            super( sym, true, sym.match.replace(/\n/g, "\\n") );
+        }
+    }
+
+    export class Bool extends Literal {
+        constructor( sym:parse.Symbol ) {
+            super(sym, (sym.match === 'true'));
+        }
+    }
+
+    export class Null extends Literal {
+        constructor( sym:parse.Symbol ) {
+            super(sym, false, 'null');
+        }
+    }
 
     /*
      * ### Function Generating stuff ###
@@ -2574,268 +2779,279 @@ export module quby.ast {
      *
      * It handles storing common items.
      */
-    qubyAst.FunctionGenerator = util.klass(
-            function(obj, methodName, numParams) {
-                this.obj = obj;
-                this.offset = obj.offset;
+    class FunctionGenerator implements ISyntax {
+        public offset: parse.Symbol;
+        public callName: string;
 
-                this.klass = null;
+        private obj;
 
-                // the name of this modifier, i.e. read, write, attr, get, set, getset
-                this.modifierName = obj.name;
+        private klass:quby.core.ClassValidator;
 
-                // flag used for checking if it's a generator,
-                // only used inside this FunctionGenerator
-                this.isGenerator = true;
+        // the name of this modifier, i.e. read, write, attr, get, set, getset
+        private modifierName: string;
 
-                // the name of the method this generates
-                this.name = methodName;
-                this.callName = quby.runtime.formatFun(methodName, numParams);
-            },
+        // flag used for checking if it's a generator,
+        // only used inside this FunctionGenerator
+        private isGenerator: bool;
 
-            {
-                /* This validation code relies on the fact that when a function
-                 * is defined on a class, it becomes the current function for that
-                 * callname, regardless of if it's a diplicate function or not.
-                 */
-                validate: function(v) {
-                    this.klass = v.getCurrentClass();
+        // the name of the method this generates
+        private name: string;
 
-                    // checks for duplicate before this get
-                    if (this.validateNameClash(v)) {
-                        v.defineFun(this);
-                        v.pushFunScope(this);
+        private numParams: number;
 
-                        this.validateInside(v);
+        constructor(obj, methodName: string, numParams: number) {
+            this.obj = obj;
+            this.offset = obj.offset;
 
-                        v.popScope();
+            this.klass = null;
 
-                        var _this = this;
-                        v.onEndValidate(function(v) { _this.onEndValidate(v); });
-                    }
-                },
+            this.modifierName = obj.name;
 
-                getNumParameters: function() {
-                    return numParams;
-                },
+            this.isGenerator = true;
 
-                onEndValidate: function(v) {
-                    this.validateNameClash(v);
-                },
+            this.name = methodName;
+            this.numPrams = numParams;
 
-                validateInside: function(v) {
-                    // do nothing
-                },
+            this.callName = quby.runtime.formatFun(methodName, numParams);
+        }
 
-                validateNameClash: function(v) {
-                    var currentFun = this.klass.getFun(this.callName);
+        getOffset() {
+            return this.offset;
+        }
 
-                    if (currentFun !== null && currentFun !== this) {
-                        // Give an error message depending on if we are
-                        // dealing with a colliding modifier or function.
-                        var errMsg = (currentFun.isGenerator) ?
-                                "'" + this.modifierName + "' modifier in class '" + this.klass.klass.name + "' clashes with modifier '" + currentFun.modifierName + '", for generating: "' + this.name + '" method' :
-                                "'" + this.modifierName + "' modifier in class '" + this.klass.klass.name + "' clashes with defined method: '" + this.name + '"';
+        /* This validation code relies on the fact that when a function
+         * is defined on a class, it becomes the current function for that
+         * callname, regardless of if it's a diplicate function or not.
+         */
+        validate(v: quby.core.Validator) {
+            this.klass = v.getCurrentClass();
 
-                        v.parseError(this.offset, errMsg);
+            // checks for duplicate before this get
+            if (this.validateNameClash(v)) {
+                v.defineFun(this);
+                v.pushFunScope(this);
 
-                        return false;
-                    } else {
-                        return true;
-                    }
-                },
+                this.validateInside(v);
+
+                v.popScope();
+
+                v.onEndValidate((v:quby.core.Validator) => this.onEndValidate(v));
+
             }
-    );
+        }
 
-    qubyAst.FunctionAttrGenerator = util.klass(
-            function(obj, methodName, numParams, fieldObj, proto) {
-                var fieldName;
-                if (fieldObj instanceof qubyAst.Variable || fieldObj instanceof qubyAst.FieldVariable) {
-                    fieldName = fieldObj.identifier;
-                } else if (fieldObj instanceof qubyAst.Symbol) {
-                    fieldName = fieldObj.match;
-                } else {
-                    fieldName = null;
-                }
+        print(p: quby.core.Printer) { }
 
-                var fullName = fieldName ? (methodName + util.string.capitalize(fieldName)) : methodName;
+        getNumParameters() {
+            return this.numParams;
+        }
 
-                // doesn't matter if fieldName is null for this, as it will be invalid laterz
-                qubyAst.FunctionGenerator.call(this, obj, fullName, numParams);
+        onEndValidate(v: quby.core.Validator) {
+            this.validateNameClash(v);
+        }
 
-                // the name of our field, null if invalid
-                this.fieldName = fieldName;
-                this.fieldObj = fieldObj;
+        validateInside(v:quby.core.Validator) {
+            // do nothing
+        }
 
-                // this is our fake field
-                this.field = null;
-            },
+        validateNameClash(v:quby.core.Validator) {
+            var currentFun = this.klass.getFun(this.callName);
 
-            qubyAst.FunctionGenerator,
-            {
-                validate: function(v) {
-                    if (this.fieldName !== null) {
-                        qubyAst.FunctionGenerator.prototype.validate.call(this, v);
-                    } else {
-                        v.parseError(this.fieldObj.offset, " Invalid parameter for generating '" + this.name + "' method");
-                    }
-                },
+            if (currentFun !== null && currentFun !== this) {
+                // Give an error message depending on if we are
+                // dealing with a colliding modifier or function.
+                var errMsg = (currentFun.isGenerator) ?
+                        "'" + this.modifierName + "' modifier in class '" + this.klass.getClass().getName() + "' clashes with modifier '" + currentFun.modifierName + '", for generating: "' + this.name + '" method' :
+                        "'" + this.modifierName + "' modifier in class '" + this.klass.getClass().getName() + "' clashes with defined method: '" + this.name + '"';
 
-                validateInside: function(v) {
-                    this.field = new proto(
-                            this.offset.clone(this.fieldName)
-                    );
+                v.parseError(this.offset, errMsg);
 
-                    this.field.validate(v);
-                }
+                return false;
+            } else {
+                return true;
             }
-    );
+        }
+    }
 
-    var FunctionReadGeneratorFieldVariable = util.klass(
-            function(id) {
-                qubyAst.FieldVariable.call(this, id);
-            },
+    class FunctionAttrGenerator extends FunctionGenerator {
+        private fieldName: string;
+        private fieldObj;
+        private field;
 
-            qubyAst.FieldVariable,
-            {
-                validateField: function(v) { } // we do this check ourselves later
+        private proto: new (sym: parse.Symbol) => FieldVariable;
+
+        constructor(obj, methodName:string, numParams:number, fieldObj, proto:new(sym:parse.Symbol) => FieldVariable ) {
+            var fieldName:string;
+            if (fieldObj instanceof Variable || fieldObj instanceof FieldVariable) {
+                fieldName = fieldObj.identifier;
+            } else if (fieldObj instanceof Symbol) {
+                fieldName = fieldObj.match;
+            } else {
+                fieldName = null;
             }
-    );
 
-    qubyAst.FunctionReadGenerator = util.klass(
-            function(obj, methodPrefix, field) {
-                qubyAst.FunctionAttrGenerator.call(this, obj, methodPrefix, 0, field, FunctionReadGeneratorFieldVariable);
-            },
+            var fullName = fieldName ? (methodName + util.str.capitalize(fieldName)) : methodName;
 
-            qubyAst.FunctionAttrGenerator,
-            {
-                onEndValidate: function(v) {
-                    qubyAst.FunctionAttrGenerator.prototype.onEndValidate.call(this, v);
+            // doesn't matter if fieldName is null for this, as it will be invalid laterz
+            super(obj, fullName, numParams);
 
-                    if (this.field) {
-                        if (!this.klass.hasFieldCallName(this.field.callName)) {
-                            v.parseError(this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name);
-                        }
-                    }
-                },
+            this.proto = proto;
 
-                /*
-                 * This will be a method.
-                 */
-                print: function(p) {
-                    if (this.field) {
-                        p.append(this.callName, '=function(){return ');
-                        this.field.print(p);
-                        p.append(';}');
-                    }
-                },
+            // the name of our field, null if invalid
+            this.fieldName = fieldName;
+            this.fieldObj = fieldObj;
+
+            // this is our fake field
+            this.field = null;
+        }
+
+        validate(v:quby.core.Validator) {
+            if (this.fieldName !== null) {
+                super.validate(v);
+            } else {
+                v.parseError(this.fieldObj.offset, " Invalid parameter for generating '" + this.name + "' method");
             }
-    );
+        }
 
-    qubyAst.FunctionWriteGenerator = util.klass(
-            function(obj, methodPrefix, field) {
-                qubyAst.FunctionAttrGenerator.call(this,
-                        obj,
-                        methodPrefix,
-                        1,
-                        field,
-                        qubyAst.FieldVariable
-                )
+        validateInside(v:quby.core.Validator) {
+            this.field = new this.proto( this.offset.clone(this.fieldName) );
 
-                this.setAssignment();
-            },
+            this.field.validate(v);
+        }
+    }
 
-            qubyAst.FieldVariable,
-            {
-                onEndValidate: function(v) {
-                    qubyAst.FunctionAttrGenerator.prototype.onEndValidate.call(this, v);
+    class FunctionReadGeneratorFieldVariable extends FieldVariable {
+        constructor (sym:parse.Symbol) {
+            super(sym);
+        }
 
-                    if (this.field) {
-                        if (!this.klass.hasFieldCallName(this.field.callName)) {
-                            v.parseError(this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name);
-                        }
-                    }
-                },
+        validateField(v:quby.core.Validator) { } // we do this check ourselves later
+    }
 
-                /*
-                 * This will be a method.
-                 */
-                print: function(p) {
-                    if (this.field) {
-                        p.append(this.callName, '=function(t){return ');
-                        this.field.print(p);
-                        p.append('=t;');
-                        p.append('}');
-                    }
-                },
-            }
-    );
+    class FunctionReadGenerator extends FunctionAttrGenerator {
+        constructor(obj, methodPrefix:string, field) {
+            super( obj, methodPrefix, 0, field, FunctionReadGeneratorFieldVariable );
+        }
 
-    qubyAst.FunctionReadWriteGenerator = util.klass(
-            function(obj, getPre, setPre, fieldObj) {
-                this.getter = new qubyAst.FunctionReadGenerator(obj, getPre, fieldObj);
-                this.setter = new qubyAst.FunctionWriteGenerator(obj, setPre, fieldObj);
-            },
+        onEndValidate(v:quby.core.Validator) {
+            super.onEndValidate(v);
 
-            {
-                validate: function(v) {
-                    this.getter.validate(v);
-                    this.setter.validate(v);
-                },
-
-                print: function(p) {
-                    this.getter.print(p);
-                    this.setter.print(p);
+            if (this.field) {
+                if (!this.klass.hasFieldCallName(this.field.callName)) {
+                    v.parseError(this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name);
                 }
             }
-    );
+        }
+
+        /*
+         * This will be a method.
+         */
+        print(p:quby.core.Printer) {
+            if (this.field) {
+                p.append(this.callName, '=function(){return ');
+                this.field.print(p);
+                p.append(';}');
+            }
+        }
+    }
+
+    class FunctionWriteGenerator extends FunctionAttrGenerator {
+        constructor (obj, methodPrefix: string, field) {
+            super(
+                     obj,
+                     methodPrefix,
+                     1,
+                     field,
+                     FieldVariableAssignment
+             )
+
+            this.setAssignment();
+        }
+
+        onEndValidate(v:quby.core.Validator) {
+            super.onEndValidate(v);
+
+            if (this.field) {
+                if (!this.klass.hasFieldCallName(this.field.callName)) {
+                    v.parseError(this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name);
+                }
+            }
+        }
+
+        /*
+         * This will be a method.
+         */
+        print(p:quby.core.Printer) {
+            if (this.field) {
+                p.append(this.callName, '=function(t){return ');
+                this.field.print(p);
+                p.append('=t;');
+                p.append('}');
+            }
+        }
+    }
+
+    class FunctionReadWriteGenerator {
+        private getter: FunctionReadGenerator;
+        private setter: FunctionWriteGenerator;
+
+        constructor(obj, getPre:string, setPre:string, fieldObj) {
+            this.getter = new FunctionReadGenerator(obj, getPre, fieldObj);
+            this.setter = new FunctionWriteGenerator(obj, setPre, fieldObj);
+        }
+
+        validate(v: quby.core.Validator) {
+            this.getter.validate(v);
+            this.setter.validate(v);
+        }
+
+        print(p:quby.core.Printer) {
+            this.getter.print(p);
+            this.setter.print(p);
+        }
+    }
 
 
     /* Other */
-    qubyAst.PreInline = util.klass(
-            function(sym) {
-                qubyAst.Syntax.call(this, sym);
+    export class PreInline extends Syntax {
+        private isPrinted: bool;
 
-                this.isPrinted = false;
-            },
+        constructor(sym:parse.Symbol) {
+            super(sym);
 
-            qubyAst.Syntax,
-            {
-                print: function(p) {
-                    if (!this.isPrinted) {
-                        var match = this.offset.match;
-                        p.append(match.substring(6, match.length - 3));
+            this.isPrinted = false;
+        }
 
-                        this.isPrinted = true;
-                    }
-                },
-                validate: function(v) {
-                    v.ensureAdminMode(
-                            this, "inlining pre-JavaScript is not allowed outside of admin mode."
-                    );
+        print(p:quby.core.Printer) {
+            if (!this.isPrinted) {
+                var match = this.offset.match;
+                p.append(match.substring(6, match.length - 3));
 
-                    v.addPreInline(this);
-                }
+                this.isPrinted = true;
             }
-    );
+        }
+        validate(v:quby.core.Validator) {
+            v.ensureAdminMode( this, "inlining pre-JavaScript is not allowed outside of admin mode." );
 
-    qubyAst.Inline = util.klass(
-            function(sym) {
-                qubyAst.Syntax.call(this, sym);
-            },
+            v.addPreInline(this);
+        }
+    }
 
-            qubyAst.Syntax,
-            {
-                print: function(p) {
-                    var match = this.offset.match;
-                    p.append(match.substring(3, match.length - 3));
-                },
-                printAsCondition: function(p) {
-                    this.print(p);
-                },
-                validate: function(v) {
-                    v.ensureAdminMode(this, "inlining JavaScript is not allowed outside of admin mode.");
-                }
-            }
-    );
+    export class Inline extends Syntax {
+        constructor (sym:parse.Symbol) {
+            super(sym);
+        }
+
+        print(p:quby.core.Printer) {
+            var match = this.offset.match;
+
+            p.append(match.substring(3, match.length - 3));
+        }
+        printAsCondition(p:quby.core.Printer) {
+            this.print(p);
+        }
+        validate(v:quby.core.Validator) {
+            v.ensureAdminMode(this, "inlining JavaScript is not allowed outside of admin mode.");
+        }
+    }
 }

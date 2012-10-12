@@ -57,30 +57,6 @@ module util {
         isSafari: browserName === 'safari'
     };
 
-    export function klass(init: () => any, ...funs: any[]) {
-        var proto = init.prototype;
-
-        for (var i = 0; i < funs.length; i++) {
-            var funs = arguments[i];
-
-            if (funs === undefined) {
-                throw new Error("undefined function info given");
-            }
-
-            if (typeof funs === 'function' || funs instanceof Function) {
-                funs = funs.prototype;
-            }
-
-            for (var k in funs) {
-                if (funs.hasOwnProperty(k)) {
-                    proto[k] = funs[k];
-                }
-            }
-        }
-
-        return init;
-    }
-
     /**
      * Creates a new JS object, copies all the properties across from source
      * to the clone, and then returns the object.

@@ -2,7 +2,7 @@
 
 ///<reference path='../quby.ts' />
 
-export module quby {
+module quby {
     /**
      * quby.parse
      *
@@ -860,7 +860,7 @@ export module quby {
             repeatSeperator( expr, terminals.symbols.comma ).
             onMatch( function( exprs ) {
                 return new quby.ast.Parameters().
-                        setStmts( exprs );
+                        setArr( exprs );
             } );
 
     var variables = parse.
@@ -1006,7 +1006,7 @@ export module quby {
             ).
             onMatch( function( params ) {
                 return new quby.ast.Parameters().
-                setStmts( params );
+                        setArr( params );
             } );
 
     /**
@@ -1068,7 +1068,7 @@ export module quby {
             then( terminals.ops.bitwiseOr ).
             onMatch( function( lOr, params, end, rOr ) {
                 if ( params !== null ) {
-                    return new quby.ast.Parameters().setStmts( params );
+                    return new quby.ast.Parameters().setArr( params );
                 } else {
                     return null;
                 }
