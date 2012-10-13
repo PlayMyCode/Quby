@@ -2,7 +2,7 @@
 
 ///<reference path='../quby.ts' />
 
-module quby {
+module quby.parser {
     /**
      * quby.parse
      *
@@ -368,7 +368,7 @@ module quby {
          *  : removes white space from the start of the source code
          *  : changes \t to ' '
          *  : replaces all '\r's with '\n's
-         *  : ensures all '}' have an end of line before them
+         *  : ensures all closing braces have an end of line before them
          *  : ensures all 'end' keywords have an end of line before them
          */
         var preScanParse = function( source: string ): string {
@@ -844,10 +844,9 @@ module quby {
             statementSeperator
     );
 
-    var statements = parse.rule();
-    
-    statements.optional( statementSeperator );
-    statements.optional( repeatStatement ).
+    var statements = parse.
+            optional( statementSeperator ).
+            optional( repeatStatement ).
             optional( statementSeperator ).
             onMatch( function( onStart, stmts, endEnd ) {
                 if ( stmts === null ) {
@@ -1026,7 +1025,7 @@ module quby {
             optional( parameterFields ).
             optional( terminals.endOfLine ). // needed to allow an end of line before the closing bracket
             then( terminals.symbols.rightBracket ).
-            onMatch( function( lParen, params, end, rParen ) {
+            onMatch( function( lParen, params, end, rParen ) : quby.ast.ISyntax {
                 if ( params === null ) {
                     return new quby.ast.Parameters();
                 } else {
@@ -1123,7 +1122,7 @@ module quby {
             a( terminals.identifiers.variableName ).
             then( parameterExprs ).
             optional( block ).
-            onMatch( function( name, exprs, block ) {
+            onMatch( function( name, exprs, block ) : quby.ast.ISyntax {
                 if ( name.getLower() === quby.runtime.SUPER_KEYWORD ) {
                     return new quby.ast.SuperCall( name, exprs, block );
                 } else {
@@ -1385,7 +1384,7 @@ module quby {
             then( parameterDefinition ).
             optional( statements ).
             then( terminals.keywords.END ).
-            onMatch( function( def, name, params, stmts, end ) {
+            onMatch( function( def, name, params, stmts, end ) : quby.ast.ISyntax {
                 if ( def.terminal === terminals.keywords.DEF ) {
                     // 'new' method, class constructor
                     if ( name.terminal === terminals.keywords.NEW ) {
@@ -1454,7 +1453,7 @@ module quby {
             either( terminals.keywords.WHILE, terminals.keywords.UNTIL ).
             then( expr, statements ).
             then( terminals.keywords.END ).
-            onMatch( function( whileUntil, expr, stmts, end ) {
+            onMatch( function( whileUntil, expr, stmts, end ) : quby.ast.ISyntax {
                 if ( whileUntil.terminal === terminals.keywords.WHILE ) {
                     return new quby.ast.WhileLoop( expr, stmts );
                 } else {
@@ -1468,7 +1467,7 @@ module quby {
             then( terminals.keywords.END ).
             either( terminals.keywords.WHILE, terminals.keywords.UNTIL ).
             then( expr ).
-            onMatch( function( loop, stmts, end, whileUntil, expr ) {
+            onMatch( function( loop, stmts, end, whileUntil, expr ) : quby.ast.ISyntax {
                 if ( whileUntil.terminal === terminals.keywords.WHILE ) {
                     return new quby.ast.LoopWhile( expr, stmts );
                 } else {
@@ -1496,33 +1495,31 @@ module quby {
                 terminals.admin.preInline
         );
 
-    export module parser {
-        /**
-        * The entry point for the parser, and the only way to interact.
-        *
-        * Call this, pass in the code, and a callback so your informed
-        * about when it's done.
-        *
-        * @param src The source code to parse.
-        * @param onFinish The function to call when parsing has finished.
-        * @param onDebug An optional callback, for sending debug information into.
-        */
-        export function parse(
-                src: string,
-                name: string,
-                onFinish: ( program: any, errors ) => void ,
-                onDebug
-        ) {
-            statements.parse( {
-                name: name,
-                src: src,
-                inputSrc: preParse( src ),
+    /**
+     * The entry point for the parser, and the only way to interact.
+     *
+     * Call this, pass in the code, and a callback so your informed
+     * about when it's done.
+     *
+     * @param src The source code to parse.
+     * @param onFinish The function to call when parsing has finished.
+     * @param onDebug An optional callback, for sending debug information into.
+     */
+    export function parseSource(
+            src: string,
+            name: string,
+            onFinish: ( program: any, errors ) => void ,
+            onDebug
+    ) {
+        statements.parse( {
+            name: name,
+            src: src,
+            inputSrc: preParse( src ),
 
-                onFinish: function( program, errors ) {
-                    onFinish( program, errors );
-                },
-                onDebug: onDebug || null
-            } );
-        }
+            onFinish: function( program, errors ) {
+                onFinish( program, errors );
+            },
+            onDebug: onDebug || null
+        } );
     }
 }

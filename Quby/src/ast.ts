@@ -2,48 +2,46 @@
 
 ///<reference path='../quby.ts' />
 
+/**
+ * AST
+ *
+ * Objects for defining the abstract syntax tree are defined
+ * here. A new function is here for representing every aspect
+ * of the possible source code that can be parsed.
+ */
+/*
+ * Functions, classes, variables and other items in Quby have both a 'name'
+ * and a 'callName'. This describes some of their differences.
+ *
+ * = Names =
+ * These are for display purposes. However names should be be considered to
+ * be unique, and so entirely different names can refer to the same thing.
+ *
+ * For example 'object' and 'Object' are different names but can potentially
+ * refer to the same thing. However what they refer to also depends on context,
+ * for example one might be a function called object and the other might be
+ * the Object class. In that context they refer to entirely different things.
+ *
+ * In short, Names are used for displaying information and should never be
+ * used for comparison.
+ *
+ * = CallNames =
+ * callNames however are unique. They are always in lower case, include no
+ * spaces and include their context in their formatting. This means it is
+ * safe to directly compare callNames (i.e. 'callName1 == callName2').
+ * It is also safe to use them in defining JSON object properties.
+ *
+ * The format functions in quby.runtime should be used for creating callNames
+ * from names. They are also designed to ensure that a callName of one context
+ * cannot refer to a callName of a different context.
+ *
+ * This is achieved by appending context unique identifiers to the beginning
+ * of the callName stating it's context (function, variable, class, etc).
+ *
+ * They are 'context unique' because one context prefix does not clash with
+ * another contexts prefix.
+ */
 module quby.ast {
-    /**
-     * AST
-     *
-     * Objects for defining the abstract syntax tree are defined
-     * here. A new function is here for representing every aspect
-     * of the possible source code that can be parsed.
-     */
-    /*
-     * Functions, classes, variables and other items in Quby have both a 'name'
-     * and a 'callName'. This describes some of their differences.
-     *
-     * = Names =
-     * These are for display purposes. However names should be be considered to
-     * be unique, and so entirely different names can refer to the same thing.
-     *
-     * For example 'object' and 'Object' are different names but can potentially
-     * refer to the same thing. However what they refer to also depends on context,
-     * for example one might be a function called object and the other might be
-     * the Object class. In that context they refer to entirely different things.
-     *
-     * In short, Names are used for displaying information and should never be
-     * used for comparison.
-     *
-     * = CallNames =
-     * callNames however are unique. They are always in lower case, include no
-     * spaces and include their context in their formatting. This means it is
-     * safe to directly compare callNames (i.e. 'callName1 == callName2').
-     * It is also safe to use them in defining JSON object properties.
-     *
-     * The format functions in quby.runtime should be used for creating callNames
-     * from names. They are also designed to ensure that a callName of one context
-     * cannot refer to a callName of a different context.
-     *
-     * This is achieved by appending context unique identifiers to the beginning
-     * of the callName stating it's context (function, variable, class, etc).
-     *
-     * They are 'context unique' because one context prefix does not clash with
-     * another contexts prefix.
-     */
-    var qubyAst = ast;
-
     export interface ISyntax {
         offset: parse.Symbol;
 
@@ -1278,7 +1276,7 @@ module quby.ast {
     * There is also a third case. It could be a special class function,
     * such as 'get x, y' or 'getset img' for generating accessors (and other things).
     */
-    export class FunctionCall extends NamedSyntax {
+    export class FunctionCall extends NamedSyntax implements IFunctionDeclaration {
         private isMethodFlag: bool;
 
         private parameters: Parameters;
@@ -1355,9 +1353,11 @@ module quby.ast {
             this.isMethodFlag = true;
         }
 
-        isMethod() : bool {
-            return this.isMethodFlag;
-        }
+        isMethod() : bool { return this.isMethodFlag }
+
+        isFunction(): bool { return !this.isMethodFlag }
+
+        isConstructor(): bool { return false }
 
         /**
          * This FunctionCall needs to declare it's self to the Validator,
@@ -1471,6 +1471,10 @@ module quby.ast {
             this.klassVal = null;
             this.superKlassVal = null;
         }
+
+        isConstructor() { return true }
+        isMethod() { return false }
+        isFunction() { return false }
 
         validate(v: quby.core.Validator) {
             if (v.ensureInConstructor(this, "Super can only be called from within a constructor.")) {
@@ -2887,6 +2891,10 @@ module quby.ast {
             return this.name;
         }
 
+        getModifier(): string {
+            return this.modifierName;
+        }
+
         /* This validation code relies on the fact that when a function
          * is defined on a class, it becomes the current function for that
          * callname, regardless of if it's a diplicate function or not.
@@ -2927,8 +2935,8 @@ module quby.ast {
             if (currentFun !== null && currentFun !== this) {
                 // Give an error message depending on if we are
                 // dealing with a colliding modifier or function.
-                var errMsg = (currentFun.isGenerator) ?
-                        "'" + this.modifierName + "' modifier in class '" + this.klass.getClass().getName() + "' clashes with modifier '" + currentFun.modifierName + '", for generating: "' + this.name + '" method' :
+                var errMsg = (currentFun instanceof FunctionGenerator) ?
+                        "'" + this.modifierName + "' modifier in class '" + this.klass.getClass().getName() + "' clashes with modifier '" + (<FunctionGenerator>currentFun).getModifier() + '", for generating: "' + this.name + '" method' :
                         "'" + this.modifierName + "' modifier in class '" + this.klass.getClass().getName() + "' clashes with defined method: '" + this.name + '"';
 
                 v.parseError(this.offset, errMsg);
