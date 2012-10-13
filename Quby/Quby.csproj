@@ -39,9 +39,6 @@
     </Content>
     <Content Include="src\core.ts" />
     <TypeScriptCompile Include="quby.ts" />
-    <Content Include="file1.js">
-      <DependentUpon>quby.ts</DependentUpon>
-    </Content>
     <Content Include="src\lib\parse.js">
       <DependentUpon>parse.ts</DependentUpon>
     </Content>

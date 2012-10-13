@@ -53,6 +53,26 @@ module quby.ast {
     }
 
     export interface IExpr extends ISyntax {
+        printAsCondition: (p: quby.core.Printer) => void;
+
+        setJSLiteral: () => void;
+        isJSLiteral: () => bool;
+    }
+
+    interface INamedExpr extends IExpr {
+        getName(): string;
+        getCallName(): string;
+    }
+
+    export interface IFunctionDeclaration extends ISyntax {
+        isConstructor(): bool;
+        isFunction(): bool;
+        isMethod(): bool;
+
+        getCallName(): string;
+        getName(): string;
+
+        getNumParameters(): number;
     }
 
     export interface IStatements extends ISyntax {
@@ -76,6 +96,10 @@ module quby.ast {
 
     interface IPrecedence {
         getPrecedence: () => number;
+
+        rebalance(): IExpr;
+        onRebalance(): IExpr;
+        performBalanceSwap(newLeft: BalancingExpr, precedence: number): IExpr ;
     }
 
     /**
@@ -112,23 +136,23 @@ module quby.ast {
      */
     var functionGeneratorFactories = {
         // prefix hard coded into these functions
-        "get": function (v, fun, param) {
+        "get": function (fun:FunctionCall, param:INamedExpr) {
             return new FunctionReadGenerator(fun, 'get', param);
         },
-        "set": function (v, fun, param) {
+        "set": function (fun:FunctionCall, param:INamedExpr) {
             return new FunctionWriteGenerator(fun, 'set', param);
         },
-        "getset": function (v, fun, param) {
+        "getset": function (fun:FunctionCall, param:INamedExpr) {
             return new FunctionReadWriteGenerator(fun, 'get', 'set', param);
         },
 
-        "read": function (v, fun, param) {
+        "read": function (fun:FunctionCall, param:INamedExpr) {
             return new FunctionReadGenerator(fun, '', param);
         },
-        "write": function (v, fun, param) {
+        "write": function (fun:FunctionCall, param:INamedExpr) {
             return new FunctionWriteGenerator(fun, '', param);
         },
-        "attr": function (v, fun, param) {
+        "attr": function (fun:FunctionCall, param:INamedExpr) {
             return new FunctionReadWriteGenerator(fun, '', '', param);
         }
     };
@@ -136,28 +160,30 @@ module quby.ast {
     /**
      * Class Modifiers are psudo-functions you can call within a class.
      * For example 'get x' to generate the method 'getX()'.
+     * 
+     * @return A syntax object representing whatever this will generate.
      */
     /*
      * Lookup the function generator, and then expand the given function into multiple function generators.
      * So get x, y, z becomes three 'get' generators; getX, getY and getZ.
      */
-    var getFunctionGenerator = function (v, fun) {
-        var name = fun.name.toLowerCase();
-        var modifierFactory = functionGeneratorFactories[name];
+    var getFunctionGenerator = function(v:quby.core.Validator, fun:FunctionCall) : ISyntax {
+        var name = fun.getName().toLowerCase();
+        var modifierFactory = <(fun:FunctionCall, param:INamedExpr) => FunctionGenerator >functionGeneratorFactories[name];
 
         if (modifierFactory) {
-            var params = fun.parameters;
+            var params = fun.getParameters();
 
             // this is to avoid building a FactoryGenerators middle-man collection
             if (params.length === 1) {
-                return modifierFactory(v, fun, params.getStmts()[0]);
+                return modifierFactory( fun, <INamedExpr> params.getStmts()[0] );
             } else {
                 var generators: ISyntax[] = [];
 
                 // sort the good parameters from the bad
                 // they must all be Varaibles
                 params.each((param) => {
-                    generators.push(modifierFactory(v, fun, param));
+                    generators.push(modifierFactory(fun, <INamedExpr> param));
                 });
 
                 if (generators.length > 0) {
@@ -713,14 +739,39 @@ module quby.ast {
         }
     }
 
-    export class ClassDefinition extends Syntax implements IClassDefinition {
+    class NamedSyntax extends Syntax {
+        private name: string;
+        private callName: string;
+
+        constructor(offset: parse.Symbol, name:string, callName:string) {
+            super(offset);
+
+            this.name = name;
+            this.callName = callName;
+        }
+
+        getName(): string {
+            return this.name;
+        }
+
+        setName(name: string) {
+            this.name = name;
+        }
+
+        getCallName(): string {
+            return this.callName;
+        }
+
+        setCallName(name: string) {
+            this.callName = name;
+        }
+    }
+
+    export class ClassDefinition extends NamedSyntax implements IClassDefinition {
         private classValidator: quby.core.ClassValidator;
 
         private header: ClassHeader;
         private statements: Statements;
-
-        private name: string;
-        private callName: string;
 
         constructor (classHeader: ClassHeader, statements: Statements) {
             /*
@@ -737,10 +788,13 @@ module quby.ast {
                  * Entirely user declared and created.
                  */
             } else {
-                super(classHeader.offset);
+                var name = classHeader.getName();
 
-                this.name = classHeader.getName();
-                this.callName = quby.runtime.formatClass(classHeader.getName());
+                super(
+                        classHeader.offset,
+                        name,
+                        quby.runtime.formatClass( name )
+                )
 
                 this.header = classHeader;
                 this.statements = statements;
@@ -757,21 +811,15 @@ module quby.ast {
             return false;
         }
 
-        getName() {
-            return this.name;
-        }
-
-        getCallName() {
-            return this.callName;
-        }
-
         getHeader() {
             return this.header;
         }
 
         validate(v: quby.core.Validator) {
-            v.ensureOutFun(this, "Class '" + this.name + "' defined within a function, this is not allowed.");
-            v.ensureOutBlock(this, "Class '" + this.name + "' defined within a block, this is not allowed.");
+            var name = this.getName();
+
+            v.ensureOutFun(this, "Class '" + name + "' defined within a function, this is not allowed.");
+            v.ensureOutBlock(this, "Class '" + name + "' defined within a block, this is not allowed.");
 
             // validator stored for printing later (validation check made inside)
             this.classValidator = v.setClass(this);
@@ -799,7 +847,7 @@ module quby.ast {
         getSuperCallName() {
             var superCallName = this.header.getSuperCallName();
 
-            if (superCallName == this.callName) {
+            if (superCallName === this.getCallName()) {
                 return null;
             } else {
                 return superCallName;
@@ -814,18 +862,14 @@ module quby.ast {
      * This also includes the extra Quby prototypes such as Array (really QubyArray)
      * and Hash (which is really a QubyHash).
      */
-    export class ExtensionClassDefinition extends Syntax implements IClassDefinition {
+    export class ExtensionClassDefinition extends NamedSyntax implements IClassDefinition {
         private header: ClassHeader;
         private statements: Statements;
 
-        private name: string;
-        private callName: string;
-
         constructor (classHeader: ClassHeader, statements: Statements) {
-            super(classHeader.offset);
+            var name = classHeader.getName();
 
-            this.name = classHeader.getName();
-            this.callName = quby.runtime.formatClass( this.name );
+            super(classHeader.offset, name, quby.runtime.formatClass(name) );
 
             this.header = classHeader;
             this.statements = statements;
@@ -839,14 +883,6 @@ module quby.ast {
             return true;
         }
 
-        getName() {
-            return this.name;
-        }
-
-        getCallName() {
-            return this.callName;
-        }
-
         getHeader() {
             return this.header;
         }
@@ -855,7 +891,7 @@ module quby.ast {
             p.setCodeMode(false);
 
             if (this.statements !== null) {
-                p.appendExtensionClassStmts(this.name, this.statements.getStmts());
+                p.appendExtensionClassStmts(this.getName(), this.statements.getStmts());
             }
 
             p.setCodeMode(true);
@@ -904,15 +940,13 @@ module quby.ast {
     /**
      * Defines a function or method definition.
      */
-    export class Function extends Syntax {
+    export class Function extends NamedSyntax implements IFunctionDeclaration {
         static FUNCTION = 0;
         static METHOD = 1;
         static CONSTRUCTOR = 2;
 
         private type: number;
 
-        private name: string;
-        private callName: string;
         private parameters: Parameters;
 
         private blockParam: ParameterBlockVariable;
@@ -926,36 +960,23 @@ module quby.ast {
         private preVariables: Identifier[];
 
         constructor(symName: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
-            super(symName);
+            super(symName, symName.match, '');
 
             this.type = Function.FUNCTION;
 
-            this.name = symName.match;
             this.parameters = parameters;
 
             if (parameters !== null) {
                 this.blockParam = parameters.getBlockParam();
-                this.callName = quby.runtime.formatFun(symName.match, parameters.length);
+                this.setCallName( quby.runtime.formatFun(symName.match, parameters.length) );
             } else {
                 this.blockParam = null;
-                this.callName = quby.runtime.formatFun(symName.match, 0);
+                this.setCallName( quby.runtime.formatFun(symName.match, 0) );
             }
 
             this.stmtBody = stmtBody;
 
             this.preVariables = [];
-        }
-
-        getCallName() {
-            return this.callName;
-        }
-
-        setCallName( name:string ) {
-            this.callName = name;
-        }
-
-        getName() {
-            return this.name;
         }
 
         hasParameters() {
@@ -964,6 +985,12 @@ module quby.ast {
 
         getParameters() {
             return this.parameters;
+        }
+
+        getNumParameters() {
+            return (this.parameters !== null) ?
+                    this.parameters.length :
+                    0;
         }
 
         getStatements() {
@@ -986,7 +1013,7 @@ module quby.ast {
             this.type = type;
         }
 
-        addPreVariable(variable: Identifier) {
+        addPreVariable(variable: quby.ast.Identifier) {
             this.preVariables.push(variable);
         }
 
@@ -996,16 +1023,17 @@ module quby.ast {
             }
 
             var isOutFun = true;
+
             if (v.isInsideFun()) {
                 var otherFun = v.getCurrentFun();
                 var strOtherType = (otherFun.isMethod() ? "method" : "function");
 
-                v.parseError(this.offset, "Function '" + this.name + "' is defined within " + strOtherType + " '" + otherFun.name + "', this is not allowed.");
+                v.parseError(this.offset, "Function '" + this.getName() + "' is defined within " + strOtherType + " '" + otherFun.getName() + "', this is not allowed.");
                 isOutFun = false;
             } else {
                 var strType = (this.isMethod() ? "Method" : "Function");
 
-                v.ensureOutBlock(this, strType + " '" + this.name + "' is within a block, this is not allowed.");
+                v.ensureOutBlock(this, strType + " '" + this.getName() + "' is within a block, this is not allowed.");
             }
 
             if (isOutFun) {
@@ -1034,9 +1062,9 @@ module quby.ast {
             }
 
             if (this.isMethod() && !this.isConstructor()) {
-                p.append(this.callName, '=function');
+                p.append(this.getCallName(), '=function');
             } else {
-                p.append('function ', this.callName);
+                p.append('function ', this.getCallName());
             }
 
             this.printParameters(p);
@@ -1101,12 +1129,6 @@ module quby.ast {
                 this.blockParam.print(p);
                 p.append('=', quby.runtime.BLOCK_VARIABLE, ';');
             }
-        }
-
-        getNumParameters() {
-            return (this.parameters !== null) ?
-                    this.parameters.length :
-                    0;
         }
     }
 
@@ -1203,6 +1225,46 @@ module quby.ast {
         }
     }
 
+    /**
+     * @param offset The source code offset for this Expr.
+     * @param isResultBool An optimization flag. Pass in true if the result of this Expression will always be a 'true' or 'false'. Optional, and defaults to false.
+     */
+    class Expr extends Syntax implements IExpr {
+        private isResultBool: bool;
+
+        constructor (offset: parse.Symbol, isResultBool?: bool = false) {
+            super(offset);
+
+            this.isResultBool = isResultBool;
+        }
+
+        printAsCondition(p: quby.core.Printer) {
+            if (this.isResultBool) {
+                this.print(p);
+            } else {
+                super.printAsCondition(p);
+            }
+        }
+    }
+
+    class NamedExpr extends NamedSyntax implements INamedExpr {
+        private isResultBool: bool;
+
+        constructor(offset: parse.Symbol, name: string, callName: string, isResultBool?: bool = false) {
+            super(offset, name, callName);
+
+            this.isResultBool = isResultBool;
+        }
+
+        printAsCondition(p: quby.core.Printer) {
+            if(this.isResultBool) {
+                this.print(p);
+            } else {
+                super.printAsCondition(p);
+            }
+        }
+    }
+
     /*
     * If this is used from within a class, then it doesn't know if it's a
     * function call, 'foo()', or a method call, 'this.foo()'.
@@ -1216,31 +1278,29 @@ module quby.ast {
     * There is also a third case. It could be a special class function,
     * such as 'get x, y' or 'getset img' for generating accessors (and other things).
     */
-    export class FunctionCall extends Syntax {
+    export class FunctionCall extends NamedSyntax {
         private isMethodFlag: bool;
 
         private parameters: Parameters;
         private block: FunctionBlock;
 
-        private name: string;
-        private callName: string;
-
-        private functionGenerator: FunctionGenerator;
+        private functionGenerator:ISyntax;
 
         private isInsideExtensionClass: bool;
 
         constructor (sym: parse.Symbol, parameters: Parameters, block: FunctionBlock) {
-            super(sym);
-
-            this.name = sym.match;
-            this.parameters = parameters;
-
-            this.callName = quby.runtime.formatFun(
+            super(
+                    sym,
                     sym.match,
-                    (parameters !== null) ?
-                            parameters.length :
-                            0
+                    quby.runtime.formatFun(
+                            sym.match,
+                            (parameters !== null) ?
+                                    parameters.length :
+                                    0
+                    )
             );
+
+            this.parameters = parameters;
 
             this.block = block;
             this.functionGenerator = null;
@@ -1258,18 +1318,6 @@ module quby.ast {
             return this.block;
         }
 
-        getName() {
-            return this.name;
-        }
-
-        getCallName() {
-            return this.callName;
-        }
-
-        setCallName(name: string) {
-            this.callName = name;
-        }
-
         print(p: quby.core.Printer) {
             if (this.functionGenerator) {
                 this.functionGenerator.print(p);
@@ -1283,7 +1331,7 @@ module quby.ast {
         }
 
         printFunCall(p: quby.core.Printer) {
-            p.append(this.callName, '(');
+            p.append(this.getCallName(), '(');
             this.printParams(p);
             p.append(')');
         }
@@ -1332,9 +1380,9 @@ module quby.ast {
                 this.functionGenerator = generator = getFunctionGenerator(v, this);
 
                 if (generator === null) {
-                    v.parseError(this.offset, "Function '" + this.name + "' called within definition of class '" + v.getCurrentClass().getClass().getName() + "', this is not allowed.");
+                    v.parseError(this.offset, "Function '" + this.getName() + "' called within definition of class '" + v.getCurrentClass().getClass().getName() + "', this is not allowed.");
                 } else if (this.block !== null) {
-                    v.parseError(this.offset, "'" + this.name + "' modifier of class '" + v.getCurrentClass().getClass().getName() + "', cannot use a block.");
+                    v.parseError(this.offset, "'" + this.getName() + "' modifier of class '" + v.getCurrentClass().getClass().getName() + "', cannot use a block.");
                 } else {
                     generator.validate(v);
                 }
@@ -1402,7 +1450,9 @@ module quby.ast {
 
         appendLeft(expr: IExpr) {
             if (this.expr !== null) {
-                this.expr.appendLeft(expr);
+                if (this.expr['appendLeft'] !== undefined) {
+                    this.expr['appendLeft'](expr);
+                }
             } else {
                 this.expr = expr;
             }
@@ -1464,6 +1514,24 @@ module quby.ast {
                 this.printParams(p);
                 p.append(')');
             }
+        }
+    }
+
+    /**
+     * // todo
+     */
+    export class JSMethodCall extends FunctionCall {
+        constructor( expr: IExpr, sym: parse.Symbol, params: Parameters, block: FunctionBlock ) {
+            super(sym, params, block);
+        }
+    }
+
+    /**
+     * // todo
+     */
+    export class JSProperty extends Expr {
+        constructor( expr: IExpr, sym: parse.Symbol ) {
+            super(sym);
         }
     }
 
@@ -1708,6 +1776,12 @@ module quby.ast {
         }
     }
 
+    /*
+     * todo: test a lambda as a condition, does it crash?
+     *       I think this needs 'printCondition'.
+         
+        if ( def() end )
+     */
     export class Lambda extends FunctionBlock {
         constructor (parameters: Parameters, statements: Statements) {
             super(parameters, statements);
@@ -1717,28 +1791,6 @@ module quby.ast {
             p.append('(');
             super.print(p);
             p.append(')');
-        }
-    }
-
-    /**
-     * @param offset The source code offset for this Expr.
-     * @param isResultBool An optimization flag. Pass in true if the result of this Expression will always be a 'true' or 'false'. Optional, and defaults to false.
-     */
-    class Expr extends Syntax {
-        private isResultBool: bool;
-
-        constructor (offset: parse.Symbol, isResultBool?: bool = false) {
-            super(offset);
-
-            this.isResultBool = isResultBool;
-        }
-
-        printAsCondition(p: quby.core.Printer) {
-            if (this.isResultBool) {
-                this.print(p);
-            } else {
-                super.printAsCondition(p);
-            }
         }
     }
 
@@ -1886,8 +1938,8 @@ module quby.ast {
                 expr = (<BalancingExpr>expr).rebalance();
             }
 
-            if ( expr['getPrecedence'] ) {
-                var pExpr = <IPrecedence> pExpr;
+            if ( expr instanceof BalancingExpr ) {
+                var pExpr = <BalancingExpr> pExpr;
 
                 if (pExpr.getPrecedence() > 1) {
                     var copy: SingleOp = util.clone(this);
@@ -1899,6 +1951,10 @@ module quby.ast {
             } else {
                 return this;
             }
+        }
+
+        performBalanceSwap(newLeft: BalancingExpr, precedence: number): IExpr {
+            return this;
         }
     }
 
@@ -2012,42 +2068,42 @@ module quby.ast {
         onRebalance(): IExpr {
             var right = this.right;
 
-            if (right.rebalance !== undefined) {
-                right = right.rebalance();
+            if ( right instanceof BalancingExpr ) {
+                right = ( <BalancingExpr> <any> right ).rebalance();
+
+                if (right instanceof BalancingExpr) {
+                    var rightP = <IPrecedence> <any> right,
+                        intPrecedence = this.precedence;
+
+                    if (rightP.getPrecedence() > intPrecedence) {
+                        var copy = <Op> util.clone(this);
+                        copy.right = rightP.performBalanceSwap(copy, intPrecedence);
+
+                        return right;
+                    }
+                }
             }
 
-            var rightPrecedence = right.precedence,
-                precedence = this.precedence;
-
-            if (
-                    rightPrecedence !== undefined &&
-                    rightPrecedence > precedence
-            ) {
-                var copy = <Op> util.clone(this);
-                copy.right = right.performBalanceSwap(copy, precedence);
-
-                return right;
-            } else {
-                return this;
-            }
+            return this;
         }
 
-        performBalanceSwap(newLeft: IExpr, precedence: number): IExpr {
-            var leftP = this.left.precedence,
+        performBalanceSwap(newLeft: BalancingExpr, precedence: number): IExpr {
+            var left = this.left,
                 oldLeft;
 
             /*
              * Left is either an node,
              * or it has higher precedence.
              */
-            if (leftP !== undefined) {
-                if (leftP <= precedence) {
-                    oldLeft = this.left;
+            if ( this.left instanceof BalancingExpr ) {
+                if ((<IPrecedence> <any> (left)).getPrecedence() <= precedence) {
+                    oldLeft = left;
+
                     this.left = newLeft;
 
                     return oldLeft;
                 } else {
-                    return this.left.performBalanceSwap(newLeft, precedence);
+                    return (<IPrecedence> <any> left).performBalanceSwap( newLeft, precedence );
                 }
             } else {
                 oldLeft = this.left;
@@ -2055,8 +2111,6 @@ module quby.ast {
 
                 return oldLeft;
             }
-
-            return null;
         }
 
         getPrecedence() {
@@ -2065,7 +2119,9 @@ module quby.ast {
 
         appendLeft(left: IExpr) {
             if (this.left !== null) {
-                this.left.appendLeft(left);
+                if (this.left['appendLeft'] !== undefined) {
+                    this.left['appendLeft'](left);
+                }
             } else if (left) {
                 this.setOffset(left.offset);
                 this.left = left;
@@ -2293,16 +2349,12 @@ module quby.ast {
         }
     }
 
-    class Identifier extends Expr implements IAssignable {
-        private name: string;
-        private callName: string;
+    export class Identifier extends NamedExpr implements IAssignable {
         private isAssignmentFlag: bool;
 
         constructor (identifier: parse.Symbol, callName: string) {
-            super(identifier);
+            super(identifier, identifier.match, callName);
 
-            this.name = identifier.match;
-            this.callName = callName;
             this.isAssignmentFlag = false;
         }
 
@@ -2310,24 +2362,12 @@ module quby.ast {
             return this.isAssignmentFlag;
         }
 
-        setCallName(newCallName: string) {
-            this.callName = newCallName;
-        }
-
         print(p: quby.core.Printer) {
-            p.append(this.callName);
+            p.append(this.getCallName());
         }
 
         setAssignment(v?:quby.core.Validator, parent?:Assignment): void {
             this.isAssignmentFlag = true;
-        }
-
-        getName(): string {
-            return this.name;
-        }
-
-        getCallName(): string {
-            return this.callName;
         }
     }
 
@@ -2562,7 +2602,7 @@ module quby.ast {
      * ### Arrays ###
      */
 
-    export class ArrayAccess extends Syntax {
+    export class ArrayAccess extends Expr {
         private array:IExpr;
         private index:IExpr;
 
@@ -2573,7 +2613,7 @@ module quby.ast {
                     array.offset :
                     null;
 
-            super( offset )
+            super(offset);
 
             this.array = array;
             this.index = index;
@@ -2602,7 +2642,9 @@ module quby.ast {
 
         appendLeft(array) {
             if (this.array !== null) {
-                this.array.appendLeft(array);
+                if (this.array['appendLeft'] !== undefined) {
+                    this.array['appendLeft'](array);
+                }
             } else if (array) {
                 this.setOffset(array.offset);
                 this.array = array;
@@ -2680,13 +2722,14 @@ module quby.ast {
         private match:string;
 
         constructor(sym:parse.Symbol, isTrue:bool, altMatch?:string) {
+            var match = altMatch ?
+                    altMatch  :
+                    sym.match ;
+
             super(sym);
 
             this.isTrue = isTrue;
 
-            this.match = altMatch ?
-                    altMatch  :
-                    sym.match ;
         }
 
         getMatch() {
@@ -2714,13 +2757,17 @@ module quby.ast {
         }
     }
 
-    export class Symbol extends Literal {
+    export class Symbol extends Literal implements INamedExpr {
         private callName: string;
 
         constructor(sym:parse.Symbol) {
             super( sym, true );
 
             this.callName = quby.runtime.formatSymbol( sym.match );
+        }
+
+        getName() {
+            return this.getMatch();
         }
 
         getCallName() {
@@ -2770,7 +2817,7 @@ module quby.ast {
     }
 
     /*
-     * ### Function Generating stuff ###
+     * = Function Generating Stuff =
      */
 
     /**
@@ -2779,11 +2826,9 @@ module quby.ast {
      *
      * It handles storing common items.
      */
-    class FunctionGenerator implements ISyntax {
+    class FunctionGenerator implements IFunctionDeclaration {
         public offset: parse.Symbol;
         public callName: string;
-
-        private obj;
 
         private klass:quby.core.ClassValidator;
 
@@ -2799,24 +2844,47 @@ module quby.ast {
 
         private numParams: number;
 
-        constructor(obj, methodName: string, numParams: number) {
-            this.obj = obj;
+        constructor(obj:FunctionCall, methodName: string, numParams: number) {
             this.offset = obj.offset;
 
             this.klass = null;
 
-            this.modifierName = obj.name;
+            this.modifierName = obj.getName();
 
             this.isGenerator = true;
 
             this.name = methodName;
-            this.numPrams = numParams;
+            this.numParams = numParams;
 
             this.callName = quby.runtime.formatFun(methodName, numParams);
         }
 
+        isConstructor() {
+            return false;
+        }
+
+        isMethod() {
+            return false;
+        }
+
+        isFunction() {
+            return true;
+        }
+
         getOffset() {
             return this.offset;
+        }
+
+        getClassValidator() : quby.core.ClassValidator {
+            return this.klass;
+        }
+
+        getCallName(): string {
+            return this.callName;
+        }
+
+        getName() : string {
+            return this.name;
         }
 
         /* This validation code relies on the fact that when a function
@@ -2836,13 +2904,12 @@ module quby.ast {
                 v.popScope();
 
                 v.onEndValidate((v:quby.core.Validator) => this.onEndValidate(v));
-
             }
         }
 
         print(p: quby.core.Printer) { }
 
-        getNumParameters() {
+        getNumParameters() : number {
             return this.numParams;
         }
 
@@ -2875,17 +2942,17 @@ module quby.ast {
 
     class FunctionAttrGenerator extends FunctionGenerator {
         private fieldName: string;
-        private fieldObj;
-        private field;
+        private fieldObj:INamedExpr;
+        private field:FieldVariable;
 
         private proto: new (sym: parse.Symbol) => FieldVariable;
 
-        constructor(obj, methodName:string, numParams:number, fieldObj, proto:new(sym:parse.Symbol) => FieldVariable ) {
+        constructor(obj:FunctionCall, methodName:string, numParams:number, fieldObj:INamedExpr, proto:new(sym:parse.Symbol) => FieldVariable ) {
             var fieldName:string;
             if (fieldObj instanceof Variable || fieldObj instanceof FieldVariable) {
-                fieldName = fieldObj.identifier;
+                fieldName = ( <Identifier>fieldObj ).getName();
             } else if (fieldObj instanceof Symbol) {
-                fieldName = fieldObj.match;
+                fieldName = ( <Symbol>fieldObj ).getMatch();
             } else {
                 fieldName = null;
             }
@@ -2902,20 +2969,24 @@ module quby.ast {
             this.fieldObj = fieldObj;
 
             // this is our fake field
-            this.field = null;
+            this.field = new this.proto( this.offset.clone(this.fieldName) );
+        }
+
+        withField(callback: (field:FieldVariable) => void ) {
+            if (this.field !== null) {
+                callback(this.field);
+            }
         }
 
         validate(v:quby.core.Validator) {
             if (this.fieldName !== null) {
                 super.validate(v);
             } else {
-                v.parseError(this.fieldObj.offset, " Invalid parameter for generating '" + this.name + "' method");
+                v.parseError(this.fieldObj.offset, " Invalid parameter for generating '" + this.getName() + "' method");
             }
         }
 
         validateInside(v:quby.core.Validator) {
-            this.field = new this.proto( this.offset.clone(this.fieldName) );
-
             this.field.validate(v);
         }
     }
@@ -2929,65 +3000,67 @@ module quby.ast {
     }
 
     class FunctionReadGenerator extends FunctionAttrGenerator {
-        constructor(obj, methodPrefix:string, field) {
+        constructor(obj:FunctionCall, methodPrefix:string, field:INamedExpr) {
             super( obj, methodPrefix, 0, field, FunctionReadGeneratorFieldVariable );
         }
 
         onEndValidate(v:quby.core.Validator) {
             super.onEndValidate(v);
 
-            if (this.field) {
-                if (!this.klass.hasFieldCallName(this.field.callName)) {
-                    v.parseError(this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name);
+            this.withField((field:FieldVariable) => {
+                var klass = this.getClassValidator();
+
+                if (!klass.hasFieldCallName(field.getCallName())) {
+                    v.parseError(this.offset, "field '" + field.getName() + "' never written to in class '" + klass.getClass().getName() + "' for generating method " + this.getName());
                 }
-            }
+            })
         }
 
         /*
          * This will be a method.
          */
         print(p:quby.core.Printer) {
-            if (this.field) {
+            this.withField((field:FieldVariable) => {
                 p.append(this.callName, '=function(){return ');
-                this.field.print(p);
+                field.print(p);
                 p.append(';}');
-            }
+            })
         }
     }
 
     class FunctionWriteGenerator extends FunctionAttrGenerator {
-        constructor (obj, methodPrefix: string, field) {
+        constructor (obj:FunctionCall, methodPrefix: string, field:INamedExpr) {
             super(
-                     obj,
-                     methodPrefix,
-                     1,
-                     field,
-                     FieldVariableAssignment
-             )
+                    obj,
+                    methodPrefix,
+                    1,
+                    field,
+                    FieldVariable
+            )
 
-            this.setAssignment();
+            this.withField((field: FieldVariable) => field.setAssignment(); );
         }
 
         onEndValidate(v:quby.core.Validator) {
             super.onEndValidate(v);
 
-            if (this.field) {
-                if (!this.klass.hasFieldCallName(this.field.callName)) {
-                    v.parseError(this.offset, "Field '" + this.field.identifier + "' never written to in class '" + this.klass.klass.name + "' for generating method " + this.name);
+            this.withField((field: FieldVariable) => {
+                if (!this.getClassValidator().hasFieldCallName(field.getCallName())) {
+                    v.parseError(this.offset, "field '" + field.getName() + "' never written to in class '" + this.getClassValidator().getClass().getName() + "' for generating method " + this.getName() );
                 }
-            }
+            })
         }
 
         /*
          * This will be a method.
          */
         print(p:quby.core.Printer) {
-            if (this.field) {
+            this.withField((field: FieldVariable) => {
                 p.append(this.callName, '=function(t){return ');
-                this.field.print(p);
+                field.print(p);
                 p.append('=t;');
                 p.append('}');
-            }
+            });
         }
     }
 
@@ -2995,7 +3068,7 @@ module quby.ast {
         private getter: FunctionReadGenerator;
         private setter: FunctionWriteGenerator;
 
-        constructor(obj, getPre:string, setPre:string, fieldObj) {
+        constructor( obj:FunctionCall, getPre:string, setPre:string, fieldObj:INamedExpr ) {
             this.getter = new FunctionReadGenerator(obj, getPre, fieldObj);
             this.setter = new FunctionWriteGenerator(obj, setPre, fieldObj);
         }
@@ -3011,8 +3084,12 @@ module quby.ast {
         }
     }
 
+    /*
+     *  = Admin Inlining = 
+     * 
+     * and other manipulation of code.
+     */
 
-    /* Other */
     export class PreInline extends Syntax {
         private isPrinted: bool;
 
@@ -3031,7 +3108,7 @@ module quby.ast {
             }
         }
         validate(v:quby.core.Validator) {
-            v.ensureAdminMode( this, "inlining pre-JavaScript is not allowed outside of admin mode." );
+            v.ensureAdminMode( this, "inlining pre-JavaScript is not allowed outside of admin mode" );
 
             v.addPreInline(this);
         }
@@ -3051,7 +3128,7 @@ module quby.ast {
             this.print(p);
         }
         validate(v:quby.core.Validator) {
-            v.ensureAdminMode(this, "inlining JavaScript is not allowed outside of admin mode.");
+            v.ensureAdminMode(this, "inlining JavaScript is not allowed outside of admin mode");
         }
     }
 }

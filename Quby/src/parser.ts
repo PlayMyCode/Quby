@@ -844,9 +844,10 @@ module quby {
             statementSeperator
     );
 
-    var statements = parse.
-            optional( statementSeperator ).
-            optional( repeatStatement ).
+    var statements = parse.rule();
+    
+    statements.optional( statementSeperator );
+    statements.optional( repeatStatement ).
             optional( statementSeperator ).
             onMatch( function( onStart, stmts, endEnd ) {
                 if ( stmts === null ) {
@@ -1144,7 +1145,7 @@ module quby {
                                 return { exprs: exprs, block: block };
                             } )
             ).
-            onMatch( function( hash, name, exprsBlock ) {
+            onMatch((hash, name: parse.Symbol, exprsBlock:{ exprs: quby.ast.Parameters; block: quby.ast.FunctionBlock; } ) : quby.ast.ISyntax => {
                 if ( exprsBlock ) {
                     return new quby.ast.JSMethodCall( null, name, exprsBlock.exprs, exprsBlock.block );
                 } else {

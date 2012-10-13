@@ -73,25 +73,27 @@ module quby {
          * @param error The error to parse.
          * @return Info on the error, for display purposes.
          */
-        var formatError = function(error): { line: number; msg: string; } {
+        var formatError = function(error:parse.ParserError): { line: number; msg: string; } {
             var errLine = error.getLine(),
                 strErr;
 
             if (error.isSymbol) {
                 strErr = "error parsing '" + error.match + "'";
             } else if (error.isTerminal) {
-                if (error.isLiteral || util.str.trim(error.match) === '') {
-                    strErr = "syntax error near '" + error.terminalName + "'";
+                var termError = <parse.TerminalError> error;
+
+                if (termError.isLiteral || util.str.trim(termError.match) === '') {
+                    strErr = "syntax error near '" + termError.terminalName + "'";
                 } else {
-                    strErr = "syntax error near " + error.terminalName + " '" + error.match + "'";
+                    strErr = "syntax error near " + termError.terminalName + " '" + error.match + "'";
                 }
             } else {
                 throw new Error("Unknown parse.js error given to format");
             }
 
             return {
-                line: errLine,
-                msg: strErr
+                    line: errLine,
+                    msg: strErr
             };
         }
 
@@ -462,43 +464,43 @@ module quby {
              *
              * @param func
              */
-            defineFun(func:quby.ast.Function) {
+            defineFun(fun:quby.ast.IFunctionDeclaration) {
                 var klass = this.currentClass;
 
                 // Methods / Constructors
                 if (klass !== null) {
                     // Constructors
-                    if (func.isConstructor()) {
-                        klass.addNew(func);
+                    if (fun.isConstructor()) {
+                        klass.addNew(fun);
                         // Methods
                     } else {
-                        klass.addFun(func);
-                        this.methodNames.add(func.getCallName(), func.getName());
+                        klass.addFun(fun);
+                        this.methodNames.add(fun.getCallName(), fun.getName());
                     }
                     // Functions
                 } else {
-                    if (this.funs[func.getCallName()]) {
-                        this.parseError(func.offset, "Function is already defined: '" + func.getName() + "', with " + func.getNumParameters() + " parameters.");
+                    if (this.funs[fun.getCallName()]) {
+                        this.parseError(fun.offset, "Function is already defined: '" + fun.getName() + "', with " + fun.getNumParameters() + " parameters.");
                     }
 
-                    this.funs[func.getCallName()] = func;
+                    this.funs[fun.getCallName()] = fun;
                 }
             }
 
             /* Store any functions which have not yet been defined.
             * Note that this will include valid function calls which are defined after
             * the call, but this is sorted in the endValidate section. */
-            useFun(fun:quby.ast.FunctionCall) {
-                if (fun.isMethod()) {
-                    this.calledMethods[fun.getCallName()] = fun;
+            useFun(funCall:quby.ast.FunctionCall) {
+                if (funCall.isMethod()) {
+                    this.calledMethods[funCall.getCallName()] = funCall;
                 } else if (this.isInsideClass()) {
-                    if (this.currentClass.hasFun(fun)) {
-                        fun.setIsMethod();
+                    if (this.currentClass.hasFun(funCall)) {
+                        funCall.setIsMethod();
                     } else {
-                        this.lateUsedFuns.addFun(fun);
+                        this.lateUsedFuns.addFun(funCall);
                     }
-                } else if (! this.funs[fun.getCallName()]) {
-                    this.usedFunsStack.push(fun);
+                } else if (! this.funs[funCall.getCallName()]) {
+                    this.usedFunsStack.push(funCall);
                 }
             }
 
@@ -608,7 +610,7 @@ module quby {
             }
 
             // adds a program to be validated by this Validator
-            validate(program, errors) {
+            validate(program:quby.ast.ISyntax, errors:parse.ParserError[]) {
                 // clear this, so errors don't seap across multiple validations
                 this.lastErrorName = null;
 
@@ -654,8 +656,8 @@ module quby {
                      * confirmed as being defined. Note this can include multiple calls
                      * to the same functions. */
                     for (var usedFunsI in this.usedFunsStack) {
-                        var fun = this.usedFunsStack[usedFunsI];
-                        var callName = fun.callName;
+                        var fun:quby.ast.FunctionCall = this.usedFunsStack[usedFunsI];
+                        var callName = fun.getCallName();
 
                         // check if the function is not defined
                         if (!this.funs[callName]) {
@@ -690,15 +692,15 @@ module quby {
                         }
 
                         if (!methodFound) {
-                            var found = this.searchForMethodLike(method),
+                            var found:quby.ast.IFunctionDeclaration = this.searchForMethodLike(method),
                                 name = method.getName().toLowerCase(),
                                 errMsg = null;
 
                             if (found !== null) {
-                                if (name === found.name.toLowerCase()) {
+                                if (name === found.getName().toLowerCase()) {
                                     errMsg = "Method '" + method.getName() + "' called with incorrect number of parameters, " + method.getNumParameters() + " instead of " + found.getNumParameters();
                                 } else {
-                                    errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.name + "'?";
+                                    errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.getName() + "'?";
                                 }
                             } else {
                                 // no alternative method found
@@ -872,12 +874,12 @@ module quby {
              * @param method The method to search for one similar too.
              * @param klassVal An optional ClassValidator to restrict the search, otherwise searches through all classes.
              */
-            searchForMethodLike(method:quby.ast.MethodCall, klassVal?:ClassValidator) {
+            searchForMethodLike(method:quby.ast.MethodCall, klassVal?:ClassValidator):quby.ast.IFunctionDeclaration {
                 if (klassVal) {
                     return this.searchMissingFun(method, klassVal.getFunctions());
                 } else {
                     var searchKlassVals = this.classes,
-                        altMethod = null,
+                        altMethod:quby.ast.IFunctionDeclaration = null,
                         methodName = method.getName().toLowerCase();
                     // check for same method, but different number of parameters
 
@@ -886,7 +888,7 @@ module quby {
 
                         if (found !== null) {
                             // wrong number of parameters
-                            if (found.name.toLowerCase() == methodName) {
+                            if (found.getName().toLowerCase() == methodName) {
                                 return found;
                                 // alternative name
                             } else if (altMethod === null) {
@@ -906,9 +908,9 @@ module quby {
              * 'alternative name' is returned, only if 'incorrect parameters' does not come first.
              * Otherwise null is returned.
              */
-            searchMissingFunWithName(name, searchFuns) {
-                var altNames = [],
-                    altFun = null;
+            searchMissingFunWithName(name, searchFuns) : quby.ast.IFunctionDeclaration {
+                var altNames:string[] = [],
+                    altFun:quby.ast.IFunctionDeclaration = null;
                 var nameLen = name.length;
 
                 if (
@@ -923,8 +925,8 @@ module quby {
                 }
 
                 for (var funIndex in searchFuns) {
-                    var searchFun = searchFuns[funIndex];
-                    var searchName = searchFun.name.toLowerCase();
+                    var searchFun = <quby.ast.IFunctionDeclaration> searchFuns[funIndex];
+                    var searchName = searchFun.getName().toLowerCase();
 
                     if (searchName === name) {
                         return searchFun;
@@ -950,19 +952,20 @@ module quby {
             /**
              *
              */
-            searchMissingFunAndError(fun, searchFuns, strFunctionType) {
-                var name = fun.name.toLowerCase();
-                var found = this.searchMissingFunWithName(name, searchFuns),
+            searchMissingFunAndError(fun:quby.ast.FunctionCall, searchFuns:Object, strFunctionType:string) {
+                var name = fun.getName(),
+                    lower = name.toLowerCase(),
+                    found = this.searchMissingFunWithName(name, searchFuns),
                     errMsg;
 
                 if (found !== null) {
-                    if (name === found.name.toLowerCase()) {
-                        errMsg = "Called " + strFunctionType + " '" + fun.name + "' with wrong number of parameters.";
+                    if (lower === found.getName().toLowerCase()) {
+                        errMsg = "Called " + strFunctionType + " '" + name + "' with wrong number of parameters.";
                     } else {
-                        errMsg = "Called " + strFunctionType + " '" + fun.name + "', but it is not defined, did you mean: '" + found.name + "'.";
+                        errMsg = "Called " + strFunctionType + " '" + name + "', but it is not defined, did you mean: '" + found.getName() + "'.";
                     }
                 } else {
-                    errMsg = "Undefined " + strFunctionType + " called: '" + fun.name + "'.";
+                    errMsg = "Undefined " + strFunctionType + " called: '" + name + "'.";
                 }
 
                 this.parseError(fun.offset, errMsg);
@@ -1021,7 +1024,7 @@ module quby {
                     var funs = this.classFuns[className];
 
                     for (var funName in funs) {
-                        var innerFuns = funs[funName];
+                        var innerFuns:quby.ast.FunctionCall[] = funs[funName];
                         var fun = innerFuns[0];
 
                         if (klassV.hasFunInHierarchy(fun)) {
@@ -1031,7 +1034,7 @@ module quby {
                         } else if (!globalFuns[funName]) {
                             for (var i = 0; i < innerFuns.length; i++) {
                                 var f = innerFuns[i];
-                                this.validator.parseError(f.offset, "Function '" + f.name + "' called with " + f.getNumParameters() + " parameters, but is not defined in this class or as a function.");
+                                this.validator.parseError(f.offset, "Function '" + f.getName() + "' called with " + f.getNumParameters() + " parameters, but is not defined in this class or as a function.");
                             }
                         }
                     }
@@ -1266,7 +1269,7 @@ module quby {
                 return (f === undefined) ? null : f;
             }
 
-            addNew(fun) {
+            addNew(fun:quby.ast.IFunctionDeclaration) {
                 var index = fun.getNumParameters();
 
                 if (this.news[index] != undefined) {
