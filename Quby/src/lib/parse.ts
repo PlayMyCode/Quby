@@ -265,11 +265,11 @@
 
 module parse {
     export interface TerminalFunction {
-        ( src: string, i: number, code: number, len: number ): number;
+        (src: string, i: number, code: number, len: number): number;
     }
 
     export interface MatchFoundFunction {
-        ( ...args: any[] ): any;
+        (...args: any[]): any;
     }
 
     export interface TimeResult {
@@ -279,26 +279,26 @@ module parse {
         total: number;
     }
 
-    export interface DebugCallback { ( terms: Term[], times: TimeResult ): void; }
+    export interface DebugCallback { (terms: Term[], times: TimeResult): void; }
 
-    export interface SymbolizeCallback { ( terminals: Term[], errors: SymbolError[] ): void; };
+    export interface SymbolizeCallback { (terminals: Term[], errors: SymbolError[]): void; };
 
-    export interface FinishCallback { ( result: any, errors: ParserError[] ): void; };
+    export interface FinishCallback { (result: any, errors: ParserError[]): void; };
 
     interface CompiledTerminals {
-        literals : Term[];
+        literals: Term[];
         terminals: Term[];
         idToTerms: Term[];
     }
 
-    var tabLog = function( indents: number ): void {
+    var tabLog = function (indents: number): void {
         var str = '';
-        for ( var i = 0; i < indents; i++ ) {
+        for (var i = 0; i < indents; i++) {
             str += '    ';
         }
 
         arguments[0] = str;
-        console.log.apply( console, arguments );
+        console.log.apply(console, arguments);
     };
 
     /**
@@ -396,24 +396,24 @@ module parse {
      * @param {number} code
      * @return {boolean}
      */
-    var isHexCode = function( code: number ): bool {
-        return ( code >= ZERO && code <= NINE ) || // a number
-               ( code >= LOWER_A && code <= LOWER_F ) || // lower a-z
-               ( code >= UPPER_A && code <= UPPER_F );   // UPPER A-Z
+    var isHexCode = function (code: number): bool {
+        return (code >= ZERO && code <= NINE) || // a number
+               (code >= LOWER_A && code <= LOWER_F) || // lower a-z
+               (code >= UPPER_A && code <= UPPER_F);   // UPPER A-Z
     };
 
-    var isAlphaNumericCode = function( code: number ): bool {
+    var isAlphaNumericCode = function (code: number): bool {
         return (
-                ( code >= LOWER_A && code <= LOWER_Z ) || // lower case letter
-                ( code >= UPPER_A && code <= UPPER_Z ) || // upper case letter
-                ( code === UNDERSCORE ) ||
-                ( code >= ZERO && code <= NINE )     // a number
+                (code >= LOWER_A && code <= LOWER_Z) || // lower case letter
+                (code >= UPPER_A && code <= UPPER_Z) || // upper case letter
+                (code === UNDERSCORE) ||
+                (code >= ZERO && code <= NINE)     // a number
         );
     };
 
-    var isAlphaCode = function( code: number ): bool {
-        return ( code >= LOWER_A && code <= LOWER_Z ) ||
-               ( code >= UPPER_A && code <= UPPER_Z );
+    var isAlphaCode = function (code: number): bool {
+        return (code >= LOWER_A && code <= LOWER_Z) ||
+               (code >= UPPER_A && code <= UPPER_Z);
     };
 
     /**
@@ -422,15 +422,15 @@ module parse {
      * @param {number} code
      * @return {boolean}
      */
-    var isNumericCode = function( code: number ): bool {
-        return ( code >= ZERO && code <= NINE ); // a number
+    var isNumericCode = function (code: number): bool {
+        return (code >= ZERO && code <= NINE); // a number
     };
 
     /**
      * @return True if f is a function object, and false if not.
      */
-    var isFunction = function( f: any ): bool {
-        return ( f instanceof Function ) || ( typeof f == 'function' );
+    var isFunction = function (f: any): bool {
+        return (f instanceof Function) || (typeof f == 'function');
     };
 
     /*  **  **  **  **  **  **  **  **  **  **  **  **  **
@@ -456,11 +456,11 @@ module parse {
      * @nosideeffects
      * @const
      */
-    var newCharacterMatch = function( match: string ): TerminalFunction {
-        var matchCode = match.charCodeAt( 0 );
+    var newCharacterMatch = function (match: string): TerminalFunction {
+        var matchCode = match.charCodeAt(0);
 
-        return function( src, i, code, len ) {
-            if ( code === matchCode ) {
+        return function (src, i, code, len) {
+            if (code === matchCode) {
                 return i + 1;
             } else {
                 return undefined;
@@ -497,137 +497,137 @@ module parse {
      *
      * @see http://jsperf.com/word-match-test
      */
-    var newWordMatch = function( match: string ): TerminalFunction {
-        if ( isWordCode( match.charCodeAt( match.length - 1 ) ) ) {
-            return newWordMatchBoundary( match );
+    var newWordMatch = function (match: string): TerminalFunction {
+        if (isWordCode(match.charCodeAt(match.length - 1))) {
+            return newWordMatchBoundary(match);
         } else {
-            return newWordMatchNoBoundary( match );
+            return newWordMatchNoBoundary(match);
         }
     }
 
-    var newWordMatchBoundary = function( match: string ): TerminalFunction {
-        var m0 = match.charCodeAt( 0 ),
-            m1 = match.charCodeAt( 1 ),
-            m2 = match.charCodeAt( 2 ),
-            m3 = match.charCodeAt( 3 ),
-            m4 = match.charCodeAt( 4 ),
-            m5 = match.charCodeAt( 5 ),
-            m6 = match.charCodeAt( 6 ),
-            m7 = match.charCodeAt( 7 );
+    var newWordMatchBoundary = function (match: string): TerminalFunction {
+        var m0 = match.charCodeAt(0),
+            m1 = match.charCodeAt(1),
+            m2 = match.charCodeAt(2),
+            m3 = match.charCodeAt(3),
+            m4 = match.charCodeAt(4),
+            m5 = match.charCodeAt(5),
+            m6 = match.charCodeAt(6),
+            m7 = match.charCodeAt(7);
 
-        if ( match.length === 1 ) {
-            return function( src, i, code, len ) {
-                if ( m0 === code && !isWordCharAt( src, i + 1 ) ) {
+        if (match.length === 1) {
+            return function (src, i, code, len) {
+                if (m0 === code && !isWordCharAt(src, i + 1)) {
                     return i + 1;
                 }
             };
-        } else if ( match.length === 2 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 2) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        !isWordCharAt( src, i + 2 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        !isWordCharAt(src, i + 2)
                 ) {
                     return i + 2;
                 }
             };
-        } else if ( match.length === 3 ) {
-            return function( src, i, code, len ) {
-                if ( m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        !isWordCharAt( src, i + 3 )
+        } else if (match.length === 3) {
+            return function (src, i, code, len) {
+                if (m0 === code &&
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        !isWordCharAt(src, i + 3)
                 ) {
                     return i + 3;
                 }
             };
-        } else if ( match.length === 4 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 4) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        !isWordCharAt( src, i + 4 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        !isWordCharAt(src, i + 4)
                 ) {
                     return i + 4;
                 }
             };
-        } else if ( match.length === 5 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 5) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 ) &&
-                        !isWordCharAt( src, i + 5 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4) &&
+                        !isWordCharAt(src, i + 5)
                 ) {
                     return i + 5;
                 }
             };
-        } else if ( match.length === 6 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 6) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 ) &&
-                        m5 === src.charCodeAt( i + 5 ) &&
-                        !isWordCharAt( src, i + 6 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4) &&
+                        m5 === src.charCodeAt(i + 5) &&
+                        !isWordCharAt(src, i + 6)
                 ) {
                     return i + 6;
                 }
             };
-        } else if ( match.length === 7 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 7) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 ) &&
-                        m5 === src.charCodeAt( i + 5 ) &&
-                        m6 === src.charCodeAt( i + 6 ) &&
-                        !isWordCharAt( src, i + 7 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4) &&
+                        m5 === src.charCodeAt(i + 5) &&
+                        m6 === src.charCodeAt(i + 6) &&
+                        !isWordCharAt(src, i + 7)
                 ) {
                     return i + 7;
                 }
             };
-        } else if ( match.length === 8 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 8) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 ) &&
-                        m5 === src.charCodeAt( i + 5 ) &&
-                        m6 === src.charCodeAt( i + 6 ) &&
-                        m7 === src.charCodeAt( i + 7 ) &&
-                        !isWordCharAt( src, i + 8 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4) &&
+                        m5 === src.charCodeAt(i + 5) &&
+                        m6 === src.charCodeAt(i + 6) &&
+                        m7 === src.charCodeAt(i + 7) &&
+                        !isWordCharAt(src, i + 8)
                 ) {
                     return i + 8;
                 }
             };
         } else {
-            return function( src, i, code, len ) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 ) &&
-                        m5 === src.charCodeAt( i + 5 ) &&
-                        m6 === src.charCodeAt( i + 6 ) &&
-                        m7 === src.charCodeAt( i + 7 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4) &&
+                        m5 === src.charCodeAt(i + 5) &&
+                        m6 === src.charCodeAt(i + 6) &&
+                        m7 === src.charCodeAt(i + 7)
                 ) {
                     var keyLen = src.length;
 
                     // starts at 7, to avoid the tests above!
-                    for ( var j = 7; j < keyLen; j++ ) {
-                        if ( src.charCodeAt( i + j ) !== match.charCodeAt( j ) ) {
+                    for (var j = 7; j < keyLen; j++) {
+                        if (src.charCodeAt(i + j) !== match.charCodeAt(j)) {
                             return undefined;
                         }
                     }
@@ -641,7 +641,7 @@ module parse {
                      * This happens if we are at the end of input,
                      * or if a non-identifier character follows.
                      */
-                    if ( !isWordCharAt( src, i + keyLen ) ) {
+                    if (!isWordCharAt(src, i + keyLen)) {
                         return i + keyLen;
                     }
                 }
@@ -651,122 +651,122 @@ module parse {
         }
     }
 
-    var newWordMatchNoBoundary = function( match: string ): TerminalFunction {
-        var m0 = match.charCodeAt( 0 ),
-            m1 = match.charCodeAt( 1 ),
-            m2 = match.charCodeAt( 2 ),
-            m3 = match.charCodeAt( 3 ),
-            m4 = match.charCodeAt( 4 ),
-            m5 = match.charCodeAt( 5 ),
-            m6 = match.charCodeAt( 6 ),
-            m7 = match.charCodeAt( 7 );
+    var newWordMatchNoBoundary = function (match: string): TerminalFunction {
+        var m0 = match.charCodeAt(0),
+            m1 = match.charCodeAt(1),
+            m2 = match.charCodeAt(2),
+            m3 = match.charCodeAt(3),
+            m4 = match.charCodeAt(4),
+            m5 = match.charCodeAt(5),
+            m6 = match.charCodeAt(6),
+            m7 = match.charCodeAt(7);
 
-        if ( match.length === 1 ) {
-            return function( src, i, code, len ) {
-                if ( m0 === code ) {
+        if (match.length === 1) {
+            return function (src, i, code, len) {
+                if (m0 === code) {
                     return i + 1;
                 }
             };
-        } else if ( match.length === 2 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 2) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 )
+                        m1 === src.charCodeAt(i + 1)
                 ) {
                     return i + 2;
                 }
             };
-        } else if ( match.length === 3 ) {
-            return function( src, i, code, len ) {
-                if ( m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 )
+        } else if (match.length === 3) {
+            return function (src, i, code, len) {
+                if (m0 === code &&
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2)
                 ) {
                     return i + 3;
                 }
             };
-        } else if ( match.length === 4 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 4) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3)
                 ) {
                     return i + 4;
                 }
             };
-        } else if ( match.length === 5 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 5) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4)
                 ) {
                     return i + 5;
                 }
             };
-        } else if ( match.length === 6 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 6) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 ) &&
-                        m5 === src.charCodeAt( i + 5 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4) &&
+                        m5 === src.charCodeAt(i + 5)
                 ) {
                     return i + 6;
                 }
             };
-        } else if ( match.length === 7 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 7) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 ) &&
-                        m5 === src.charCodeAt( i + 5 ) &&
-                        m6 === src.charCodeAt( i + 6 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4) &&
+                        m5 === src.charCodeAt(i + 5) &&
+                        m6 === src.charCodeAt(i + 6)
                 ) {
                     return i + 7;
                 }
             };
-        } else if ( match.length === 8 ) {
-            return function( src, i, code, len ) {
+        } else if (match.length === 8) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 ) &&
-                        m5 === src.charCodeAt( i + 5 ) &&
-                        m6 === src.charCodeAt( i + 6 ) &&
-                        m7 === src.charCodeAt( i + 7 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4) &&
+                        m5 === src.charCodeAt(i + 5) &&
+                        m6 === src.charCodeAt(i + 6) &&
+                        m7 === src.charCodeAt(i + 7)
                 ) {
                     return i + 8;
                 }
             };
         } else {
-            return function( src, i, code, len ) {
+            return function (src, i, code, len) {
                 if (
                         m0 === code &&
-                        m1 === src.charCodeAt( i + 1 ) &&
-                        m2 === src.charCodeAt( i + 2 ) &&
-                        m3 === src.charCodeAt( i + 3 ) &&
-                        m4 === src.charCodeAt( i + 4 ) &&
-                        m5 === src.charCodeAt( i + 5 ) &&
-                        m6 === src.charCodeAt( i + 6 ) &&
-                        m7 === src.charCodeAt( i + 7 )
+                        m1 === src.charCodeAt(i + 1) &&
+                        m2 === src.charCodeAt(i + 2) &&
+                        m3 === src.charCodeAt(i + 3) &&
+                        m4 === src.charCodeAt(i + 4) &&
+                        m5 === src.charCodeAt(i + 5) &&
+                        m6 === src.charCodeAt(i + 6) &&
+                        m7 === src.charCodeAt(i + 7)
                 ) {
                     var keyLen = src.length;
 
                     // starts at 7, to avoid the tests above!
-                    for ( var j = 7; j < keyLen; j++ ) {
-                        if ( src.charCodeAt( i + j ) !== match.charCodeAt( j ) ) {
+                    for (var j = 7; j < keyLen; j++) {
+                        if (src.charCodeAt(i + j) !== match.charCodeAt(j)) {
                             return undefined;
                         }
                     }
@@ -791,12 +791,12 @@ module parse {
      * @param {number} A code for a character.
      * @return {boolean} True if it is a word character, and false if not.
      */
-    var isWordCode = function( code: number ): bool {
+    var isWordCode = function (code: number): bool {
         return (
-                ( code >= 97 && code <= 122 ) || // lower case letter
-                ( code >= 48 && code <= 57 ) || // a number
-                ( code === 95 ) || // underscore
-                ( code >= 65 && code <= 90 )    // uppper case letter
+                (code >= 97 && code <= 122) || // lower case letter
+                (code >= 48 && code <= 57) || // a number
+                (code === 95) || // underscore
+                (code >= 65 && code <= 90)    // uppper case letter
         );
     }
 
@@ -816,8 +816,8 @@ module parse {
      * @param {number} i The index of the character to check in the string.
      * @return {boolean}
      */
-    var isWordCharAt = function( src: string, i: number ): bool {
-        return isWordCode( src.charCodeAt( i ) );
+    var isWordCharAt = function (src: string, i: number): bool {
+        return isWordCode(src.charCodeAt(i));
     }
 
     /**
@@ -851,12 +851,12 @@ module parse {
      * @param {string} str The string to convert to an array.
      * @return An array of character codes for the string given.
      */
-    var stringToCodes = function( str: string ): number[] {
+    var stringToCodes = function (str: string): number[] {
         var len = str.length,
-        arr: number[] = new Array( len );
+        arr: number[] = new Array(len);
 
-        for ( var i = 0; i < len; i++ ) {
-            arr[i] = str.charCodeAt( i );
+        for (var i = 0; i < len; i++) {
+            arr[i] = str.charCodeAt(i);
         }
 
         return arr;
@@ -867,7 +867,7 @@ module parse {
      *     'ELSE_IF' => 'else if'
      *      'leftBracket' => 'left bracket'
      */
-    var formatTerminalName = function( str: string ): string {
+    var formatTerminalName = function (str: string): string {
         /*
          * - reaplce camelCase in the middle to end of the string,
          * - lowerCase anything left (start of string)
@@ -875,10 +875,10 @@ module parse {
          * - uppercase the first letter of each word
          */
         return str.
-                replace( /([^A-Z])([A-Z]+)/g, function( t, a, b ) { return a + ' ' + b; } ).
-                replace( '_', ' ' ).
+                replace(/([^A-Z])([A-Z]+)/g, function (t, a, b) { return a + ' ' + b; }).
+                replace('_', ' ').
                 toLowerCase().
-                replace( /\b([a-z])/g, function( t, letter ) { return letter.toUpperCase(); } );
+                replace(/\b([a-z])/g, function (t, letter) { return letter.toUpperCase(); });
     }
 
     /**
@@ -1002,22 +1002,22 @@ module parse {
         */
         terminalParent: Term = null;
 
-        constructor( match: string, name?: string );
-        constructor( match: number, name?: string );
-        constructor( match: Term, name?: string );
-        constructor( match: any[], name?: string );
-        constructor( match: TerminalFunction, name?: string );
-        constructor( match, name?: string ) {
-            var nameSupplied = ( name !== undefined );
-            if ( name ) {
+        constructor (match: string, name?: string);
+        constructor (match: number, name?: string);
+        constructor (match: Term, name?: string);
+        constructor (match: any[], name?: string);
+        constructor (match: TerminalFunction, name?: string);
+        constructor (match, name?: string) {
+            var nameSupplied = (name !== undefined);
+            if (name) {
                 this.termName = name;
             }
 
             var literal = null;
 
-            if ( match instanceof Term ) {
+            if (match instanceof Term) {
                 return match;
-            } else if ( isFunction( match ) ) {
+            } else if (isFunction(match)) {
                 this.isLiteral = false;
                 this.testData = match;
                 this.type = TYPE_FUNCTION;
@@ -1034,22 +1034,22 @@ module parse {
                 if (
                         matchType === 'number' ||
                         (
-                                ( matchType === 'string' || match instanceof String ) &&
+                                (matchType === 'string' || match instanceof String) &&
                                  match.length === 1
                         )
                 ) {
-                    if ( matchType === 'string' ) {
+                    if (matchType === 'string') {
                         literal = match;
 
-                        if ( !nameSupplied ) {
+                        if (!nameSupplied) {
                             this.termName = "'" + match + "'";
                         }
 
-                        match = match.charCodeAt( 0 );
+                        match = match.charCodeAt(0);
                     } else {
-                        literal = String.fromCharCode( match );
+                        literal = String.fromCharCode(match);
 
-                        if ( !nameSupplied ) {
+                        if (!nameSupplied) {
                             this.termName = "'" + literal + "'";
                         }
                     }
@@ -1058,7 +1058,7 @@ module parse {
                     this.isLiteral = true;
                     this.literal = literal;
 
-                    this.type = isWordCode( match ) ?
+                    this.type = isWordCode(match) ?
                         TYPE_WORD_CODE :
                             TYPE_CODE;
 
@@ -1071,20 +1071,20 @@ module parse {
                      * a length of zero will raise an error,
                      * and 1 length is caught by the clause above.
                      */
-                } else if ( matchType === 'string' || match instanceof String ) {
+                } else if (matchType === 'string' || match instanceof String) {
                     this.literalLength = match.length;
                     this.isLiteral = true;
                     this.literal = match;
                     this.type = TYPE_STRING;
 
-                    if ( match.length === 0 ) {
-                        throw new Error( "Empty string given for Terminal" );
+                    if (match.length === 0) {
+                        throw new Error("Empty string given for Terminal");
                     } else {
-                        this.testData = stringToCodes( match );
+                        this.testData = stringToCodes(match);
 
-                        if ( !nameSupplied ) {
-                            if ( match > 20 ) {
-                                this.termName = "'" + match.substring( 0, 20 ) + "'";
+                        if (!nameSupplied) {
+                            if (match > 20) {
+                                this.termName = "'" + match.substring(0, 20) + "'";
                             } else {
                                 this.termName = "'" + match + "'";
                             }
@@ -1096,21 +1096,21 @@ module parse {
                      * For example, multiple string keywords
                      * in an array.
                      */
-                } else if ( match instanceof Array ) {
+                } else if (match instanceof Array) {
                     var mTerminals = [];
                     var isLiteral = true,
                         literalLength = Number.MAX_VALUE;
 
-                    for ( var i = 0; i < match.length; i++ ) {
-                        var innerTerm = new Term( match[i], name );
+                    for (var i = 0; i < match.length; i++) {
+                        var innerTerm = new Term(match[i], name);
 
-                        if ( innerTerm.isLiteral ) {
-                            literalLength = Math.min( literalLength, innerTerm.literalLength );
+                        if (innerTerm.isLiteral) {
+                            literalLength = Math.min(literalLength, innerTerm.literalLength);
                         } else {
                             isLiteral = false;
                         }
 
-                        innerTerm.setParentTerm( this );
+                        innerTerm.setParentTerm(this);
                         mTerminals[i] = innerTerm;
                     }
 
@@ -1119,25 +1119,25 @@ module parse {
                     this.literalLength = literalLength;
                     this.testData = mTerminals;
                     // errors!
-                } else if ( match === undefined ) {
-                    throw new Error( "undefined match given" );
-                } else if ( match === null ) {
-                    throw new Error( "null match given" );
+                } else if (match === undefined) {
+                    throw new Error("undefined match given");
+                } else if (match === null) {
+                    throw new Error("null match given");
                 } else {
-                    throw new Error( "unknown match given" );
+                    throw new Error("unknown match given");
                 }
             }
         }
 
         getParentTerm() {
-            if ( this.terminalParent !== null ) {
+            if (this.terminalParent !== null) {
                 return this.terminalParent.getParentTerm();
             } else {
                 return this;
             }
         }
 
-        setParentTerm( parent ) {
+        setParentTerm(parent) {
             this.terminalParent = parent;
         }
 
@@ -1145,11 +1145,11 @@ module parse {
             return this.termName;
         }
 
-        setName( name: string ) {
+        setName(name: string) {
             this.termName = name;
         }
 
-        setID( id: number ) {
+        setID(id: number) {
             this.id = id;
 
             /*
@@ -1157,9 +1157,9 @@ module parse {
              * so pass the id on,
              * otherwise the grammar breaks.
              */
-            if ( this.type === TYPE_ARRAY ) {
-                for ( var i = 0; i < this.testData.length; i++ ) {
-                    this.testData[i].setID( id );
+            if (this.type === TYPE_ARRAY) {
+                for (var i = 0; i < this.testData.length; i++) {
+                    this.testData[i].setID(id);
                 }
             }
 
@@ -1178,9 +1178,9 @@ module parse {
          *
          * @param callback The callback to run; null for no callback, or a valid function.
          */
-        symbolMatch( callback: TerminalFunction ) {
-            if ( callback !== null && !isFunction( callback ) ) {
-                throw new Error( "symbolMatch callback is not valid: " + callback );
+        symbolMatch(callback: TerminalFunction) {
+            if (callback !== null && !isFunction(callback)) {
+                throw new Error("symbolMatch callback is not valid: " + callback);
             }
 
             this.postMatch = callback;
@@ -1207,8 +1207,8 @@ module parse {
          * @param callback The function to call (or null to clear a previous one).
          * @return This object to allow chaining.
          */
-        onMatch( callback: MatchFoundFunction ) {
-            if ( !callback ) {
+        onMatch(callback: MatchFoundFunction) {
+            if (!callback) {
                 this.onMatchFun = null;
             } else {
                 this.onMatchFun = callback;
@@ -1235,22 +1235,22 @@ module parse {
         source: SourceLines;
         match: string;
 
-        constructor( offset, source, match ) {
+        constructor (offset, source, match) {
             this.offset = offset;
             this.source = source;
             this.match = match;
         }
 
         getLine() {
-            return this.source.getLine( this.offset );
+            return this.source.getLine(this.offset);
         }
     }
 
     export class SymbolError extends ParserError {
         isSymbol = true;
 
-        constructor( i, str, sourceLines ) {
-            super( i, sourceLines, str );
+        constructor (i, str, sourceLines) {
+            super(i, sourceLines, str);
 
             this.isSymbol = true;
         }
@@ -1264,8 +1264,8 @@ module parse {
 
         isLiteral: bool;
 
-        constructor( symbol: Symbol ) {
-            super( symbol.offset, symbol.source, symbol.match );
+        constructor (symbol: Symbol) {
+            super(symbol.offset, symbol.source, symbol.match);
 
             this.terminal = symbol.terminal;
         }
@@ -1296,7 +1296,7 @@ module parse {
         private source: string;
         private name: string;
 
-        constructor( src, name ) {
+        constructor (src, name) {
             // source code altered and should be used for indexing
             this.source = src;
 
@@ -1305,7 +1305,7 @@ module parse {
 
         private index() {
             // index source code on the fly, only if needed
-            if ( this.lineOffsets == null ) {
+            if (this.lineOffsets == null) {
                 var src = this.source;
 
                 var len = src.length;
@@ -1319,19 +1319,19 @@ module parse {
                  *
                  * This is so we can index any code, without having to alter it.
                  */
-                var searchIndex = ( src.indexOf( "\n", lastIndex ) !== -1 ) ?
+                var searchIndex = (src.indexOf("\n", lastIndex) !== -1) ?
                         "\n" :
                         "\r";
 
-                while ( running ) {
-                    var index = src.indexOf( searchIndex, lastIndex );
+                while (running) {
+                    var index = src.indexOf(searchIndex, lastIndex);
 
-                    if ( index != -1 ) {
-                        lines.push( index );
+                    if (index != -1) {
+                        lines.push(index);
                         lastIndex = index + 1;
                         // the last line
                     } else {
-                        lines.push( len );
+                        lines.push(len);
                         running = false;
                     }
 
@@ -1346,14 +1346,14 @@ module parse {
             return this.name;
         }
 
-        getLine( offset: number ) {
+        getLine(offset: number) {
             this.index();
 
-            for ( var line = 0; line < this.lineOffsets.length; line++ ) {
+            for (var line = 0; line < this.lineOffsets.length; line++) {
                 // lineOffset is from the end of the line.
                 // If it's greater then offset, then we return that line.
                 // It's +1 to start lines from 1 rather then 0.
-                if ( this.lineOffsets[line] > offset ) {
+                if (this.lineOffsets[line] > offset) {
                     return line + 1;
                 }
             }
@@ -1379,20 +1379,20 @@ module parse {
 
         public lower: string = null;
 
-        constructor( terminal, offset, sourceLines, match ) {
+        constructor (terminal, offset, sourceLines, match) {
             this['terminal'] = terminal;
             this['offset'] = offset;
             this['source'] = sourceLines;
             this['match'] = match;
         }
 
-        clone( newMatch: string ) {
-            return new Symbol( this.terminal, this.offset, this.source, newMatch );
+        clone(newMatch: string) {
+            return new Symbol(this.terminal, this.offset, this.source, newMatch);
         }
 
         getLower() {
-            if ( this.lower === null ) {
-                return ( this.lower = this.match.toLowerCase() );
+            if (this.lower === null) {
+                return (this.lower = this.match.toLowerCase());
             } else {
                 return this.lower;
             }
@@ -1408,15 +1408,15 @@ module parse {
         onFinish(): any {
             var onMatch = this.terminal.onMatchFun;
 
-            if ( onMatch !== null ) {
-                return onMatch( this );
+            if (onMatch !== null) {
+                return onMatch(this);
             } else {
                 return this;
             }
         }
 
         getLine() {
-            return this.source.getLine( this.offset );
+            return this.source.getLine(this.offset);
         }
 
         getSourceName() {
@@ -1467,7 +1467,7 @@ module parse {
         currentID: number;
         stringI: number;
 
-        constructor(
+        constructor (
                 errors,
 
                 symbols,
@@ -1490,7 +1490,7 @@ module parse {
 
             this.currentID = INVALID_TERMINAL;
 
-            if ( symbolLength > 0 ) {
+            if (symbolLength > 0) {
                 this.currentID = this.symbolIDs[0];
             }
         }
@@ -1502,7 +1502,7 @@ module parse {
          * Otherwise i is left unchanged.
          */
         updateMax() {
-            if ( this.i > this.maxI ) {
+            if (this.i > this.maxI) {
                 this.maxI = this.i;
             }
         }
@@ -1511,7 +1511,7 @@ module parse {
          * @return The maximum id value the symbol result has moved up to.
          */
         maxID() {
-            if ( this.i > this.maxI ) {
+            if (this.i > this.maxI) {
                 return this.i;
             } else {
                 return this.maxI;
@@ -1529,7 +1529,7 @@ module parse {
         getTerminals() {
             var symbols: Term[] = [];
 
-            for ( var i = 0; i < this.length; i++ ) {
+            for (var i = 0; i < this.length; i++) {
                 symbols[i] = this.symbols[i].terminal;
             }
 
@@ -1554,7 +1554,7 @@ module parse {
         finalizeMove() {
             var i = this.i;
 
-            if ( i < this.length ) {
+            if (i < this.length) {
                 this.currentID = this.symbolIDs[i];
                 this.symbolIndex = i;
             } else {
@@ -1566,10 +1566,10 @@ module parse {
         next() {
             this.i++;
 
-            if ( this.i < this.length ) {
+            if (this.i < this.length) {
                 this.currentID = this.symbolIDs[this.i];
                 return this.symbols[this.i - 1];
-            } else if ( this.i === this.length ) {
+            } else if (this.i === this.length) {
                 this.currentID = INVALID_TERMINAL;
                 return this.symbols[this.i - 1];
             } else {
@@ -1578,17 +1578,17 @@ module parse {
             }
         }
 
-        back( increments: number ) {
+        back(increments: number) {
             var i = this.i;
 
-            if ( i > this.maxI ) {
+            if (i > this.maxI) {
                 this.maxI = i;
             }
 
-            this.i = ( i -= increments );
+            this.i = (i -= increments);
 
-            if ( i < this.symbolIndex ) {
-                throw new Error( "Moved back by more increments then the last finalize move location" );
+            if (i < this.symbolIndex) {
+                throw new Error("Moved back by more increments then the last finalize move location");
             } else {
                 this.currentID = this.symbolIDs[i];
             }
@@ -1613,7 +1613,7 @@ module parse {
         }
 
         peekID() {
-            if ( this.i >= this.length ) {
+            if (this.i >= this.length) {
                 return INVALID_TERMINAL;
             }
 
@@ -1645,7 +1645,7 @@ module parse {
      *  = terminals - the compressed list of terminals
      *  = idToTerms - a sparse array of terminal ID's to terminals.
      */
-    var compressTerminals = function( terminals: Term[] ): CompiledTerminals {
+    var compressTerminals = function (terminals: Term[]): CompiledTerminals {
         var termIDToTerms: Term[] = [];
 
         /*
@@ -1662,11 +1662,11 @@ module parse {
         var literalTerms: Term[] = [],
         nonLiteralTerms: Term[] = [];
 
-        compressTerminalsInner( termIDToTerms, literalTerms, nonLiteralTerms, terminals );
+        compressTerminalsInner(termIDToTerms, literalTerms, nonLiteralTerms, terminals);
 
-        literalTerms.sort( function( a, b ) {
+        literalTerms.sort(function (a, b) {
             return b.literalLength - a.literalLength;
-        } );
+        });
 
         return {
             literals: literalTerms,
@@ -1675,13 +1675,13 @@ module parse {
         };
     };
 
-    var compressTerminalsInner: { ( termIDToTerms: Term[], literalTerms: Term[], nonLiteralTerms: Term[], terminals: Term[] ): void; } =
-        function( termIDToTerms: Term[], literalTerms: Term[], nonLiteralTerms: Term[], terminals: Term[] ): void {
-            for ( var k in terminals ) {
-                if ( terminals.hasOwnProperty( k ) ) {
+    var compressTerminalsInner: { (termIDToTerms: Term[], literalTerms: Term[], nonLiteralTerms: Term[], terminals: Term[]): void; } =
+        function (termIDToTerms: Term[], literalTerms: Term[], nonLiteralTerms: Term[], terminals: Term[]): void {
+            for (var k in terminals) {
+                if (terminals.hasOwnProperty(k)) {
                     var term: Term = terminals[k];
 
-                    if ( term.type === TYPE_ARRAY ) {
+                    if (term.type === TYPE_ARRAY) {
                         compressTerminalsInner(
                                 termIDToTerms,
                                 literalTerms,
@@ -1691,19 +1691,19 @@ module parse {
                     } else {
                         termIDToTerms[term.id] = term;
 
-                        if ( term.isLiteral ) {
-                            literalTerms.push( term )
+                        if (term.isLiteral) {
+                            literalTerms.push(term)
                         } else {
-                            nonLiteralTerms.push( term )
+                            nonLiteralTerms.push(term)
                         }
                     }
                 }
             }
         }
 
-    var bruteScan: { ( parserRule: ParserRuleImplementation, seenRules: bool[], idsFound: bool[] ): void; } =
-        function( parserRule: ParserRuleImplementation, seenRules: bool[], idsFound: bool[] ) {
-            if ( seenRules[parserRule.compiledId] !== true ) {
+    var bruteScan: { (parserRule: ParserRuleImplementation, seenRules: bool[], idsFound: bool[]): void; } =
+        function (parserRule: ParserRuleImplementation, seenRules: bool[], idsFound: bool[]) {
+            if (seenRules[parserRule.compiledId] !== true) {
                 seenRules[parserRule.compiledId] = true;
 
                 var rules = parserRule.rules,
@@ -1720,67 +1720,67 @@ module parse {
                 do {
                     var rule = rules[i];
 
-                    if ( rule instanceof Term ) {
-                        if ( rule.id !== INVALID_TERMINAL ) {
+                    if (rule instanceof Term) {
+                        if (rule.id !== INVALID_TERMINAL) {
                             idsFound[rule.id] = true;
                         }
-                    } else if ( rule instanceof Array ) {
-                        for ( var j = 0; j < rule.length; j++ ) {
+                    } else if (rule instanceof Array) {
+                        for (var j = 0; j < rule.length; j++) {
                             var r = rule[j];
 
-                            if ( r instanceof Term ) {
-                                if ( r.id !== INVALID_TERMINAL ) {
+                            if (r instanceof Term) {
+                                if (r.id !== INVALID_TERMINAL) {
                                     idsFound[r.id] = true;
                                 }
                             } else {
-                                bruteScan( r, seenRules, idsFound );
+                                bruteScan(r, seenRules, idsFound);
                             }
                         }
                     } else {
-                        bruteScan( rule, seenRules, idsFound );
+                        bruteScan(rule, seenRules, idsFound);
                     }
 
                     i++;
-                } while ( i < rules.length && isOptional[i] );
+                } while (i < rules.length && isOptional[i]);
             } else {
                 return;
             }
         };
-        
+
     /**
     * Used when searching for terminals to use for parsing,
     * during the compilation phase.
     */
     var addRule: {
-        ( rule: ParserRule, terminals: Term[], id: number, allRules: ParserRule[] ): number;
-        ( rule: Term, terminals: Term[], id: number, allRules: ParserRule[] ): number;
-    } = function( rule, terminals: Term[], id: number, allRules: ParserRule[] ) {
-            if ( rule instanceof Term ) {
-                var termID = rule.id;
+        (rule: ParserRule, terminals: Term[], id: number, allRules: ParserRule[]): number;
+        (rule: Term, terminals: Term[], id: number, allRules: ParserRule[]): number;
+    } = function (rule, terminals: Term[], id: number, allRules: ParserRule[]) {
+        if (rule instanceof Term) {
+            var termID = rule.id;
 
-                if ( termID !== INVALID_TERMINAL ) {
-                    terminals[termID] = rule;
-                }
-
-                return id;
-            } else {
-                return ( <ParserRuleImplementation>rule ).optimizeScan( terminals, id, allRules );
+            if (termID !== INVALID_TERMINAL) {
+                terminals[termID] = rule;
             }
-        };
 
-    var addRuleToLookup = function( id: number, ruleLookup: any, term: any ) {
+            return id;
+        } else {
+            return (<ParserRuleImplementation>rule).optimizeScan(terminals, id, allRules);
+        }
+    };
+
+    var addRuleToLookup = function (id: number, ruleLookup: any, term: any) {
         var arrLookup = ruleLookup[id];
 
-        if ( arrLookup === undefined ) {
+        if (arrLookup === undefined) {
             ruleLookup[id] = term;
-        } else if ( arrLookup instanceof Array ) {
-            arrLookup.push( term );
+        } else if (arrLookup instanceof Array) {
+            arrLookup.push(term);
         } else {
             ruleLookup[id] = [arrLookup, term];
         }
     }
 
-    var callParseDebug = function(
+    var callParseDebug = function (
         debugCallback: DebugCallback,
         symbols: SymbolResult,
         compileTime: number,
@@ -1788,7 +1788,7 @@ module parse {
         rulesTime: number,
         totalTime: number
     ) {
-        if ( debugCallback ) {
+        if (debugCallback) {
             var times = {
                 compile: compileTime,
                 symbols: symbolTime,
@@ -1796,7 +1796,7 @@ module parse {
                 total: totalTime
             };
 
-            debugCallback( symbols.getTerminals(), times );
+            debugCallback(symbols.getTerminals(), times);
         }
     }
 
@@ -1827,36 +1827,36 @@ module parse {
     var NO_COMPILE_ID = -1;
 
     export interface ParserRule {
-        repeatSeperator( match, seperator ) : ParserRule;
-        optionalSeperator( match, seperator ) : ParserRule;
-        seperatingRule( match, seperator ) : ParserRule;
+        repeatSeperator(match, seperator): ParserRule;
+        optionalSeperator(match, seperator): ParserRule;
+        seperatingRule(match, seperator): ParserRule;
 
-        or( ...args: any[] ): ParserRule;
-        either( ...args: any[] ): ParserRule;
-        thenOr( ...args: any[] ): ParserRule;
-        thenEither( ...args: any[] ): ParserRule;
-        optional( ...args: any[] ): ParserRule;
-        maybe( ...args: any[] ): ParserRule;
-        then( ...args: any[] ): ParserRule;
-        onMatch( callback: ( ...args: any[] ) => any ): ParserRule;
-        
-        optionalThis( ...args: any[] ): ParserRule;
-        maybeThis( ...args: any[] ): ParserRule;
-        orThis( ...args: any[] ): ParserRule;
+        or(...args: any[]): ParserRule;
+        either(...args: any[]): ParserRule;
+        thenOr(...args: any[]): ParserRule;
+        thenEither(...args: any[]): ParserRule;
+        optional(...args: any[]): ParserRule;
+        maybe(...args: any[]): ParserRule;
+        then(...args: any[]): ParserRule;
+        onMatch(callback: (...args: any[]) => any): ParserRule;
 
-        parse( options: {
+        optionalThis(...args: any[]): ParserRule;
+        maybeThis(...args: any[]): ParserRule;
+        orThis(...args: any[]): ParserRule;
+
+        parse(options: {
             src: string;
             inputSrc?: string;
             name?: string;
             onFinish: FinishCallback;
             debugCallback?: DebugCallback;
-        } ): void;
+        }): void;
 
-        parseLowerCase( input: string, callback: FinishCallback );
-        parseUpperCase( input: string, callback: FinishCallback );
-        symbolize( input: string, callback: SymbolizeCallback ): void;
-        symbolizeLowerCase( input: string, callback: SymbolizeCallback ): void;
-        symbolizeUpperCase( input: string, callback: SymbolizeCallback ): void;
+        parseLowerCase(input: string, callback: FinishCallback);
+        parseUpperCase(input: string, callback: FinishCallback);
+        symbolize(input: string, callback: SymbolizeCallback): void;
+        symbolizeLowerCase(input: string, callback: SymbolizeCallback): void;
+        symbolizeUpperCase(input: string, callback: SymbolizeCallback): void;
     }
 
     /**
@@ -1887,7 +1887,7 @@ module parse {
         /**
         * A callback to call when this is done.
         */
-        finallyFun: ( ...args: any[] ) => any = null;
+        finallyFun: (...args: any[]) => any = null;
 
         /**
         * States if this is compiled yet, or not.
@@ -1978,7 +1978,7 @@ module parse {
 
         hasBeenUsed = false;
 
-        constructor( parse: Parse ) {
+        constructor (parse: Parse) {
             this.parseParent = parse;
         }
 
@@ -1992,8 +1992,8 @@ module parse {
          * @param seperator The seperator between each match.
          * @return This parser rule.
          */
-        repeatSeperator( match, seperator ) {
-            return this.seperatingRule( match, seperator );
+        repeatSeperator(match, seperator): ParserRule {
+            return this.seperatingRule(match, seperator);
         }
 
         /**
@@ -2003,16 +2003,16 @@ module parse {
          * @param seperator The seperator between each match.
          * @return This parser rule.
          */
-        optionalSeperator( match, seperator ) {
-            return this.seperatingRule( match, seperator ).
-                    markOptional( true );
+        optionalSeperator(match, seperator) {
+            return this.seperatingRule(match, seperator).
+                    markOptional(true);
         }
 
-        seperatingRule( match, seperator ) {
+        seperatingRule(match, seperator) {
             this.endCurrentOr();
 
             return this.thenSingle(
-                    new ParserRuleImplementation( this.parseParent ).markSeperatingRule( match, seperator )
+                    new ParserRuleImplementation(this.parseParent).markSeperatingRule(match, seperator)
             );
         }
 
@@ -2023,7 +2023,7 @@ module parse {
          * 'or' options.
          */
         or() {
-            return this.orAll( arguments );
+            return this.orAll(arguments);
         }
 
         /**
@@ -2045,7 +2045,7 @@ module parse {
          * See 'or' for usage details.
          */
         either() {
-            return this.orAll( arguments );
+            return this.orAll(arguments);
         }
 
         /**
@@ -2063,10 +2063,10 @@ module parse {
          * 'thenOr' is an alias for 'thenEither'.
          */
         thenOr() {
-            return this.endCurrentOr().orAll( arguments );
+            return this.endCurrentOr().orAll(arguments);
         }
         thenEither() {
-            return this.endCurrentOr().orAll( arguments );
+            return this.endCurrentOr().orAll(arguments);
         }
 
         /**
@@ -2076,7 +2076,7 @@ module parse {
          * a match is found, and skipped if a match fails.
          */
         optional() {
-            return this.optionalAll( arguments );
+            return this.optionalAll(arguments);
         }
 
         /**
@@ -2086,20 +2086,20 @@ module parse {
          * @return This ParserRule instance.
          */
         maybe() {
-            return this.optionalAll( arguments );
+            return this.optionalAll(arguments);
         }
 
         /**
          * States the next items to parse.
          */
         then() {
-            return this.thenAll( arguments );
+            return this.thenAll(arguments);
         }
 
         /**
          *
          */
-        onMatch( callback:(...args:any[]) => any ) : ParserRule {
+        onMatch(callback: (...args: any[]) => any): ParserRule {
             this.finallyFun = callback;
 
             return this.endCurrentOr();
@@ -2118,8 +2118,8 @@ module parse {
          * @param {string} input The text to parse.
          * @param callback A function to call when parsing is complete.
          */
-        parseLowerCase( input, callback ) {
-            this.parseInner( input, input.toLowerCase(), callback );
+        parseLowerCase(input, callback) {
+            this.parseInner(input, input.toLowerCase(), callback);
         }
 
         /**
@@ -2132,8 +2132,8 @@ module parse {
          * @param {string} input The text to parse.
          * @param callback A function to call when parsing is complete.
          */
-        parseUpperCase( input, callback ) {
-            this.parseInner( input, input.toUpperCase(), callback );
+        parseUpperCase(input, callback) {
+            this.parseInner(input, input.toUpperCase(), callback);
         }
 
         /**
@@ -2158,20 +2158,20 @@ module parse {
          *
          * @param options An object listing the options to parse. Can also be a string.
          */
-        parse( options: {
+        parse(options: {
             src: string;
             inputSrc?: string;
             name?: string;
             onFinish: FinishCallback;
             debugCallback?: DebugCallback;
-        } ) {
+        }) {
             var displaySrc,
                 parseSrc,
                 name = null,
                 callback = null,
                 debugCallback = null;
 
-            if ( typeof options === 'string' || ( options instanceof String ) ) {
+            if (typeof options === 'string' || (options instanceof String)) {
                 displaySrc = parseSrc = options;
             } else {
                 displaySrc = options['src'];
@@ -2182,31 +2182,31 @@ module parse {
                 debugCallback = options['onDebug'] || null;
             }
 
-            this.parseInner( displaySrc, parseSrc, callback, debugCallback, name );
+            this.parseInner(displaySrc, parseSrc, callback, debugCallback, name);
         }
 
-        symbolize( input, callback ) {
-            this.symbolizeInner( input, input, callback );
+        symbolize(input, callback) {
+            this.symbolizeInner(input, input, callback);
         }
 
-        symbolizeLowerCase( input, callback ) {
-            this.symbolizeInner( input, input.toLowerCase(), callback );
+        symbolizeLowerCase(input, callback) {
+            this.symbolizeInner(input, input.toLowerCase(), callback);
         }
 
-        symbolizeUpperCase( input, callback ) {
-            this.symbolizeInner( input, input.toUpperCase(), callback );
+        symbolizeUpperCase(input, callback) {
+            this.symbolizeInner(input, input.toUpperCase(), callback);
         }
 
         optionalThis() {
-            return this.endCurrentOr().optionalSingle( this );
+            return this.endCurrentOr().optionalSingle(this);
         }
 
         maybeThis() {
-            return this.endCurrentOr().optionalSingle( this );
+            return this.endCurrentOr().optionalSingle(this);
         }
 
         orThis() {
-            this.orAll( arguments );
+            this.orAll(arguments);
 
             this.orThisFlag = true;
 
@@ -2219,29 +2219,40 @@ module parse {
          * 
          */
 
-        cyclicOr( rules:IArguments ) {
-            if ( this.rules.length > 0 ) {
-                throw new Error( "Cyclic rules cannot have any other rules" );
+        cyclicOrSingle(rule: ParserRule) {
+            this.orSingle(rule);
+
+            return this.cyclicDone();
+        }
+
+        cyclicOrAll(rules: IArguments) {
+            this.orAll(rules);
+
+            return this.cyclicDone();
+        }
+
+        cyclicDone() {
+            if (this.rules.length > 1) {
+                throw new Error("Cyclic rules cannot have any other rules");
             }
 
-            this.orAll( rules );
             this.endCurrentOr();
 
             this.isCyclic = true;
 
-            if ( this.rules.length === 1 && this.rules[0] instanceof Array ) {
+            if (this.rules.length === 1 && this.rules[0] instanceof Array) {
                 this.rules = this.rules[0];
             } else {
-                throw new Error( "Internal error, cyclic rule setup has gone wrong (this is a parse.js bug)" );
+                throw new Error("Internal error, cyclic rule setup has gone wrong (this is a parse.js bug)");
             }
 
             return this;
         }
 
-        private markSeperatingRule( match, seperator ) {
+        private markSeperatingRule(match, seperator) {
             this.
-                    thenAll( match ).
-                    thenAll( seperator ).
+                    thenAll(match).
+                    thenAll(seperator).
                     endCurrentOr();
 
             this.isSeperator = true;
@@ -2249,25 +2260,25 @@ module parse {
             return this;
         }
 
-        private errorIfInLeftBranch( rule ) {
-            if ( this.rules.length !== 0 ) {
+        private errorIfInLeftBranch(rule) {
+            if (this.rules.length !== 0) {
                 var left = this.rules[0];
 
-                if ( left instanceof Array ) {
-                    for ( var i = 0; i < left.length; i++ ) {
+                if (left instanceof Array) {
+                    for (var i = 0; i < left.length; i++) {
                         var leftRule = left[i];
 
-                        if ( leftRule === rule ) {
-                            throw new Error( "First sub-rule given leads to a recursive definition (infinite loop at runtime)" );
-                        } else if ( leftRule instanceof ParserRuleImplementation ) {
-                            leftRule.errorIfInLeftBranch( rule );
+                        if (leftRule === rule) {
+                            throw new Error("First sub-rule given leads to a recursive definition (infinite loop at runtime)");
+                        } else if (leftRule instanceof ParserRuleImplementation) {
+                            leftRule.errorIfInLeftBranch(rule);
                         }
                     }
                 } else {
-                    if ( left === rule ) {
-                        throw new Error( "First sub-rule given leads to a recursive definition (infinite loop at runtime)" );
-                    } else if ( left instanceof ParserRuleImplementation ) {
-                        left.errorIfInLeftBranch( rule );
+                    if (left === rule) {
+                        throw new Error("First sub-rule given leads to a recursive definition (infinite loop at runtime)");
+                    } else if (left instanceof ParserRuleImplementation) {
+                        left.errorIfInLeftBranch(rule);
                     }
                 }
             }
@@ -2276,13 +2287,13 @@ module parse {
         /**
          * @param ignoreSpecial Pass in true to skip the cyclic check.
          */
-        private errorIfEnded( ignoreSpecial? ) {
-            if ( this.compiled !== null ) {
-                throw new Error( "New rule added, but 'finally' has already been called" );
+        private errorIfEnded(ignoreSpecial? ) {
+            if (this.compiled !== null) {
+                throw new Error("New rule added, but 'finally' has already been called");
             }
 
-            if ( ( this.isCyclic || this.isSeperator ) && !ignoreSpecial ) {
-                throw new Error( "Cannot add more rules to a special ParserRule" );
+            if ((this.isCyclic || this.isSeperator) && !ignoreSpecial) {
+                throw new Error("Cannot add more rules to a special ParserRule");
             }
         }
 
@@ -2291,11 +2302,11 @@ module parse {
          *
          * Optional rules can be skipped.
          */
-        private markOptional( isOptional ) {
+        private markOptional(isOptional) {
             var rulesLen = this.rules.length;
 
-            if ( rulesLen === 0 ) {
-                throw new Error( "Item being marked as optional, when there are no rules." );
+            if (rulesLen === 0) {
+                throw new Error("Item being marked as optional, when there are no rules.");
             }
 
             this.isOptional[rulesLen - 1] = !!isOptional;
@@ -2303,13 +2314,13 @@ module parse {
             return this;
         }
 
-        optionalAll( obj ) {
-            return this.endCurrentOr().helperAll( 'optionalSingle', obj );
+        optionalAll(obj) {
+            return this.endCurrentOr().helperAll('optionalSingle', obj);
         }
 
-        private optionalSingle( obj ) {
-            this.thenSingle( obj );
-            this.markOptional( true );
+        private optionalSingle(obj) {
+            this.thenSingle(obj);
+            this.markOptional(true);
 
             return this;
         }
@@ -2317,33 +2328,33 @@ module parse {
         private endCurrentOr() {
             var currentOr = this.currentOr;
 
-            if ( this.orThisFlag ) {
-                if ( currentOr === null ) {
-                    throw new Error( "infinite recursive parse rule, this given as 'or/either' condition, with no alternatives." );
+            if (this.orThisFlag) {
+                if (currentOr === null) {
+                    throw new Error("infinite recursive parse rule, this given as 'or/either' condition, with no alternatives.");
                 } else {
-                    currentOr.push( this );
+                    currentOr.push(this);
                 }
 
                 this.orThisFlag = false;
             }
 
-            if ( currentOr !== null ) {
+            if (currentOr !== null) {
                 /*
                  * If still building the left branch,
                  * check if we are cyclic.
                  */
-                if ( this.rules.length === 0 ) {
-                    for ( var j = 0; j < currentOr.length; j++ ) {
+                if (this.rules.length === 0) {
+                    for (var j = 0; j < currentOr.length; j++) {
                         var or = currentOr[j];
 
-                        if ( or instanceof ParserRuleImplementation ) {
-                            or.errorIfInLeftBranch( this );
+                        if (or instanceof ParserRuleImplementation) {
+                            or.errorIfInLeftBranch(this);
                         }
                     }
                 }
 
-                this.rules.push( currentOr );
-                this.markOptional( false );
+                this.rules.push(currentOr);
+                this.markOptional(false);
 
                 this.currentOr = null;
             }
@@ -2351,68 +2362,68 @@ module parse {
             return this;
         }
 
-        orAll( obj: IArguments ) {
-            return this.helperAll( 'orSingle', obj );
+        orAll(obj: IArguments) {
+            return this.helperAll('orSingle', obj);
         }
 
-        private orSingle( other ) {
-            if ( this.currentOr !== null ) {
-                this.currentOr.push( other );
+        private orSingle(other) {
+            if (this.currentOr !== null) {
+                this.currentOr.push(other);
             } else {
                 this.currentOr = [other];
             }
         }
 
-        private thenSingle( rule ) {
-            if ( rule === this && this.rules.length === 0 ) {
-                throw new Error( "infinite recursive parse rule, 'this' given as 'then' parse rule." );
+        private thenSingle(rule) {
+            if (rule === this && this.rules.length === 0) {
+                throw new Error("infinite recursive parse rule, 'this' given as 'then' parse rule.");
             } else {
-                if ( this.rules.length === 0 && rule instanceof ParserRuleImplementation ) {
-                    rule.errorIfInLeftBranch( this );
+                if (this.rules.length === 0 && rule instanceof ParserRuleImplementation) {
+                    rule.errorIfInLeftBranch(this);
                 }
 
-                this.rules.push( rule );
-                this.markOptional( false );
+                this.rules.push(rule);
+                this.markOptional(false);
             }
 
             return this;
         };
 
-        thenAll( obj: IArguments ) : ParserRuleImplementation {
-            return this.endCurrentOr().helperAll( 'thenSingle', obj );
+        thenAll(obj: IArguments): ParserRuleImplementation {
+            return this.endCurrentOr().helperAll('thenSingle', obj);
         }
 
-        private helperAll( singleMethod: string, obj: IArguments ): ParserRuleImplementation {
+        private helperAll(singleMethod: string, obj: IArguments): ParserRuleImplementation {
             this.errorIfEnded();
 
-            if ( !obj ) {
-                if ( obj === undefined ) {
-                    throw new Error( "Undefined 'then' rule given." );
+            if (!obj) {
+                if (obj === undefined) {
+                    throw new Error("Undefined 'then' rule given.");
                 } else {
-                    throw new Error( "Unknown 'then' rule given of type " + typeof ( obj ) );
+                    throw new Error("Unknown 'then' rule given of type " + typeof (obj));
                 }
             } else if (
                     obj instanceof ParserRuleImplementation ||
                     obj instanceof Term
             ) {
-                this[singleMethod]( obj );
+                this[singleMethod](obj);
                 // something that can be used as a terminal
             } else if (
                     typeof obj === 'string' || obj instanceof String ||
                     typeof obj === 'number' || obj instanceof Number ||
-                    isFunction( obj )
+                    isFunction(obj)
             ) {
-                this[singleMethod]( this.parseParent['terminal']( obj ) );
+                this[singleMethod](this.parseParent['terminal'](obj));
                 // arguments or array
-            } else if ( ( typeof ( obj.length ) ) === 'number' ) {
-                for ( var i = 0; i < obj.length; i++ ) {
-                    this.helperAll( singleMethod, obj[i] );
+            } else if ((typeof (obj.length)) === 'number') {
+                for (var i = 0; i < obj.length; i++) {
+                    this.helperAll(singleMethod, obj[i]);
                 }
                 // ??? maybe an object of terminals?
             } else {
-                for ( var k in obj ) {
-                    if ( obj.hasOwnProperty( k ) ) {
-                        this.helperAll( singleMethod, obj[k] );
+                for (var k in obj) {
+                    if (obj.hasOwnProperty(k)) {
+                        this.helperAll(singleMethod, obj[k]);
                     }
                 }
             }
@@ -2440,7 +2451,7 @@ module parse {
          * ignored.
          */
         private compile() {
-            if ( this.compiled === null ) {
+            if (this.compiled === null) {
                 var start = Date.now();
 
                 this.compiled = this.optimize();
@@ -2451,46 +2462,46 @@ module parse {
         }
 
         terminalScan() {
-            if ( this.compiledLookups === null ) {
+            if (this.compiledLookups === null) {
                 var rules = this.rules,
                     len = rules.length,
-                    lookups = new Array( len );
+                    lookups = new Array(len);
 
-                for ( var i = 0; i < len; i++ ) {
+                for (var i = 0; i < len; i++) {
                     var rule = rules[i],
                         ruleLookup = [];
 
                     // an 'or' rule
-                    if ( rule instanceof Array ) {
-                        for ( var j = 0; j < rule.length; j++ ) {
+                    if (rule instanceof Array) {
+                        for (var j = 0; j < rule.length; j++) {
                             var r = rule[j];
 
-                            if ( r instanceof Term ) {
-                                addRuleToLookup( r.id, ruleLookup, r );
+                            if (r instanceof Term) {
+                                addRuleToLookup(r.id, ruleLookup, r);
                             } else {
                                 var ids = [],
                                     seen = [];
 
-                                bruteScan( r, seen, ids );
+                                bruteScan(r, seen, ids);
 
                                 // merge this rules lookups in
-                                for ( var id in ids ) {
-                                    addRuleToLookup( parseInt( id ), ruleLookup, r );
+                                for (var id in ids) {
+                                    addRuleToLookup(parseInt(id), ruleLookup, r);
                                 }
                             }
                         }
                         // an 'then' rule
-                    } else if ( rule instanceof Term ) {
-                        addRuleToLookup( rule.id, ruleLookup, rule );
+                    } else if (rule instanceof Term) {
+                        addRuleToLookup(rule.id, ruleLookup, rule);
                     } else {
                         var ids = [],
                             seen = [];
 
-                        bruteScan( rule, seen, ids );
+                        bruteScan(rule, seen, ids);
 
                         // merge this rules lookups in
-                        for ( var id in ids ) {
-                            addRuleToLookup( parseInt( id ), ruleLookup, rule );
+                        for (var id in ids) {
+                            addRuleToLookup(parseInt(id), ruleLookup, rule);
                         }
                     }
 
@@ -2514,25 +2525,25 @@ module parse {
          * have managed to chop out a few functions calls.
          */
         private optimize(): CompiledTerminals {
-            var terminals: Term[] = new Array( this.parseParent.getNumTerminals() );
+            var terminals: Term[] = new Array(this.parseParent.getNumTerminals());
 
             var allRules: ParserRuleImplementation[] = [];
-            var len = this.optimizeScan( terminals, 0, allRules );
+            var len = this.optimizeScan(terminals, 0, allRules);
 
-            for ( var i = 0; i < len; i++ ) {
+            for (var i = 0; i < len; i++) {
                 allRules[i].terminalScan();
             }
 
-            return compressTerminals( terminals );
+            return compressTerminals(terminals);
         }
 
         /**
          * Converts the rules stored in this parser into a trie
          * of rules.
          */
-        optimizeScan( terminals: Term[], id: number, allRules: ParserRule[] ): number {
-            if ( this.isRecursive === NO_RECURSION ) {
-                if ( this.compiledId === NO_COMPILE_ID ) {
+        optimizeScan(terminals: Term[], id: number, allRules: ParserRule[]): number {
+            if (this.isRecursive === NO_RECURSION) {
+                if (this.compiledId === NO_COMPILE_ID) {
                     this.compiledId = id;
                     allRules[id] = this;
 
@@ -2546,22 +2557,22 @@ module parse {
                 var rules = this.rules,
                     len = rules.length;
 
-                if ( len === 0 ) {
-                    throw new Error( "No rules in parserRule" );
-                } else if ( len > 1 && this.finallyFun === null && !this.isSeperator ) {
-                    throw new Error( "No onMatch provided for parser rule, when there are multiple conditions" );
+                if (len === 0) {
+                    throw new Error("No rules in parserRule");
+                } else if (len > 1 && this.finallyFun === null && !this.isSeperator) {
+                    throw new Error("No onMatch provided for parser rule, when there are multiple conditions");
                 } else {
-                    for ( var i = 0; i < len; i++ ) {
+                    for (var i = 0; i < len; i++) {
                         var rule = rules[i];
 
                         // an 'or' rule
-                        if ( rule instanceof Array ) {
-                            for ( var j = 0; j < rule.length; j++ ) {
-                                id = addRule( rule[j], terminals, id, allRules );
+                        if (rule instanceof Array) {
+                            for (var j = 0; j < rule.length; j++) {
+                                id = addRule(rule[j], terminals, id, allRules);
                             }
                             // an 'then' rule
                         } else {
-                            id = addRule( rule, terminals, id, allRules );
+                            id = addRule(rule, terminals, id, allRules);
                         }
                     }
                 }
@@ -2572,27 +2583,27 @@ module parse {
             return id;
         }
 
-        private parseInner( input: string, parseInput: string, callback: FinishCallback, debugCallback?: DebugCallback, name?: string ): void {
-            if ( typeof input !== 'string' && !( input instanceof String ) ) {
-                throw new Error( "Non-string source given as input" );
+        private parseInner(input: string, parseInput: string, callback: FinishCallback, debugCallback?: DebugCallback, name?: string): void {
+            if (typeof input !== 'string' && !(input instanceof String)) {
+                throw new Error("Non-string source given as input");
             }
 
             if (
                     debugCallback !== undefined &&
                     debugCallback !== null &&
-                    !isFunction( debugCallback )
+                    !isFunction(debugCallback)
             ) {
-                throw new Error( "Invalid debugCallback object given" );
+                throw new Error("Invalid debugCallback object given");
             }
 
             var self = this,
                 compileTime = this.compileTime,
                 start = Date.now();
 
-            this.parseSymbols( input, parseInput, function( symbols, symbolsTime ) {
-                if ( symbols.hasErrors() ) {
-                    callback( [], symbols.getErrors() );
-                    callParseDebug( debugCallback, symbols,
+            this.parseSymbols(input, parseInput, function (symbols, symbolsTime) {
+                if (symbols.hasErrors()) {
+                    callback([], symbols.getErrors());
+                    callParseDebug(debugCallback, symbols,
                             compileTime,
                             symbolsTime,
                             0,
@@ -2600,26 +2611,26 @@ module parse {
                     );
                 } else {
                     var rulesStart = Date.now();
-                    var result = self.parseRules( symbols, input, parseInput );
+                    var result = self.parseRules(symbols, input, parseInput);
                     var rulesTime = Date.now() - rulesStart;
 
-                    util.future.run( function() {
-                        callback( result.result, result.errors );
-                        callParseDebug( debugCallback, symbols,
+                    util.future.run(function () {
+                        callback(result.result, result.errors);
+                        callParseDebug(debugCallback, symbols,
                                 compileTime,
                                 symbolsTime,
                                 rulesTime,
                                 Date.now() - start
                         );
-                    } );
+                    });
                 }
-            } )
+            })
         }
 
-        private symbolizeInner( input: string, parseInput: string, callback: SymbolizeCallback ): void {
-            this.parseSymbols( input, parseInput, function( symbols ) {
-                callback( symbols.getTerminals(), symbols.getErrors() );
-            } );
+        private symbolizeInner(input: string, parseInput: string, callback: SymbolizeCallback): void {
+            this.parseSymbols(input, parseInput, function (symbols) {
+                callback(symbols.getTerminals(), symbols.getErrors());
+            });
         }
 
         /**
@@ -2629,30 +2640,30 @@ module parse {
          * Callbacks are used internally, so it gets spread across
          * multiple JS executions.
          */
-        private parseSymbols( input: string, parseInput: string, callback: { ( symbols: SymbolResult, time: number ): void; } ): void {
-            if ( !isFunction( callback ) ) {
-                throw new Error( "No callback provided for parsing" );
+        private parseSymbols(input: string, parseInput: string, callback: { (symbols: SymbolResult, time: number): void; }): void {
+            if (!isFunction(callback)) {
+                throw new Error("No callback provided for parsing");
             }
 
             this.endCurrentOr();
 
             this['compile']();
 
-            if ( this.hasBeenUsed ) {
+            if (this.hasBeenUsed) {
                 this.clearRecursionFlag();
                 this.hasBeenUsed = false;
             }
 
             var _this = this;
 
-            util.future.run( function() {
+            util.future.run(function () {
                 var start = Date.now();
 
-                var symbols = _this.parseSymbolsInner( input, parseInput, name );
+                var symbols = _this.parseSymbolsInner(input, parseInput, name);
                 var time = Date.now() - start;
 
-                callback( symbols, time );
-            } );
+                callback(symbols, time);
+            });
         }
 
         /**
@@ -2662,24 +2673,24 @@ module parse {
          * but can be left in a strange state between use.
          */
         private clearRecursionFlag(): void {
-            if ( !this.isClearingRecursion ) {
+            if (!this.isClearingRecursion) {
                 this.isClearingRecursion = true;
 
                 this.isRecursive = NO_RECURSION;
                 this.recursiveCount = 0;
 
-                for ( var i = 0; i < this.rules.length; i++ ) {
+                for (var i = 0; i < this.rules.length; i++) {
                     var rule = this.rules[i];
 
-                    if ( rule instanceof Array ) {
-                        for ( var j = 0; j < rule.length; j++ ) {
+                    if (rule instanceof Array) {
+                        for (var j = 0; j < rule.length; j++) {
                             var r = rule[j];
 
-                            if ( r instanceof ParserRuleImplementation ) {
+                            if (r instanceof ParserRuleImplementation) {
                                 r.clearRecursionFlag();
                             }
                         }
-                    } else if ( rule instanceof ParserRuleImplementation ) {
+                    } else if (rule instanceof ParserRuleImplementation) {
                         rule.clearRecursionFlag();
                     }
                 }
@@ -2688,7 +2699,7 @@ module parse {
             }
         }
 
-        private parseRules( symbols: SymbolResult, inputSrc: string, src: string ) {
+        private parseRules(symbols: SymbolResult, inputSrc: string, src: string) {
             this.hasBeenUsed = true;
 
             /*
@@ -2701,22 +2712,22 @@ module parse {
             var errors = [],
                 hasError = null;
 
-            if ( symbols.hasMore() ) {
-                var onFinish = this.ruleTest( symbols, inputSrc );
+            if (symbols.hasMore()) {
+                var onFinish = this.ruleTest(symbols, inputSrc);
 
-                if ( onFinish !== null ) {
+                if (onFinish !== null) {
                     symbols.finalizeMove();
 
-                    if ( !symbols.hasMore() ) {
+                    if (!symbols.hasMore()) {
                         return {
                             result: onFinish(),
                             errors: errors
                         };
                     } else {
-                        errors.push( new TerminalError( symbols.maxSymbol() ) );
+                        errors.push(new TerminalError(symbols.maxSymbol()));
                     }
                 } else {
-                    errors.push( new TerminalError( symbols.maxSymbol() ) );
+                    errors.push(new TerminalError(symbols.maxSymbol()));
                 }
             }
 
@@ -2726,34 +2737,34 @@ module parse {
             };
         };
 
-        private ruleTest( symbols: SymbolResult, inputSrc: string ): () =>any {
-            if ( this.isSeperator || this.isCyclic ) {
+        private ruleTest(symbols: SymbolResult, inputSrc: string): () =>any {
+            if (this.isSeperator || this.isCyclic) {
                 var args = null;
 
-                if ( this.isSeperator ) {
-                    args = this.ruleTestSeperator( symbols, inputSrc );
+                if (this.isSeperator) {
+                    args = this.ruleTestSeperator(symbols, inputSrc);
                 } else {
-                    args = this.ruleTestCyclic( symbols, inputSrc );
+                    args = this.ruleTestCyclic(symbols, inputSrc);
                 }
 
-                if ( args === null ) {
+                if (args === null) {
                     return null;
                 } else {
                     var finallyFun = this.finallyFun;
 
-                    if ( finallyFun === null ) {
-                        return function() {
-                            for ( var i = 0; i < args.length; i++ ) {
+                    if (finallyFun === null) {
+                        return function () {
+                            for (var i = 0; i < args.length; i++) {
                                 var arg = args[i];
 
-                                if ( isFunction( arg ) ) {
+                                if (isFunction(arg)) {
                                     arg = arg();
-                                } else if ( arg instanceof Symbol ) {
+                                } else if (arg instanceof Symbol) {
                                     arg = arg.onFinish();
                                 }
 
-                                if ( arg === undefined ) {
-                                    throw new Error( "onMatch result is undefined" );
+                                if (arg === undefined) {
+                                    throw new Error("onMatch result is undefined");
                                 }
 
                                 args[i] = arg;
@@ -2762,79 +2773,79 @@ module parse {
                             return args;
                         };
                     } else {
-                        return function() {
-                            for ( var i = 0; i < args.length; i++ ) {
+                        return function () {
+                            for (var i = 0; i < args.length; i++) {
                                 var arg = args[i];
 
-                                if ( isFunction( arg ) ) {
+                                if (isFunction(arg)) {
                                     arg = arg();
-                                } else if ( arg instanceof Symbol ) {
+                                } else if (arg instanceof Symbol) {
                                     arg = arg.onFinish();
                                 }
 
-                                if ( arg === undefined ) {
-                                    throw new Error( "onMatch result is undefined" );
+                                if (arg === undefined) {
+                                    throw new Error("onMatch result is undefined");
                                 }
 
                                 args[i] = arg;
                             }
 
-                            return finallyFun( args );
+                            return finallyFun(args);
                         };
                     }
                 }
             } else {
-                var args = this.ruleTestNormal( symbols, inputSrc );
+                var args = this.ruleTestNormal(symbols, inputSrc);
 
-                if ( args === null ) {
+                if (args === null) {
                     return null;
                 } else {
                     var finallyFun = this.finallyFun;
 
-                    if ( finallyFun !== null ) {
-                        return function() {
+                    if (finallyFun !== null) {
+                        return function () {
                             // evaluate all args, bottom up
-                            for ( var i = 0; i < args.length; i++ ) {
+                            for (var i = 0; i < args.length; i++) {
                                 var arg = args[i];
 
-                                if ( isFunction( arg ) ) {
+                                if (isFunction(arg)) {
                                     var r = arg();
 
-                                    if ( r === undefined ) {
-                                        throw new Error( "onMatch result is undefined" );
+                                    if (r === undefined) {
+                                        throw new Error("onMatch result is undefined");
                                     } else {
                                         args[i] = r;
                                     }
-                                } else if ( arg instanceof Symbol ) {
+                                } else if (arg instanceof Symbol) {
                                     var r = arg.onFinish();
 
-                                    if ( r === undefined ) {
-                                        throw new Error( "onMatch result is undefined" );
+                                    if (r === undefined) {
+                                        throw new Error("onMatch result is undefined");
                                     } else {
                                         args[i] = r;
                                     }
                                 }
                             }
 
-                            return finallyFun.apply( null, args );
+                            return finallyFun.apply(null, args);
                         };
                     } else {
                         var arg = args[0];
 
-                        return function() {
-                            if ( isFunction( arg ) ) {
+                        return function () {
+                            if (isFunction(arg)) {
                                 var r = arg();
 
-                                if ( r === undefined ) {
-                                    throw new Error( "onMatch result is undefined" );
+                                if (r === undefined) {
+                                    throw new Error("onMatch result is undefined");
                                 } else {
                                     return r;
                                 }
-                            } else if ( arg instanceof Symbol ) {
+                            } else if (arg instanceof Symbol) {
                                 var r = arg.onFinish();
 
-                                if ( r === undefined ) {
-                                    throw new Error( "onMatch result is undefined" );
+                                if (r === undefined) {
+                                    throw new Error("onMatch result is undefined");
                                 } else {
                                     return r;
                                 }
@@ -2847,21 +2858,21 @@ module parse {
             }
         }
 
-        private ruleTestSeperator( symbols: SymbolResult, inputSrc: string ): () =>any {
+        private ruleTestSeperator(symbols: SymbolResult, inputSrc: string): () =>any {
             var lookups = this.compiledLookups,
                 peekID = symbols.peekID(),
                 onFinish = null,
                 rules = lookups[0],
                 rule = rules[peekID];
 
-            if ( rule === undefined ) {
+            if (rule === undefined) {
                 return null;
             } else {
                 var symbolI = symbols.idIndex(),
                     args = null;
 
-                if ( this.isRecursive === symbolI ) {
-                    if ( this.recursiveCount > 2 ) {
+                if (this.isRecursive === symbolI) {
+                    if (this.recursiveCount > 2) {
                         return null;
                     } else {
                         this.recursiveCount++;
@@ -2871,12 +2882,12 @@ module parse {
                     this.isRecursive = symbolI;
                 }
 
-                if ( rule instanceof ParserRuleImplementation ) {
-                    onFinish = rule.ruleTest( symbols, inputSrc );
+                if (rule instanceof ParserRuleImplementation) {
+                    onFinish = rule.ruleTest(symbols, inputSrc);
 
-                    if ( onFinish === null ) {
+                    if (onFinish === null) {
                         this.isRecursive = symbolI;
-                        if ( this.recursiveCount > 0 ) {
+                        if (this.recursiveCount > 0) {
                             this.recursiveCount--;
                         }
 
@@ -2884,28 +2895,28 @@ module parse {
                     } else {
                         args = [onFinish];
                     }
-                } else if ( rule instanceof Array ) {
+                } else if (rule instanceof Array) {
                     var ruleLen = rule.length;
 
-                    for ( var j = 0; j < ruleLen; j++ ) {
+                    for (var j = 0; j < ruleLen; j++) {
                         var r = rule[j];
 
-                        if ( r instanceof ParserRuleImplementation ) {
-                            onFinish = r.ruleTest( symbols, inputSrc );
+                        if (r instanceof ParserRuleImplementation) {
+                            onFinish = r.ruleTest(symbols, inputSrc);
 
-                            if ( onFinish !== null ) {
+                            if (onFinish !== null) {
                                 args = [onFinish];
                                 break;
                             }
-                        } else if ( r.id === peekID ) {
+                        } else if (r.id === peekID) {
                             args = [symbols.next()];
                             break;
                         }
                     }
-                } else if ( rule.id === peekID ) {
+                } else if (rule.id === peekID) {
                     args = [symbols.next()];
                 } else {
-                    if ( this.recursiveCount > 0 ) {
+                    if (this.recursiveCount > 0) {
                         this.recursiveCount--;
                     }
 
@@ -2913,26 +2924,26 @@ module parse {
                 }
 
                 var separators = lookups[1];
-                while ( symbols.hasMore() ) {
+                while (symbols.hasMore()) {
                     symbolI = symbols.idIndex();
                     peekID = symbols.peekID();
 
                     var separator = separators[peekID],
                         hasSeperator = false;
 
-                    if ( separator === undefined ) {
+                    if (separator === undefined) {
                         break;
-                    } else if ( separator instanceof Array ) {
-                        for ( var j = 0; j < separator.length; j++ ) {
+                    } else if (separator instanceof Array) {
+                        for (var j = 0; j < separator.length; j++) {
                             var r = separator[j];
 
                             if (
                                 r instanceof ParserRuleImplementation &&
-                                r.ruleTest( symbols, inputSrc ) !== null
+                                r.ruleTest(symbols, inputSrc) !== null
                             ) {
                                 hasSeperator = true;
                                 break;
-                            } else if ( r.id === peekID ) {
+                            } else if (r.id === peekID) {
                                 symbols.next();
                                 hasSeperator = true;
                                 break;
@@ -2940,8 +2951,8 @@ module parse {
                         }
                     } else if (
                             (
-                                    ( separator instanceof ParserRuleImplementation ) &&
-                                    separator.ruleTest( symbols, inputSrc ) !== null
+                                    (separator instanceof ParserRuleImplementation) &&
+                                    separator.ruleTest(symbols, inputSrc) !== null
                             ) || (
                                     separator.id === peekID &&
                                     symbols.next()
@@ -2950,52 +2961,52 @@ module parse {
                         hasSeperator = true;
                     }
 
-                    if ( hasSeperator ) {
+                    if (hasSeperator) {
                         peekID = symbols.peekID();
                         rule = rules[peekID];
 
-                        if ( rule === undefined ) {
-                            symbols.back( symbols.idIndex() - symbolI );
+                        if (rule === undefined) {
+                            symbols.back(symbols.idIndex() - symbolI);
                             break;
-                        } else if ( rule instanceof ParserRuleImplementation ) {
-                            onFinish = rule.ruleTest( symbols, inputSrc );
+                        } else if (rule instanceof ParserRuleImplementation) {
+                            onFinish = rule.ruleTest(symbols, inputSrc);
 
-                            if ( onFinish === null ) {
-                                symbols.back( symbols.idIndex() - symbolI );
+                            if (onFinish === null) {
+                                symbols.back(symbols.idIndex() - symbolI);
                                 break;
                             } else {
-                                args.push( onFinish );
+                                args.push(onFinish);
                             }
-                        } else if ( rule instanceof Array ) {
+                        } else if (rule instanceof Array) {
                             var ruleLen = rule.length,
                                 success = false;
 
-                            for ( var j = 0; j < ruleLen; j++ ) {
+                            for (var j = 0; j < ruleLen; j++) {
                                 var r = rule[j];
 
-                                if ( r instanceof ParserRuleImplementation ) {
-                                    onFinish = r.ruleTest( symbols, inputSrc );
+                                if (r instanceof ParserRuleImplementation) {
+                                    onFinish = r.ruleTest(symbols, inputSrc);
 
-                                    if ( onFinish !== null ) {
-                                        args.push( onFinish );
+                                    if (onFinish !== null) {
+                                        args.push(onFinish);
                                         success = true;
                                         break;
                                     }
-                                } else if ( r.id === peekID ) {
-                                    args.push( symbols.next() );
+                                } else if (r.id === peekID) {
+                                    args.push(symbols.next());
                                     success = true;
                                     break;
                                 }
                             }
 
-                            if ( !success ) {
-                                symbols.back( symbols.idIndex() - symbolI );
+                            if (!success) {
+                                symbols.back(symbols.idIndex() - symbolI);
                                 break;
                             }
-                        } else if ( rule.id === peekID ) {
-                            args.push( symbols.next() );
+                        } else if (rule.id === peekID) {
+                            args.push(symbols.next());
                         } else {
-                            symbols.back( symbols.idIndex() - symbolI );
+                            symbols.back(symbols.idIndex() - symbolI);
                             break;
                         }
                     } else {
@@ -3004,10 +3015,10 @@ module parse {
                 }
 
 
-                if ( args === null ) {
+                if (args === null) {
                     // needs to remember it's recursive position when we leave
                     this.isRecursive = symbolI;
-                    if ( this.recursiveCount > 0 ) {
+                    if (this.recursiveCount > 0) {
                         this.recursiveCount--;
                     }
 
@@ -3019,7 +3030,7 @@ module parse {
             }
         }
 
-        private ruleTestNormal( symbols: SymbolResult, inputSrc: string ): { (): any; }[] {
+        private ruleTestNormal(symbols: SymbolResult, inputSrc: string): { (): any; }[] {
             /*
              * Recursive re-entrance rules.
              *
@@ -3039,14 +3050,14 @@ module parse {
             var startSymbolI = symbols.idIndex(),
                 peekID = symbols.peekID();
 
-            if ( this.internalCount === 0 ) {
+            if (this.internalCount === 0) {
                 this.recursiveCount = 0;
             }
 
             this.internalCount++;
 
-            if ( this.isRecursive === startSymbolI ) {
-                if ( this.recursiveCount > 2 ) {
+            if (this.isRecursive === startSymbolI) {
+                if (this.recursiveCount > 2) {
                     this.internalCount--;
 
                     return null;
@@ -3082,59 +3093,59 @@ module parse {
                  */
                 var rule = lookups[i][peekID];
 
-                if ( rule === undefined ) {
-                    if ( optional[i] ) {
-                        if ( i !== 0 ) {
-                            symbols.back( symbols.idIndex() - startSymbolI );
+                if (rule === undefined) {
+                    if (optional[i]) {
+                        if (i !== 0) {
+                            symbols.back(symbols.idIndex() - startSymbolI);
                         }
 
                         // needs to remember it's recursive position when we leave
                         this.isRecursive = startSymbolI;
-                        if ( this.recursiveCount > 0 ) {
+                        if (this.recursiveCount > 0) {
                             this.recursiveCount--;
                         }
 
                         args = null;
                         break;
                     } else {
-                        if ( args === null ) {
+                        if (args === null) {
                             args = [null];
                             this.isRecursive = NO_RECURSION;
                         } else {
-                            args.push( null );
+                            args.push(null);
                         }
                     }
                 } else {
                     // 'or' rules
-                    if ( rule instanceof Array ) {
+                    if (rule instanceof Array) {
                         var ruleLen = rule.length;
 
-                        for ( var j = 0; j < ruleLen; j++ ) {
+                        for (var j = 0; j < ruleLen; j++) {
                             var r = rule[j];
 
-                            if ( r instanceof ParserRuleImplementation ) {
-                                onFinish = r.ruleTest( symbols, inputSrc );
+                            if (r instanceof ParserRuleImplementation) {
+                                onFinish = r.ruleTest(symbols, inputSrc);
 
-                                if ( onFinish !== null ) {
+                                if (onFinish !== null) {
                                     break;
                                 }
-                            } else if ( r.id === peekID ) {
+                            } else if (r.id === peekID) {
                                 onFinish = symbols.next();
                                 break;
                             }
                         }
                         // 'then' rules
-                    } else if ( rule instanceof ParserRuleImplementation ) {
-                        onFinish = rule.ruleTest( symbols, inputSrc );
+                    } else if (rule instanceof ParserRuleImplementation) {
+                        onFinish = rule.ruleTest(symbols, inputSrc);
                         // terminal rule
-                    } else if ( peekID === rule.id ) {
+                    } else if (peekID === rule.id) {
                         onFinish = symbols.next();
                     }
 
                     // it is only the first iteration where recursiveness is not allowed,
                     // so we always turn it off
-                    if ( onFinish === null && !optional[i] ) {
-                        symbols.back( symbols.idIndex() - startSymbolI );
+                    if (onFinish === null && !optional[i]) {
+                        symbols.back(symbols.idIndex() - startSymbolI);
 
                         // needs to remember it's recursive position when we leave
                         this.isRecursive = startSymbolI;
@@ -3142,11 +3153,11 @@ module parse {
                         args = null;
                         break;
                     } else {
-                        if ( args === null ) {
+                        if (args === null) {
                             args = [onFinish];
                             this.isRecursive = NO_RECURSION;
                         } else {
-                            args.push( onFinish );
+                            args.push(onFinish);
                         }
 
                         onFinish = null;
@@ -3155,7 +3166,7 @@ module parse {
                 }
             }
 
-            if ( this.recursiveCount > 0 ) {
+            if (this.recursiveCount > 0) {
                 this.recursiveCount--;
             }
 
@@ -3163,49 +3174,49 @@ module parse {
             return args;
         }
 
-        private ruleTestCyclic( symbols: SymbolResult, inputSrc: string ): { (): any; }[] {
+        private ruleTestCyclic(symbols: SymbolResult, inputSrc: string): { (): any; }[] {
             var args = null,
                 lookups = this.compiledLookups,
                 len = lookups.length,
                 onFinish = null;
 
-            while ( symbols.hasMore() ) {
-                for ( var i = 0; i < len; i++ ) {
+            while (symbols.hasMore()) {
+                for (var i = 0; i < len; i++) {
                     var peekID = symbols.peekID(),
                         rule = lookups[i][peekID];
 
-                    if ( rule === undefined ) {
+                    if (rule === undefined) {
                         return args;
                     } else {
-                        if ( rule instanceof ParserRuleImplementation ) {
-                            onFinish = rule.ruleTest( symbols, inputSrc );
-                        } else if ( rule instanceof Array ) {
-                            for ( var j = 0; j < rule.length; j++ ) {
+                        if (rule instanceof ParserRuleImplementation) {
+                            onFinish = rule.ruleTest(symbols, inputSrc);
+                        } else if (rule instanceof Array) {
+                            for (var j = 0; j < rule.length; j++) {
                                 var r = rule[j];
 
-                                if ( r instanceof ParserRuleImplementation ) {
-                                    onFinish = r.ruleTest( symbols, inputSrc );
+                                if (r instanceof ParserRuleImplementation) {
+                                    onFinish = r.ruleTest(symbols, inputSrc);
                                     break;
-                                } else if ( r.id === peekID ) {
+                                } else if (r.id === peekID) {
                                     onFinish = symbols.next();
                                     break;
                                 }
                             }
-                        } else if ( rule.id === peekID ) {
+                        } else if (rule.id === peekID) {
                             onFinish = symbols.next();
                         }
 
-                        if ( onFinish !== null ) {
+                        if (onFinish !== null) {
                             break;
                         }
                     }
                 }
 
-                if ( onFinish !== null ) {
-                    if ( args === null ) {
+                if (onFinish !== null) {
+                    if (args === null) {
                         args = [onFinish];
                     } else {
-                        args.push( onFinish );
+                        args.push(onFinish);
                     }
 
                     onFinish = null;
@@ -3242,8 +3253,8 @@ module parse {
          *
          *  strings: a substrings for each symbol, where the terminal stated to return a string
          */
-        private parseSymbolsInner( inputSrc: string, src: string, name: string ) {
-            var sourceLines = new SourceLines( inputSrc, name );
+        private parseSymbolsInner(inputSrc: string, src: string, name: string) {
+            var sourceLines = new SourceLines(inputSrc, name);
 
             var symbolI = 0,
 
@@ -3252,28 +3263,28 @@ module parse {
             symbols: Symbol[] = [],
             symbolIDs: number[] = [],
 
-            ignores: Term[] = getIgnores( this.parseParent ),
+            ignores: Term[] = getIgnores(this.parseParent),
             literals: Term[] = this.compiled.literals,
             terminals: Term[] = this.compiled.terminals,
 
-            allTerms: Term[] = ignores.concat( literals, terminals ),
+            allTerms: Term[] = ignores.concat(literals, terminals),
 
                 ignoresLen = ignores.length,
                 literalsLen = ignoresLen + literals.length,
                 termsLen = literalsLen + terminals.length,
 
-            ignoresTests: TerminalFunction[] = new Array( ignoresLen ),
-                literalsData = new Array( literalsLen ),
-                literalsMatches = new Array( literalsLen ),
-                literalsType = new Array( literalsLen ),
+            ignoresTests: TerminalFunction[] = new Array(ignoresLen),
+                literalsData = new Array(literalsLen),
+                literalsMatches = new Array(literalsLen),
+                literalsType = new Array(literalsLen),
 
                 symbolIDToTerms = this.compiled.idToTerms,
 
-            postMatches: TerminalFunction[] = new Array( termsLen ),
+            postMatches: TerminalFunction[] = new Array(termsLen),
 
-            termTests: TerminalFunction[] = new Array( termsLen ),
-            termIDs: number[] = new Array( termsLen ),
-            multipleIgnores: bool = ( ignores.length > 1 ),
+            termTests: TerminalFunction[] = new Array(termsLen),
+            termIDs: number[] = new Array(termsLen),
+            multipleIgnores: bool = (ignores.length > 1),
 
             /**
              * An invalid index in the string, used to denote
@@ -3296,13 +3307,13 @@ module parse {
              * the return flag is stored by shifting the id 16
              * places to the left when it is set.
              */
-            for ( var i = 0; i < allTerms.length; i++ ) {
+            for (var i = 0; i < allTerms.length; i++) {
                 var term = allTerms[i],
                     test = term.testData;
 
-                if ( i < ignoresLen ) {
+                if (i < ignoresLen) {
                     ignoresTests[i] = test;
-                } else if ( i < literalsLen ) {
+                } else if (i < literalsLen) {
                     literalsData[i] = term.testData;
                     literalsMatches[i] = term.literal;
                     literalsType[i] = term.type;
@@ -3311,7 +3322,7 @@ module parse {
                 }
 
                 var mostUpper = term.getParentTerm();
-                if ( mostUpper !== term ) {
+                if (mostUpper !== term) {
                     allTerms[i] = mostUpper;
                 }
 
@@ -3319,14 +3330,14 @@ module parse {
                 termIDs[i] = mostUpper.id;
             }
 
-            if ( terminals.length === 0 ) {
-                throw new Error( "No terminals provided" );
+            if (terminals.length === 0) {
+                throw new Error("No terminals provided");
             } else {
                 var i = 0;
 
                 scan:
-                while ( i < len ) {
-                    var code = src.charCodeAt( i );
+                while (i < len) {
+                    var code = src.charCodeAt(i);
 
                     /*
                      * All terminals are put in one array,
@@ -3355,19 +3366,19 @@ module parse {
                      * Test the 'ignores', i.e. whitespace.
                      */
 
-                    while ( j < ignoresLen ) {
-                        r = ignoresTests[j]( src, i, code, len );
+                    while (j < ignoresLen) {
+                        r = ignoresTests[j](src, i, code, len);
 
-                        if ( r !== undefined && r !== false && r > i ) {
-                            code = src.charCodeAt( r );
+                        if (r !== undefined && r !== false && r > i) {
+                            code = src.charCodeAt(r);
 
                             var postMatchEvent = postMatches[j];
-                            if ( postMatchEvent !== null ) {
-                                var r2 = postMatchEvent( src, r, code, len );
+                            if (postMatchEvent !== null) {
+                                var r2 = postMatchEvent(src, r, code, len);
 
-                                if ( r2 !== undefined && r2 > r ) {
+                                if (r2 !== undefined && r2 > r) {
                                     i = r2;
-                                    code = src.charCodeAt( r2 );
+                                    code = src.charCodeAt(r2);
                                 } else {
                                     i = r;
                                 }
@@ -3375,7 +3386,7 @@ module parse {
                                 i = r;
                             }
 
-                            if ( multipleIgnores ) {
+                            if (multipleIgnores) {
                                 j = 0;
                             }
                         } else {
@@ -3389,7 +3400,7 @@ module parse {
 
                     r = 0;
                     scan_literals:
-                    while ( j < literalsLen ) {
+                    while (j < literalsLen) {
                         var type = literalsType[j],
                             match = literalsData[j];
 
@@ -3397,17 +3408,17 @@ module parse {
                          * A string,
                          * but it is actually an array of code characters.
                          */
-                        if ( type === TYPE_STRING ) {
+                        if (type === TYPE_STRING) {
                             var testLen = match.length;
 
-                            for ( var testI = 0; testI < testLen; testI++ ) {
-                                if ( src.charCodeAt( i + testI ) !== match[testI] ) {
+                            for (var testI = 0; testI < testLen; testI++) {
+                                if (src.charCodeAt(i + testI) !== match[testI]) {
                                     j++;
                                     continue scan_literals;
                                 }
                             }
 
-                            if ( !isWordCharAt( src, i + testI ) ) {
+                            if (!isWordCharAt(src, i + testI)) {
                                 r = i + testI;
                             } else {
                                 j++;
@@ -3417,8 +3428,8 @@ module parse {
                             /*
                              * Non-alphanumeric codes, such as '+'.
                              */
-                        } else if ( type === TYPE_CODE ) {
-                            if ( code === match ) {
+                        } else if (type === TYPE_CODE) {
+                            if (code === match) {
                                 r = i + 1;
                             } else {
                                 j++;
@@ -3430,8 +3441,8 @@ module parse {
                              *
                              * I expect it is unpopular, which is why it is last.
                              */
-                        } else if ( type === TYPE_WORD_CODE ) {
-                            if ( code === match && !isWordCode( src.charCodeAt( i + 1 ) ) ) {
+                        } else if (type === TYPE_WORD_CODE) {
+                            if (code === match && !isWordCode(src.charCodeAt(i + 1))) {
                                 r = i + 1;
                             } else {
                                 j++;
@@ -3439,7 +3450,7 @@ module parse {
                             }
                         }
 
-                        if ( r > i ) {
+                        if (r > i) {
                             symbolIDs[symbolI] = termIDs[j];
                             symbols[symbolI++] = new Symbol(
                                     allTerms[j],
@@ -3453,23 +3464,23 @@ module parse {
                             //
                             // This is from the last terminal,
                             // to this one, but ignores whitespace.
-                            if ( errorStart !== NO_ERROR ) {
-                                errors.push( new SymbolError(
+                            if (errorStart !== NO_ERROR) {
+                                errors.push(new SymbolError(
                                         errorStart,
-                                        inputSrc.substring( errorStart, i ),
+                                        inputSrc.substring(errorStart, i),
                                         sourceLines
-                                ) );
+                                ));
 
                                 errorStart = NO_ERROR;
                             }
 
                             var postMatchEvent = postMatches[j];
-                            if ( postMatchEvent !== null ) {
-                                code = src.charCodeAt( r );
+                            if (postMatchEvent !== null) {
+                                code = src.charCodeAt(r);
 
-                                var r2 = postMatchEvent( src, r, code, len );
+                                var r2 = postMatchEvent(src, r, code, len);
 
-                                if ( r2 !== undefined && r2 > r ) {
+                                if (r2 !== undefined && r2 > r) {
                                     i = r2;
                                 } else {
                                     i = r;
@@ -3488,17 +3499,17 @@ module parse {
                      * Test 'non-literals', i.e. variable.
                      */
 
-                    while ( j < termsLen ) {
-                        r = termTests[j]( src, i, code, len );
+                    while (j < termsLen) {
+                        r = termTests[j](src, i, code, len);
 
-                        if ( r !== undefined && r !== false && r > i ) {
+                        if (r !== undefined && r !== false && r > i) {
                             symbolIDs[symbolI] = termIDs[j];
 
                             symbols[symbolI++] = new Symbol(
                                     allTerms[j],
                                     i,
                                     sourceLines,
-                                    inputSrc.substring( i, r )
+                                    inputSrc.substring(i, r)
                             );
 
                             // If we were in error mode,
@@ -3506,23 +3517,23 @@ module parse {
                             //
                             // This is from the last terminal,
                             // to this one, but ignores whitespace.
-                            if ( errorStart !== NO_ERROR ) {
-                                errors.push( new SymbolError(
+                            if (errorStart !== NO_ERROR) {
+                                errors.push(new SymbolError(
                                         errorStart,
-                                        inputSrc.substring( errorStart, i ),
+                                        inputSrc.substring(errorStart, i),
                                         sourceLines
-                                ) );
+                                ));
 
                                 errorStart = NO_ERROR;
                             }
 
                             var postMatchEvent = postMatches[j];
-                            if ( postMatchEvent !== null ) {
-                                code = src.charCodeAt( r );
+                            if (postMatchEvent !== null) {
+                                code = src.charCodeAt(r);
 
-                                var r2 = postMatchEvent( src, r, code, len );
+                                var r2 = postMatchEvent(src, r, code, len);
 
-                                if ( r2 !== undefined && r2 > r ) {
+                                if (r2 !== undefined && r2 > r) {
                                     i = r2;
                                 } else {
                                     i = r;
@@ -3545,12 +3556,12 @@ module parse {
                     i++;
                 }
 
-                if ( errorStart !== NO_ERROR && errorStart < len ) {
-                    errors.push( new SymbolError(
+                if (errorStart !== NO_ERROR && errorStart < len) {
+                    errors.push(new SymbolError(
                             errorStart,
-                            inputSrc.substring( errorStart, i ),
+                            inputSrc.substring(errorStart, i),
                             sourceLines
-                    ) );
+                    ));
                 }
 
                 return new SymbolResult(
@@ -3585,59 +3596,59 @@ module parse {
     */
 
     var ignoreSingle: {
-        ( ps: Parse, match: Term ): void;
-        ( ps: Parse, match: string ): void;
-        ( ps: Parse, match: number ): void;
-        ( ps: Parse, match: TerminalFunction ): void;
-        ( ps: Parse, match: any[] ): void;
+        (ps: Parse, match: Term): void;
+        (ps: Parse, match: string): void;
+        (ps: Parse, match: number): void;
+        (ps: Parse, match: TerminalFunction): void;
+        (ps: Parse, match: any[]): void;
     } =
-        function( ps: Parse, term:any ) {
-            if ( term instanceof String || isFunction( term ) ) {
-                ignoreSingle( ps, terminal( term ) );
-            } else if ( terminal instanceof Term ) {
-                ingoreInner( ps, term );
-            } else if ( term instanceof Array ) {
-                for ( var i = 0; i < term.length; i++ ) {
-                    ignoreSingle( ps, terminalsInner( term[i], null ) );
+        function (ps: Parse, term: any) {
+            if (term instanceof String || isFunction(term)) {
+                ignoreSingle(ps, terminal(term));
+            } else if (terminal instanceof Term) {
+                ingoreInner(ps, term);
+            } else if (term instanceof Array) {
+                for (var i = 0; i < term.length; i++) {
+                    ignoreSingle(ps, terminalsInner(term[i], null));
                 }
-            } else if ( term instanceof Object ) {
-                for ( var k in term ) {
-                    if ( term.hasOwnProperty( k ) ) {
-                        ignoreSingle( ps, terminalsInner( term[k], k ) );
+            } else if (term instanceof Object) {
+                for (var k in term) {
+                    if (term.hasOwnProperty(k)) {
+                        ignoreSingle(ps, terminalsInner(term[k], k));
                     }
                 }
             } else {
-                throw new Error( "unknown ignore terminal given" );
+                throw new Error("unknown ignore terminal given");
             }
         };
 
     /**
     * @return A list of all ignores set to be used.
     */
-    var getIgnores = function( ps: Parse ) {
+    var getIgnores = function (ps: Parse) {
         return ps.ignores;
     }
 
-    var ingoreInner = function( ps: Parse, t: Term ) {
-        ps.ignores.push( t );
+    var ingoreInner = function (ps: Parse, t: Term) {
+        ps.ignores.push(t);
     }
 
-    var terminalsInner = function( ps: Parse, obj, termName?: string ) {
-        if ( obj instanceof Object && !isFunction( obj ) && !( obj instanceof Array ) ) {
+    var terminalsInner = function (ps: Parse, obj, termName?: string) {
+        if (obj instanceof Object && !isFunction(obj) && !(obj instanceof Array)) {
             var terminals = {};
 
-            for ( var name in obj ) {
-                if ( obj.hasOwnProperty( name ) ) {
-                    terminals[name] = terminalsInner( ps, obj[name], name );
+            for (var name in obj) {
+                if (obj.hasOwnProperty(name)) {
+                    terminals[name] = terminalsInner(ps, obj[name], name);
                 }
             }
 
             return terminals;
         } else {
-            var term = new Term( obj, termName ).setID( ps.terminalID++ );
+            var term = new Term(obj, termName).setID(ps.terminalID++);
 
-            if ( termName !== undefined ) {
-                term.setName( formatTerminalName( termName ) );
+            if (termName !== undefined) {
+                term.setName(formatTerminalName(termName));
             }
 
             return term;
@@ -3679,7 +3690,7 @@ module parse {
          */
         ignores: Term[] = [];
 
-        constructor() { }
+        constructor () { }
 
         /**
          * @return {number} The number of terminals created with this Parse.
@@ -3689,34 +3700,34 @@ module parse {
              * INVALID_TERMINAL+1 is added to terminalID at the start,
              * so removing it ensures we are only left with the number of terminals created
              */
-            return this.terminalID - (INVALID_TERMINAL+1);
+            return this.terminalID - (INVALID_TERMINAL + 1);
         }
 
-        rule() : ParserRule {
-            return new ParserRuleImplementation( this );
+        rule(): ParserRule {
+            return new ParserRuleImplementation(this);
         }
 
-        a( ...args: any[] ): ParserRule;
+        a(...args: any[]): ParserRule;
         a() {
-            return new ParserRuleImplementation( this ).thenAll( arguments );
+            return new ParserRuleImplementation(this).thenAll(arguments);
         }
 
-        or( ...args: any[] ): ParserRule;
+        or(...args: any[]): ParserRule;
         or() {
-            return new ParserRuleImplementation( this ).orAll( arguments );
+            return new ParserRuleImplementation(this).orAll(arguments);
         }
-        either( ...args: any[] ): ParserRule;
+        either(...args: any[]): ParserRule;
         either() {
-            return new ParserRuleImplementation( this ).orAll( arguments );
+            return new ParserRuleImplementation(this).orAll(arguments);
         }
 
-        optional( ...args: any[] ): ParserRule;
+        optional(...args: any[]): ParserRule;
         optional() {
-            return new ParserRuleImplementation( this ).optionalAll( arguments );
+            return new ParserRuleImplementation(this).optionalAll(arguments);
         }
-        maybe( ...args: any[] ): ParserRule;
+        maybe(...args: any[]): ParserRule;
         maybe() {
-            return new ParserRuleImplementation( this ).optionalAll( arguments );
+            return new ParserRuleImplementation(this).optionalAll(arguments);
         }
 
         /**
@@ -3737,10 +3748,10 @@ module parse {
          * @param terminal The terminal to always be ignoring.
          * @return This Parse object, for method chaining.
          */
-        ignore( ...args: any[] ): Parse;
+        ignore(...args: any[]): Parse;
         ignore() {
-            for ( var i = 0; i < arguments.length; i++ ) {
-                ignoreSingle( this, arguments[i] );
+            for (var i = 0; i < arguments.length; i++) {
+                ignoreSingle(this, arguments[i]);
             }
 
             return this;
@@ -3762,12 +3773,12 @@ module parse {
          * Note how the comma is always between each variable. It won't match
          * commas on the outside.
          */
-        repeatSeperator( match, seperator ) {
-            return new ParserRuleImplementation( this ).repeatSeperator( match, seperator );
+        repeatSeperator(match, seperator) {
+            return new ParserRuleImplementation(this).repeatSeperator(match, seperator);
         }
 
-        optionalSeperator( match, seperator ) {
-            return new ParserRuleImplementation( this ).optionalSeperator( match, seperator );
+        optionalSeperator(match, seperator) {
+            return new ParserRuleImplementation(this).optionalSeperator(match, seperator);
         }
 
         /**
@@ -3778,9 +3789,16 @@ module parse {
          *
          * It's onMatch is called multiple times, allowing you to build up
          */
-        repeatEither( ...args: any[] ): ParserRule;
+        repeatEither(...args: any[]): ParserRule;
         repeatEither() {
-            return new ParserRuleImplementation( this ).cyclicOr( arguments );
+            return new ParserRuleImplementation(this).cyclicOrAll(arguments);
+        }
+
+        repeat(...args: any[]): ParserRule;
+        repeat() {
+            return new ParserRuleImplementation(this).cyclicOrSingle(
+                    new ParserRuleImplementation(this).thenAll(arguments)
+            )
         }
 
         /**
@@ -3794,55 +3812,61 @@ module parse {
          * This also works recursively, so arrays of arrays of
          * matches is turned into terminals.
          */
-        terminals( obj ) {
-            return terminalsInner( this, obj, null );
+        terminals(obj) {
+            return terminalsInner(this, obj, null);
         }
     }
 
     var pInstance = new Parse();
 
-    export function rule() : ParserRule {
-        return new ParserRuleImplementation( pInstance );
+    export function rule(): ParserRule {
+        return new ParserRuleImplementation(pInstance);
     }
 
-    export function a( ...args: any[] ): ParserRule;
+    export function a(...args: any[]): ParserRule;
     export function a() {
-        return new ParserRuleImplementation( pInstance ).thenAll( arguments );
+        return new ParserRuleImplementation(pInstance).thenAll(arguments);
     }
 
-    export function either( ...args: any[] ): ParserRule;
+    export function either(...args: any[]): ParserRule;
     export function either() {
-        return new ParserRuleImplementation( pInstance ).orAll( arguments );
+        return new ParserRuleImplementation(pInstance).orAll(arguments);
     }
 
     export var optional = either;
 
-    export function maybe( ...args: any[] ): ParserRule;
+    export function maybe(...args: any[]): ParserRule;
     export function maybe() {
-        return new ParserRuleImplementation( pInstance ).optionalAll( arguments );
+        return new ParserRuleImplementation(pInstance).optionalAll(arguments);
     }
 
-    export function ignore( ...args: any[] ): Parse;
+    export function ignore(...args: any[]): Parse;
     export function ignore() {
-        for ( var i = 0; i < arguments.length; i++ ) {
-            ignoreSingle( pInstance, arguments[i] );
+        for (var i = 0; i < arguments.length; i++) {
+            ignoreSingle(pInstance, arguments[i]);
         }
 
         return pInstance;
     }
 
-    export function repeatSeperator( match, seperator ) {
-        return new ParserRuleImplementation( pInstance ).repeatSeperator( match, seperator );
+    export function repeatSeperator(match, seperator) {
+        return new ParserRuleImplementation(pInstance).repeatSeperator(match, seperator);
     }
 
-    export function optionalSeperator( match, seperator ) {
-        return new ParserRuleImplementation( pInstance ).optionalSeperator( match, seperator );
+    export function optionalSeperator(match, seperator) {
+        return new ParserRuleImplementation(pInstance).optionalSeperator(match, seperator);
     }
 
-    export function repeatEither( ...args: any[] ): ParserRule;
+    export function repeatEither(...args: any[]): ParserRule;
     export function repeatEither() {
-        return new ParserRuleImplementation( pInstance ).cyclicOr( arguments );
+        return new ParserRuleImplementation(pInstance).cyclicOrAll(arguments);
     }
+
+    export function repeat(...args: any[]): ParserRule;
+    export function repeat() =>
+        new ParserRuleImplementation(pInstance).cyclicOrSingle(
+                new ParserRuleImplementation(pInstance).thenAll(arguments)
+        )
 
     /**
     * Code checking utility functions.
@@ -3868,27 +3892,27 @@ module parse {
     * For the end of line version, use Parse.WHITESPACE_AND_END_OF_LINE
     */
 
-    export var terminal : {
-            ( match:Term, termName?:string ): Term;
-            ( match:string, termName?:string ): Term;
-            ( match:number, termName?:string ): Term;
-            ( match:TerminalFunction, termName?:string ): Term;
-            ( match:any[], termName?:string ): Term;
-
-            WHITESPACE: TerminalFunction;
-            WHITESPACE_END_OF_LINE: TerminalFunction;
-            NUMBER: TerminalFunction;
-            C_SINGLE_LINE_COMMENT: TerminalFunction;
-            C_MULTI_LINE_COMMENT: TerminalFunction;
-            STRING: TerminalFunction;
-    } = ( () => {
+    export var terminal = ( () => {
         /**
          * Turns the given item into a single terminal.
          *
          * @param match The item used for this terminal to match against.
          * @param termName Optional, a name for this terminal, for error reporting.
          */
-        var terminal:any = function( match:any, termName?:string ) : Term {
+        var terminal: {
+                ( match:Term, termName?:string ): Term;
+                ( match:string, termName?:string ): Term;
+                ( match:number, termName?:string ): Term;
+                ( match:TerminalFunction, termName?:string ): Term;
+                ( match:any[], termName?:string ): Term;
+
+                WHITESPACE: TerminalFunction;
+                WHITESPACE_END_OF_LINE: TerminalFunction;
+                NUMBER: TerminalFunction;
+                C_SINGLE_LINE_COMMENT: TerminalFunction;
+                C_MULTI_LINE_COMMENT: TerminalFunction;
+                STRING: TerminalFunction;
+        } = <any> function( match:any, termName?:string ) : Term {
             return terminalsInner( pInstance, match, termName );
         }
 
@@ -3909,7 +3933,7 @@ module parse {
         /**
         * A terminal that matches: tabs, spaces, \n and \r characters.
         */
-        terminal.WHITESPACE_AND_END_OF_LINE = function( src, i, code, len ) {
+        terminal.WHITESPACE_END_OF_LINE = function( src, i, code, len ) {
             while ( code === SPACE || code === TAB || code === SLASH_N || code === SLASH_R ) {
                 i++;
                 code = src.charCodeAt( i );

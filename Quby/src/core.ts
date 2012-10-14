@@ -33,30 +33,27 @@ module quby.core {
      * their access from teh public API (namely
      * the ParserInstance).
      */
-    export function runParser(instance, validator: Validator) {
-        var callback = instance.whenFinished,
-            debugCallback = instance.debugCallback,
-            source = instance.getSource(),
-            name = instance.getName();
+    export function runParser(instance:quby.main.ParserInstance, validator: Validator) {
+        instance.lock();
 
         quby.parser.parseSource(
-                source,
-                instance,
+                instance.getSource(),
+                instance.getName(),
 
-                function(program, errors) {
-                    validator.adminMode(instance.isAdmin);
-                    validator.strictMode(instance.isStrict);
+                function(program:quby.ast.ISyntax, errors) {
+                    validator.adminMode( instance.isAdmin() );
+                    validator.strictMode( instance.isStrict() );
 
                     validator.validate(program, errors);
 
-                    if (callback !== undefined && callback !== null) {
-                        util.future.runFun(callback);
-                    }
+                    var callback = instance.getFinishedFun();
 
-                    instance.hasParsed = true;
+                    if ( callback ) {
+                        util.future.runFun( callback );
+                    }
                 },
 
-                debugCallback
+                instance.getDebugFun()
         );
     }
 

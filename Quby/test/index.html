@@ -315,7 +315,7 @@
                     parser.
                             parse( core ).
                             adminMode( true ).
-                            debug( function(symbols, times) {
+                            onDebug( function(symbols, times) {
                                 compileTime += times.compile;
                                 symbolsTime += times.symbols;
                                 rulesTime   += times.rules;
@@ -329,7 +329,7 @@
                     parser.
                             parse( sourceCode.value ).
                             adminMode( isAdmin ).
-                            debug( function(symbols, times) {
+                            onDebug( function(symbols, times) {
                                 var displaySymbols = new Array( symbols.length );
 
                                 for ( var i = 0; i < symbols.length; i++ ) {

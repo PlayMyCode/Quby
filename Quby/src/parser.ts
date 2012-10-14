@@ -492,7 +492,12 @@ module quby.parser {
 
             YIELD: 'yield',
 
-            THIS: 'this'
+            THIS: 'this',
+
+            CASE: 'case',
+            WHEN: 'when',
+            BREAK: 'break',
+            CONTINUE: 'continue'
         },
 
         symbols: {
@@ -857,11 +862,8 @@ module quby.parser {
             } );
 
     var exprs = parse.
-            repeatSeperator( expr, terminals.symbols.comma ).
-            onMatch( function( exprs ) {
-                return new quby.ast.Parameters().
-                        setArr( exprs );
-            } );
+            repeatSeperator(expr, terminals.symbols.comma).
+            onMatch((exprs) => new quby.ast.Parameters(exprs));
 
     var variables = parse.
             either(
@@ -1004,10 +1006,7 @@ module quby.parser {
                     ),
                     terminals.symbols.comma
             ).
-            onMatch( function( params ) {
-                return new quby.ast.Parameters().
-                        setArr( params );
-            } );
+            onMatch( ( params ) => new quby.ast.Parameters(params) )
 
     /**
      * These are the definitions for parameters for a function, method or lamda.
@@ -1068,7 +1067,7 @@ module quby.parser {
             then( terminals.ops.bitwiseOr ).
             onMatch( function( lOr, params, end, rOr ) {
                 if ( params !== null ) {
-                    return new quby.ast.Parameters().setArr( params );
+                    return new quby.ast.Parameters(params);
                 } else {
                     return null;
                 }
@@ -1114,9 +1113,9 @@ module quby.parser {
             a( terminals.keywords.DEF, parameterDefinition ).
             optional( statements ).
             then( terminals.keywords.END ).
-            onMatch( function( def, params, stmts, end ) {
-                return new quby.ast.Lambda( params, stmts );
-            } );
+            onMatch( (def, params, stmts, end) =>
+                new quby.ast.Lambda( params, stmts )
+            )
 
     var functionCall = parse.
             a( terminals.identifiers.variableName ).
@@ -1157,9 +1156,9 @@ module quby.parser {
             then( terminals.identifiers.variableName ).
             then( parameterExprs ).
             optional( block ).
-            onMatch( function( dot, name, exprs, block ) {
-                return new quby.ast.MethodCall( null, name, exprs, block );
-            } );
+            onMatch( (dot, name, exprs, block) =>
+                new quby.ast.MethodCall( null, name, exprs, block )
+            );
 
     var newInstance = parse.
             a( terminals.keywords.NEW ).
@@ -1169,21 +1168,19 @@ module quby.parser {
                             then( expr ).
                             then( parameterExprs ).
                             optional( block ).
-                            onMatch( function( hash, expr, params, block ) {
-                                return new quby.ast.NewJSInstance( expr, params, block );
-                            } ),
+                            onMatch( (hash, expr, params, block) =>
+                                new quby.ast.NewJSInstance( expr, params, block )
+                            ),
 
                     parse.
                             a( terminals.identifiers.variableName ).
                             then( parameterExprs ).
                             optional( block ).
-                            onMatch( function( name, params, block ) {
-                                return new quby.ast.NewInstance( name, params, block );
-                            } )
+                            onMatch( (name, params, block) =>
+                                new quby.ast.NewInstance( name, params, block )
+                            )
             ).
-            onMatch( function( nw, newInstance ) {
-                return newInstance;
-            } );
+            onMatch( (nw, newInstance) => newInstance )
 
     var exprInParenthesis = parse.
             a( terminals.symbols.leftBracket ).
@@ -1254,7 +1251,7 @@ module quby.parser {
                                     ops.assignment
                             ).
                             then( expr ).
-                            onMatch( function( op, right ) {
+                            onMatch(function (op:parse.Symbol, right:quby.ast.IExpr ) {
                                 var term = op.terminal;
 
                                 if ( term === ops.assignment ) {
@@ -1404,15 +1401,15 @@ module quby.parser {
      */
 
     var ifStart = parse.
-            a( terminals.keywords.IF ).
-            then( expr ).
-            optional( terminals.keywords.THEN ).
-            then( statements ).
-            onMatch( function( IF, condition, THEN, stmts ) {
-                return new quby.ast.IfBlock( condition, stmts );
-            } );
+            a(terminals.keywords.IF).
+            then(expr).
+            optional(terminals.keywords.THEN).
+            then(statements).
+            onMatch( (IF, condition, THEN, stmts) =>
+                new quby.ast.IfBlock(condition, stmts)
+            )
 
-    var isElseIf = parse.
+    var ifElseIf = parse.
             either(
                     terminals.keywords.ELSE_IF,
                     terminals.keywords.ELSEIF,
@@ -1421,33 +1418,26 @@ module quby.parser {
             then( expr ).
             optional( terminals.keywords.THEN ).
             then( statements ).
-            onMatch( function( elseIf, condition, then, stmts ) {
-                return new quby.ast.IfBlock( condition, stmts );
-            } );
+            onMatch( (elseIf, condition, then, stmts) =>
+                new quby.ast.IfBlock(condition, stmts)
+            )
 
     var ifElseIfs = parse.
-            a( isElseIf ).
-            maybeThis().
-            onMatch( function( elseIf, elseIfs ) {
-                if ( elseIfs === null ) {
-                    elseIfs = new quby.ast.IfElseIfs();
-                }
+            repeat(ifElseIf).
+            onMatch( (elseIfs) => new quby.ast.IfElseIfs(elseIfs) );
 
-                return elseIfs.unshift( elseIf );
-            } );
-
-    var ifElse = parse.
+    var elseClause = parse.
             a( terminals.keywords.ELSE, statements ).
-            onMatch( function( els, stmts ) { return stmts; } );
+            onMatch( (els, stmts) => stmts );
 
     var ifStatement = parse.
             a( ifStart ).
             optional( ifElseIfs ).
-            optional( ifElse ).
+            optional( elseClause ).
             then( terminals.keywords.END ).
-            onMatch( function( start, otherIfs, elses, end ) {
-                return new quby.ast.IfStmt( start, otherIfs, elses );
-            } );
+            onMatch( ( start, otherIfs, elses, end ) =>
+                new quby.ast.IfStmt( start, otherIfs, elses );
+            );
 
     var whileUntilStatement = parse.
             either( terminals.keywords.WHILE, terminals.keywords.UNTIL ).
@@ -1475,6 +1465,29 @@ module quby.parser {
                 }
             } );
 
+    var whenStatement = parse.
+            a(terminals.keywords.WHEN).
+            then(expr).
+            thenEither(
+                    terminals.keywords.THEN,
+                    statementSeperator
+            ).
+            then(statements).
+            onMatch((when, expr, seperator, statements) => new quby.ast.WhenClause(expr, statements));
+
+    var whenStatements = parse.
+            repeat(whenStatement);
+    
+    var caseWhenStatement = parse.
+            a(terminals.keywords.CASE).
+            then( expr ).
+            optional(whenStatements).
+            optional(elseClause).
+            then(terminals.keywords.END).
+            onMatch( (caseTerm, expr, whenClauses, elseClause, end) =>
+                new quby.ast.CaseWhen(expr, whenClauses, elseClause)
+            );
+        
     statement.either(
                 functionDefinition,
                 classDefinition,
@@ -1483,6 +1496,7 @@ module quby.parser {
                 ifStatement,
                 whileUntilStatement,
                 loopStatement,
+                caseWhenStatement,
 
                 returnStatement,
 
@@ -1508,15 +1522,15 @@ module quby.parser {
     export function parseSource(
             src: string,
             name: string,
-            onFinish: ( program: any, errors ) => void ,
-            onDebug
+            onFinish: ( program: quby.ast.ISyntax, errors ) => void ,
+            onDebug: parse.DebugCallback
     ) {
         statements.parse( {
             name: name,
             src: src,
             inputSrc: preParse( src ),
 
-            onFinish: function( program, errors ) {
+            onFinish: function( program:quby.ast.ISyntax, errors ) {
                 onFinish( program, errors );
             },
             onDebug: onDebug || null

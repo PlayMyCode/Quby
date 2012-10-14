@@ -306,8 +306,8 @@ module quby.ast {
         private appendToLast: bool;
         private stmts: ISyntax[];
 
-        constructor (strSeperator: string, appendToLast: bool) {
-            this.stmts = [];
+        constructor (strSeperator: string, appendToLast: bool, stmts?: ISyntax[] = []) {
+            this.stmts = stmts;
             this.seperator = strSeperator;
             this.offset = null;
             this.length = 0;
@@ -379,11 +379,7 @@ module quby.ast {
 
     export class Statements extends SyntaxList {
         constructor (stmtsArray?: ISyntax[]) {
-            super('', false);
-
-            if (stmtsArray !== undefined) {
-                this.setArr(stmtsArray);
-            }
+            super('', false, stmtsArray);
         }
 
         print(p: quby.core.Printer) {
@@ -396,16 +392,12 @@ module quby.ast {
         private errorParam: ParameterBlockVariable;
         private blockParamPosition: number;
 
-        constructor () {
-            super(',', false);
+        constructor ( params?: ISyntax[] ) {
+            super(',', false, params);
 
             this.blockParam = null;
             this.errorParam = null;
             this.blockParamPosition = -1;
-
-            for (var i = 0; i < arguments.length; i++) {
-                this.add(arguments[i]);
-            }
         }
 
         /**
@@ -493,10 +485,8 @@ module quby.ast {
     }
 
     export class Mappings extends SyntaxList {
-        constructor (mappings: ISyntax[]) {
-            super(',', false);
-
-            this.setArr(mappings);
+        constructor (mappings?: ISyntax[]) {
+            super(',', false, mappings);
         }
     }
 
@@ -581,8 +571,8 @@ module quby.ast {
     }
 
     export class IfElseIfs extends SyntaxList {
-        constructor () {
-            super('else ', false);
+        constructor (elseIfs?:IfBlock[]) {
+            super('else ', false, elseIfs);
         }
     }
 
@@ -2180,6 +2170,9 @@ module quby.ast {
         }
 
         validate(v:quby.core.Validator) {
+            v.parseError(this.getOffset(), "'is' is not yet implemented");
+            return;
+
             if (this.isJSLiteral()) {
                 if (v.ensureAdminMode( this, 'JS inlining for instance check, is not allowed in Sandbox mode') ) {
                     // todo, check if the class exists
