@@ -1467,25 +1467,25 @@ module quby.parser {
 
     var whenStatement = parse.
             a(terminals.keywords.WHEN).
-            then(expr).
+            then(exprs).
             thenEither(
                     terminals.keywords.THEN,
                     statementSeperator
             ).
             then(statements).
-            onMatch((when, expr, seperator, statements) => new quby.ast.WhenClause(expr, statements));
+            onMatch((when, exprs, seperator, statements) => new quby.ast.WhenClause(exprs, statements));
 
     var whenStatements = parse.
             repeat(whenStatement);
     
     var caseWhenStatement = parse.
             a(terminals.keywords.CASE).
-            then( expr ).
+            optional( expr ).
             optional(whenStatements).
             optional(elseClause).
             then(terminals.keywords.END).
             onMatch( (caseTerm, expr, whenClauses, elseClause, end) =>
-                new quby.ast.CaseWhen(expr, whenClauses, elseClause)
+                new quby.ast.CaseWhen(caseTerm, expr, whenClauses, elseClause)
             );
         
     statement.either(
@@ -1525,6 +1525,7 @@ module quby.parser {
             onFinish: ( program: quby.ast.ISyntax, errors ) => void ,
             onDebug: parse.DebugCallback
     ) {
+        console.log(src);
         statements.parse( {
             name: name,
             src: src,

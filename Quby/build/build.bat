@@ -1,10 +1,4 @@
-@echo off
 
-call %~dp0\declarations.bat
+tsc --out %~dp0\..\release\quby.js %~dp0\..\quby.ts
 
-type %~dp0\..\license.txt   >  %~dp0\..\dist\quby.js
-type %~dp0\..\src\lib\*.js  >> %~dp0\..\dist\quby.js
-type %~dp0\..\src\*.js      >> %~dp0\..\dist\quby.js
-
-@echo on
 rem ### Build Done! ###

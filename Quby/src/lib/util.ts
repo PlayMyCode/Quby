@@ -267,7 +267,14 @@ module util {
         var futureBlockingOffset = 0,
             blockingCount = 1;
 
-        var requestAnimFrame = util.future.getRequestAnimationFrame();
+        var requestAnimFrame =
+                window.requestAnimationFrame ||
+                window['webkitRequestAnimationFrame'] ||
+                window['mozRequestAnimationFrame'] ||
+                window['oRequestAnimationFrame'] ||
+                window.msRequestAnimationFrame ||
+                null;
+
         var intervalFuns: { isRunning: bool; }[] = [],
             intervalFunID = 1;
 
@@ -318,6 +325,9 @@ module util {
             } else {
                 isFutureRunning = false;
             }
+        }
+        export function getRequestAnimationFrame(): (callback: () =>void , element?: HTMLElement) => void {
+            return requestAnimFrame;
         }
 
         export function block(f) {
@@ -444,15 +454,6 @@ module util {
             } else {
                 clearInterval(tag);
             }
-        }
-
-        export function getRequestAnimationFrame(): (callback: () =>void , element?: HTMLElement) => void {
-            return window.requestAnimationFrame ||
-                    window['webkitRequestAnimationFrame'] ||
-                    window['mozRequestAnimationFrame'] ||
-                    window['oRequestAnimationFrame'] ||
-                    window.msRequestAnimationFrame
-            null;
         }
 
         export function once(f: () =>any): void {

@@ -1,13 +1,16 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Express 2012 for Web
+# Visual Studio 2012
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Quby", "Quby\Quby.csproj", "{19CED4D3-D344-45E0-83A1-D770F7ED21B6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		build|Any CPU = build|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{19CED4D3-D344-45E0-83A1-D770F7ED21B6}.build|Any CPU.ActiveCfg = Release|Any CPU
+		{19CED4D3-D344-45E0-83A1-D770F7ED21B6}.build|Any CPU.Build.0 = Release|Any CPU
 		{19CED4D3-D344-45E0-83A1-D770F7ED21B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{19CED4D3-D344-45E0-83A1-D770F7ED21B6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection

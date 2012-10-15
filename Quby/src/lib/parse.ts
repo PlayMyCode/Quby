@@ -3600,25 +3600,28 @@ module parse {
         (ps: Parse, match: string): void;
         (ps: Parse, match: number): void;
         (ps: Parse, match: TerminalFunction): void;
+        (ps: Parse, match: { [name: string]: any; } ): void;
         (ps: Parse, match: any[]): void;
     } =
         function (ps: Parse, term: any) {
-            if (term instanceof String || isFunction(term)) {
-                ignoreSingle(ps, terminal(term));
-            } else if (terminal instanceof Term) {
+            if (term instanceof Term) {
                 ingoreInner(ps, term);
-            } else if (term instanceof Array) {
-                for (var i = 0; i < term.length; i++) {
-                    ignoreSingle(ps, terminalsInner(term[i], null));
-                }
-            } else if (term instanceof Object) {
-                for (var k in term) {
-                    if (term.hasOwnProperty(k)) {
-                        ignoreSingle(ps, terminalsInner(term[k], k));
-                    }
-                }
             } else {
-                throw new Error("unknown ignore terminal given");
+                if (term instanceof String || isFunction(term)) {
+                    ignoreSingle(ps, terminal(term));
+                } else if (term instanceof Array) {
+                    for (var i = 0; i < term.length; i++) {
+                        ignoreSingle(ps, terminalsInner(term[i], null));
+                    }
+                } else if (term instanceof Object) {
+                    for (var k in term) {
+                        if (term.hasOwnProperty(k)) {
+                            ignoreSingle(ps, terminalsInner(term[k], k));
+                        }
+                    }
+                } else {
+                    throw new Error("unknown ignore terminal given");
+                }
             }
         };
 

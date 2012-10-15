@@ -79,6 +79,8 @@ module quby.ast {
 
     export interface IClassDefinition extends ISyntax {
         getHeader(): ClassHeader;
+        setHeader(header: ClassHeader);
+
         getName(): string;
         getCallName(): string;
         getSuperCallName(): string;
@@ -203,7 +205,7 @@ module quby.ast {
         public offset: parse.Symbol;
         private isJSLiteralFlag = false;
 
-        constructor (offset) {
+        constructor (offset?:parse.Symbol = null) {
             this.offset = offset;
             this.isJSLiteralFlag = false;
         }
@@ -312,6 +314,10 @@ module quby.ast {
             this.offset = null;
             this.length = 0;
             this.appendToLast = appendToLast;
+        }
+
+        setSeperator(seperator: string) {
+            this.seperator = seperator;
         }
 
         add(stmt: ISyntax) {
@@ -490,11 +496,18 @@ module quby.ast {
         }
     }
 
+    /**
+     * A common building block to create a list of statements,
+     * which starts or ends with a conditional test.
+     * 
+     * For example an if statement, while loop, until loop,
+     * while until, and so on.
+     */
     class StmtBlock extends Syntax {
         private condition: IExpr;
-        private stmts: Statements;
+        private stmts: IStatements;
 
-        constructor (condition: IExpr, stmts: Statements) {
+        constructor (condition: IExpr, stmts: IStatements) {
             if (condition !== null) {
                 super(condition.offset);
             } else {
@@ -582,7 +595,108 @@ module quby.ast {
         }
 
         print(p: quby.core.Printer) {
-            this.printBlockWrap(p, 'if(', '){', '}');
+            super.printBlockWrap(p, 'if(', '){', '}');
+        }
+    }
+
+    export class WhenClause extends Syntax {
+        private exprs: Parameters;
+        private stmts: IStatements;
+
+        constructor(exprs: Parameters, stmts: IStatements) {
+            super( exprs.getOffset() );
+
+            this.exprs = exprs;
+            this.stmts = stmts;
+        }
+
+        validate(v: quby.core.Validator) {
+            if (this.exprs.length === 0) {
+                v.parseError(this.getOffset(), "no conditions provided for when clause");
+            } else {
+                this.exprs.validate(v);
+                this.stmts.validate(v);
+            }
+        }
+
+        printClause(p: quby.core.Printer, tempVar: string, isFirst: bool) {
+            if (!isFirst) {
+                p.append(' else');
+            }
+            p.append(' if (');
+
+            var startExpr = '(' + tempVar + ' === ';
+            p.append(startExpr);
+            this.exprs.setSeperator(') || ' + startExpr);
+            this.exprs.print(p);
+            p.append(')');
+
+            p.append(')'); // close whole if condition
+
+            p.append('{');
+            this.stmts.print(p);
+            p.append('}');
+        }
+    }
+
+    export class CaseWhen extends Syntax {
+        private condition: IExpr;
+        private whenClauses: WhenClause[];
+        private elseClause: IStatements;
+
+        constructor(caseSymbol:parse.Symbol, expr: IExpr, whens:WhenClause[], elseClause:IStatements) {
+            super(caseSymbol);
+
+            this.condition = expr;
+            this.whenClauses = whens;
+            this.elseClause = elseClause;
+        }
+
+        validate(v: quby.core.Validator) {
+            var whenClauses = this.whenClauses;
+
+            if (this.condition === null) {
+                if (whenClauses.length === 0) {
+                    v.parseError(this.getOffset(), "case-when clause is entirely empty");
+                } else {
+                    v.parseError(this.getOffset(), "no value provided for case");
+                }
+
+                return;
+            } else if (whenClauses.length === 0) {
+                v.parseError(this.getOffset(), "no when clauses provided for case");
+                return;
+            }
+
+            this.condition.validate(v);
+
+            for (var i = 0; i < whenClauses.length; i++) {
+                whenClauses[i].validate(v);
+            }
+
+            if (this.elseClause !== null) {
+                this.elseClause.validate(v);
+            }
+        }
+
+        print(p: quby.core.Printer) {
+            var temp = p.getTempVariable();
+
+            p.append('var ', temp, ' = ');
+            this.condition.print(p);
+            p.endStatement();
+
+            var whenClauses = this.whenClauses;
+            for (var i = 0; i < whenClauses.length; i++) {
+                whenClauses[i].printClause(p, temp, i === 0);
+                
+            }
+
+            if (this.elseClause !== null) {
+                p.append(' else {');
+                this.elseClause.print(p);
+                p.append('}');
+            }
         }
     }
 
@@ -803,6 +917,10 @@ module quby.ast {
             return this.header;
         }
 
+        setHeader(header: ClassHeader) {
+            this.header = header;
+        }
+
         validate(v: quby.core.Validator) {
             var name = this.getName();
 
@@ -873,6 +991,10 @@ module quby.ast {
 
         getHeader() {
             return this.header;
+        }
+
+        setHeader(header: ClassHeader) {
+            this.header = header;
         }
 
         print(p: quby.core.Printer) {
@@ -1535,7 +1657,7 @@ module quby.ast {
         private parameters: Parameters;
 
         constructor( expr:IExpr, parameters: Parameters, block: FunctionBlock) {
-            super(expr);
+            super(expr.getOffset());
 
             this.expr = expr;
             this.block = block;

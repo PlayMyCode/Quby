@@ -265,7 +265,7 @@ module quby.core {
 
                 // if super relationship is set later in the app
                 if (!oldKlassHead.hasSuper() && klassHead.hasSuper()) {
-                    oldKlass.getHeader() = klassHead;
+                    oldKlass.setHeader( klassHead );
                 } else if (oldKlassHead.hasSuper() && klassHead.hasSuper()) {
                     if (oldKlassHead.getSuperCallName() != klassHead.getSuperCallName()) {
                         this.parseError(klass.offset, "Super class cannot be redefined for class '" + klass.getName() + "'.");
