@@ -23,7 +23,7 @@ interface StringMap {
 /* quby.ast maps */
 
 interface IFunctionDeclarationMap {
-    [callName: string]: quby.ast.IFunctionDeclaration;
+    [callName: string]: quby.ast.IFunctionMeta;
 }
 
 interface FunctionCallArrayMap {
@@ -35,7 +35,7 @@ interface FunctionCallArrayMapMap {
 }
 
 interface VariableMap {
-    [callName: string]: quby.ast.Variable;
+    [callName: string]: quby.ast.LocalVariable;
 }
 
 interface FieldVariableMap {

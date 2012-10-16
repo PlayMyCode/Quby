@@ -5,7 +5,7 @@
 /**
  * AST
  *
- * Objects for defining the abstract syntax tree are defined
+ * Objects for declaring the abstract syntax tree are defined
  * here. A new function is here for representing every aspect
  * of the possible source code that can be parsed.
  */
@@ -62,7 +62,7 @@ module quby.ast {
         getCallName(): string;
     }
 
-    export interface IFunctionDeclaration extends ISyntax {
+    export interface IFunctionMeta extends ISyntax {
         isConstructor(): bool;
         isFunction(): bool;
         isMethod(): bool;
@@ -77,7 +77,7 @@ module quby.ast {
         length: number;
     }
 
-    export interface IClassDefinition extends ISyntax {
+    export interface IClassDeclaration extends ISyntax {
         getHeader(): ClassHeader;
         setHeader(header: ClassHeader);
 
@@ -828,7 +828,7 @@ module quby.ast {
     /**
      * TODO
      */
-    export class ModuleDefinition extends Syntax {
+    export class ModuleDeclaration extends Syntax {
         constructor (symName, statements) {
             super(symName);
         }
@@ -869,7 +869,7 @@ module quby.ast {
         }
     }
 
-    export class ClassDefinition extends NamedSyntax implements IClassDefinition {
+    export class ClassDeclaration extends NamedSyntax implements IClassDeclaration {
         private classValidator: quby.core.ClassValidator;
 
         private header: ClassHeader;
@@ -883,7 +883,7 @@ module quby.ast {
              * to.
              */
             if (quby.runtime.isCoreClass(classHeader.getName().toLowerCase())) {
-                return new ExtensionClassDefinition(classHeader, statements);
+                return new ExtensionClassDeclaration(classHeader, statements);
                 /*
                  * Quby class
                  *
@@ -968,7 +968,7 @@ module quby.ast {
      * This also includes the extra Quby prototypes such as Array (really QubyArray)
      * and Hash (which is really a QubyHash).
      */
-    export class ExtensionClassDefinition extends NamedSyntax implements IClassDefinition {
+    export class ExtensionClassDeclaration extends NamedSyntax implements IClassDeclaration {
         private header: ClassHeader;
         private statements: Statements;
 
@@ -1048,9 +1048,9 @@ module quby.ast {
     }
 
     /**
-     * Defines a function or method definition.
+     * Defines a function or method declaration.
      */
-    export class Function extends NamedSyntax implements IFunctionDeclaration {
+    export class FunctionDeclaration extends NamedSyntax implements IFunctionMeta {
         static FUNCTION = 0;
         static METHOD = 1;
         static CONSTRUCTOR = 2;
@@ -1063,16 +1063,18 @@ module quby.ast {
 
         private stmtBody: Statements;
 
+        private autoReturn: bool;
+
         /**
          * These are the variables initialized at the start
          * of a function call, to ensure they are not undefined.
          */
-        private preVariables: Identifier[];
+        private preVariables: Variable[];
 
         constructor(symName: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
             super(symName, symName.match, '');
 
-            this.type = Function.FUNCTION;
+            this.type = FunctionDeclaration.FUNCTION;
 
             this.parameters = parameters;
 
@@ -1087,6 +1089,16 @@ module quby.ast {
             this.stmtBody = stmtBody;
 
             this.preVariables = [];
+
+            this.autoReturn = false;
+        }
+
+        /**
+         * When true, the last statement in a function or method
+         * will automatically return it's value.
+         */
+        markAutoReturn() {
+            this.autoReturn = true;
         }
 
         hasParameters() {
@@ -1108,28 +1120,28 @@ module quby.ast {
         }
 
         isMethod() {
-            return this.type !== Function.METHOD;
+            return this.type !== FunctionDeclaration.METHOD;
         }
 
         isConstructor() {
-            return this.type === Function.CONSTRUCTOR;
+            return this.type === FunctionDeclaration.CONSTRUCTOR;
         }
 
         isFunction() {
-            return this.type === Function.FUNCTION;
+            return this.type === FunctionDeclaration.FUNCTION;
         }
 
         setType(type: number) {
             this.type = type;
         }
 
-        addPreVariable(variable: quby.ast.Identifier) {
+        addPreVariable(variable: quby.ast.Variable) {
             this.preVariables.push(variable);
         }
 
         validate(v: quby.core.Validator) {
             if (this.isFunction() && v.isInsideClass()) {
-                this.setType(Function.METHOD);
+                this.setType(FunctionDeclaration.METHOD);
             }
 
             var isOutFun = true;
@@ -1245,9 +1257,9 @@ module quby.ast {
     /**
      * Defines a constructor for a class.
      */
-    export class Constructor extends Function {
+    export class Constructor extends FunctionDeclaration {
         private className: string;
-        private klass: ClassDefinition;
+        private klass: ClassDeclaration;
         private isExtensionClass: bool;
 
         constructor (sym: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
@@ -1257,7 +1269,7 @@ module quby.ast {
             this.klass = null;
             this.isExtensionClass = false;
 
-            this.setType(Function.CONSTRUCTOR);
+            this.setType(FunctionDeclaration.CONSTRUCTOR);
         }
 
         setClass(klass) {
@@ -1317,7 +1329,7 @@ module quby.ast {
         }
     }
 
-    export class AdminMethod extends Function {
+    export class AdminMethod extends FunctionDeclaration {
         private callName: string;
 
         constructor (name: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
@@ -1388,7 +1400,7 @@ module quby.ast {
     * There is also a third case. It could be a special class function,
     * such as 'get x, y' or 'getset img' for generating accessors (and other things).
     */
-    export class FunctionCall extends NamedSyntax implements IFunctionDeclaration {
+    export class FunctionCall extends NamedSyntax implements IFunctionMeta {
         private isMethodFlag: bool;
 
         private parameters: Parameters;
@@ -1488,11 +1500,11 @@ module quby.ast {
         validate(v: quby.core.Validator) {
             var generator = null;
 
-            if (v.isInsideClassDefinition()) {
+            if (v.isInsideClassDeclaration()) {
                 this.functionGenerator = generator = getFunctionGenerator(v, this);
 
                 if (generator === null) {
-                    v.parseError(this.offset, "Function '" + this.getName() + "' called within definition of class '" + v.getCurrentClass().getClass().getName() + "', this is not allowed.");
+                    v.parseError(this.offset, "Function '" + this.getName() + "' called within the declaration of class '" + v.getCurrentClass().getClass().getName() + "', this is not allowed.");
                 } else if (this.block !== null) {
                     v.parseError(this.offset, "'" + this.getName() + "' modifier of class '" + v.getCurrentClass().getClass().getName() + "', cannot use a block.");
                 } else {
@@ -1757,7 +1769,7 @@ module quby.ast {
                             v.parseError(this.offset, "Called constructor for class '" + klass.getName() + "' with wrong number of parameters: " + this.getNumParameters());
                         }
                     } else {
-                        this.isExtensionClass = ( klass instanceof ExtensionClassDefinition );
+                        this.isExtensionClass = ( klass instanceof ExtensionClassDeclaration );
                     }
                 } else {
                     v.parseError( this.offset, "Making new instance of undefined class: '" + this.getName() );
@@ -2282,7 +2294,12 @@ module quby.ast {
     export var GreaterThan = newShortOp(">", 6, true);
     export var GreaterThanEqual = newShortOp(">=", 6, true);
 
-    export class IsInstanceOf extends Op {
+    /**
+     * The JS version of 'instanceof', used as:
+     * 
+     *  if ( a #instanceof #Foo ) {
+     */
+    export class JSInstanceOf extends Op {
         constructor(left, right) {
             super( left, right, 'instanceof', true, 7);
 
@@ -2292,23 +2309,25 @@ module quby.ast {
         }
 
         validate(v:quby.core.Validator) {
-            v.parseError(this.getOffset(), "'is' is not yet implemented");
-            return;
+            if (v.ensureAdminMode(this, "JS instanceof is not allowed in Sandbox mode")) {
+                v.parseError(this.getOffset(), "'is' is not yet implemented");
+                return;
 
-            if (this.isJSLiteral()) {
-                if (v.ensureAdminMode( this, 'JS inlining for instance check, is not allowed in Sandbox mode') ) {
-                    // todo, check if the class exists
-                    this.getRight().validate(v);
-                    this.getLeft().validate(v);
+                if (this.isJSLiteral()) {
+                    if (v.ensureAdminMode(this, 'JS inlining for instance check, is not allowed in Sandbox mode')) {
+                        // todo, check if the class exists
+                        this.getRight().validate(v);
+                        this.getLeft().validate(v);
+                    }
+
+                    // todo : if a Foo.class class literal, then just do the test
+                    // also add 'foo.class' to the literals list in the parser
+                    // otherwise if an IExpr, ensure it results in a class, and then test
+                } else if (this.getRight() instanceof LocalVariable) {
+                    // todo, no need for any side swapping here
+                } else {
+                    v.parseError(this.offset, "expecting a class name for instance check");
                 }
-
-            // todo : if a Foo.class class literal, then just do the test
-            // also add 'foo.class' to the literals list in the parser
-            // otherwise if an IExpr, ensure it results in a class, and then test
-            } else if (this.getRight() instanceof Variable) {
-                // todo, no need for any side swapping here
-            } else {
-                v.parseError(this.offset, "expecting a class name for instance check");
             }
         }
     }
@@ -2468,7 +2487,11 @@ module quby.ast {
         }
     }
 
-    export class Identifier extends NamedExpr implements IAssignable {
+    /**
+     * The super class for 'all' types of variables.
+     * These include globals, fields, locals, and even 'this'!.
+     */
+    export class Variable extends NamedExpr implements IAssignable {
         private isAssignmentFlag: bool;
 
         constructor (identifier: parse.Symbol, callName: string) {
@@ -2494,7 +2517,7 @@ module quby.ast {
      * ### Variables ###
      */
 
-    export class Variable extends Identifier {
+    export class LocalVariable extends Variable {
         private useVar:bool;
 
         constructor(identifier) {
@@ -2539,7 +2562,7 @@ module quby.ast {
         }
     }
 
-    export class GlobalVariable extends Identifier {
+    export class GlobalVariable extends Variable {
         constructor(identifier) {
             super( identifier, quby.runtime.formatGlobal(identifier.match) );
         }
@@ -2573,7 +2596,7 @@ module quby.ast {
         }
     }
 
-    export class ParameterBlockVariable extends Variable {
+    export class ParameterBlockVariable extends LocalVariable {
         constructor( identifier:parse.Symbol ) {
             super( identifier );
         }
@@ -2585,8 +2608,8 @@ module quby.ast {
         }
     }
 
-    export class FieldVariable extends Identifier {
-        private klass:IClassDefinition;
+    export class FieldVariable extends Variable {
+        private klass:IClassDeclaration;
         private isInsideExtensionClass: bool;
 
         constructor(identifier:parse.Symbol) {
@@ -2698,7 +2721,7 @@ module quby.ast {
         }
     }
 
-    export class JSVariable extends Variable {
+    export class JSVariable extends LocalVariable {
         constructor(identifier:parse.Symbol) {
             super( identifier );
 
@@ -2779,7 +2802,7 @@ module quby.ast {
         }
     }
 
-    export class ArrayDefinition extends Syntax {
+    export class ArrayLiteral extends Syntax {
         private parameters:IStatements;
 
         constructor(parameters?:IStatements) {
@@ -2817,7 +2840,7 @@ module quby.ast {
         }
     }
 
-    export class HashDefinition extends ArrayDefinition {
+    export class HashLiteral extends ArrayLiteral {
         constructor(parameters?:Mappings) {
             super(parameters);
         }
@@ -2945,7 +2968,7 @@ module quby.ast {
      *
      * It handles storing common items.
      */
-    class FunctionGenerator implements IFunctionDeclaration {
+    class FunctionGenerator implements IFunctionMeta {
         public offset: parse.Symbol;
         public callName: string;
 
@@ -3072,8 +3095,8 @@ module quby.ast {
 
         constructor(obj:FunctionCall, methodName:string, numParams:number, fieldObj:INamedExpr, proto:new(sym:parse.Symbol) => FieldVariable ) {
             var fieldName:string;
-            if (fieldObj instanceof Variable || fieldObj instanceof FieldVariable) {
-                fieldName = ( <Identifier>fieldObj ).getName();
+            if (fieldObj instanceof LocalVariable || fieldObj instanceof FieldVariable) {
+                fieldName = ( <Variable>fieldObj ).getName();
             } else if (fieldObj instanceof Symbol) {
                 fieldName = ( <Symbol>fieldObj ).getMatch();
             } else {

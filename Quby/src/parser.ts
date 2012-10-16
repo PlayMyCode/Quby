@@ -591,9 +591,7 @@ module quby.parser {
             not: ['!', 'not'],
 
             bitwiseAnd: '&',
-            bitwiseOr: '|',
-
-            is: 'is'
+            bitwiseOr: '|'
         },
 
         identifiers: {
@@ -638,6 +636,8 @@ module quby.parser {
 
         admin: {
             hashDef: '#def',
+
+            jsInstanceOf: '#instanceof',
 
             inline: function( src, i, code, len ) {
                 // #<# random( javascript.code ) #>#
@@ -883,7 +883,7 @@ module quby.parser {
                 var term = identifier.terminal;
 
                 if ( term === terminals.identifiers.variableName ) {
-                    return new quby.ast.Variable( identifier );
+                    return new quby.ast.LocalVariable( identifier );
                 } else if ( term === terminals.identifiers.global ) {
                     return new quby.ast.GlobalVariable( identifier );
                 } else if ( term === terminals.identifiers.objectField ) {
@@ -931,16 +931,16 @@ module quby.parser {
                 }
             } );
 
-    var arrayDefinition = parse.
+    var arrayLiteral = parse.
             a( terminals.symbols.leftSquare ).
             optional( exprs ).
             optional( terminals.endOfLine ).
             then( terminals.symbols.rightSquare ).
             onMatch( function( lSquare, exprs, endOfLine, rSquare ) {
                 if ( exprs !== null ) {
-                    return new quby.ast.ArrayDefinition( exprs );
+                    return new quby.ast.ArrayLiteral( exprs );
                 } else {
-                    return new quby.ast.ArrayDefinition();
+                    return new quby.ast.ArrayLiteral();
                 }
             } );
 
@@ -952,18 +952,18 @@ module quby.parser {
                 return new quby.ast.Mapping( left, right );
             } );
 
-    var hashDefinition = parse.
+    var hashLiteral = parse.
             a( terminals.symbols.leftBrace ).
             optionalSeperator( hashMapping, terminals.symbols.comma ).
             optional( terminals.endOfLine ).
             then( terminals.symbols.rightBrace ).
             onMatch( function( lBrace, mappings, endOfLine, rBrace ) {
                 if ( mappings !== null ) {
-                    return new quby.ast.HashDefinition(
+                    return new quby.ast.HashLiteral(
                             new quby.ast.Mappings( mappings )
                     );
                 } else {
-                    return new quby.ast.HashDefinition();
+                    return new quby.ast.HashLiteral();
                 }
             } );
 
@@ -1244,11 +1244,11 @@ module quby.parser {
                                     ops.bitwiseAnd,
                                     ops.bitwiseOr,
 
-                                    ops.is,
-
                                     ops.power,
 
-                                    ops.assignment
+                                    ops.assignment,
+
+                                    terminals.admin.jsInstanceOf
                             ).
                             then( expr ).
                             onMatch(function (op:parse.Symbol, right:quby.ast.IExpr ) {
@@ -1297,11 +1297,12 @@ module quby.parser {
                                 } else if ( term === ops.bitwiseOr ) {
                                     return new quby.ast.BitOr( null, right );
 
-                                } else if ( term === ops.is ) {
-                                    return new quby.ast.IsInstanceOf( null, right );
+                                } else if ( term === terminals.admin.jsInstanceOf ) {
+                                    return new quby.ast.JSInstanceOf( null, right );
 
                                 } else if ( term === ops.power ) {
                                     return new quby.ast.Power( null, right );
+                                    
                                 } else {
                                     throw Error( "Unknown op given: " + op );
                                 }
@@ -1311,8 +1312,8 @@ module quby.parser {
     expr.
             either(
                     singleOpExpr,
-                    arrayDefinition,
-                    hashDefinition,
+                    arrayLiteral,
+                    hashLiteral,
                     yieldExpr,
                     exprInParenthesis,
                     newInstance,
@@ -1341,7 +1342,7 @@ module quby.parser {
             } );
 
     /*
-     * Definitions
+     * Declarations
      */
 
     var classHeader = parse.
@@ -1357,40 +1358,40 @@ module quby.parser {
                 return new quby.ast.ClassHeader( name, superClass );
             } );
 
-    var moduleDefinition = parse.
+    var moduleDeclaration = parse.
             a( terminals.keywords.MODULE ).
             then( terminals.identifiers.variableName ).
             optional( statements ).
             then( terminals.keywords.END ).
             onMatch( function( keyModule, name, stmts, end ) {
-                return new quby.ast.ModuleDefinition( name, stmts );
+                return new quby.ast.ModuleDeclaration( name, stmts );
             } );
 
-    var classDefinition = parse.
+    var classDeclaration = parse.
             a( terminals.keywords.CLASS ).
             then( classHeader ).
             optional( statements ).
             then( terminals.keywords.END ).
             onMatch( function( klass, header, stmts, end ) {
-                return new quby.ast.ClassDefinition( header, stmts );
+                return new quby.ast.ClassDeclaration( header, stmts );
             } );
 
-    var functionDefinition = parse.
+    var functionDeclaration = parse.
             either( terminals.keywords.DEF, terminals.admin.hashDef ).
             thenEither( terminals.keywords.NEW, terminals.identifiers.variableName ).
             then( parameterDefinition ).
-            optional( statements ).
-            then( terminals.keywords.END ).
+            optional(statements).
+            then(terminals.keywords.END).
             onMatch( function( def, name, params, stmts, end ) : quby.ast.ISyntax {
                 if ( def.terminal === terminals.keywords.DEF ) {
                     // 'new' method, class constructor
                     if ( name.terminal === terminals.keywords.NEW ) {
                         return new quby.ast.Constructor( name, params, stmts );
-                        // normal function
+                    // normal function
                     } else {
-                        return new quby.ast.Function( name, params, stmts );
+                        return new quby.ast.FunctionDeclaration( name, params, stmts );
                     }
-                    // admin method
+                // admin method
                 } else {
                     return new quby.ast.AdminMethod( name, params, stmts );
                 }
@@ -1489,9 +1490,9 @@ module quby.parser {
             );
         
     statement.either(
-                functionDefinition,
-                classDefinition,
-                moduleDefinition,
+                functionDeclaration,
+                classDeclaration,
+                moduleDeclaration,
 
                 ifStatement,
                 whileUntilStatement,

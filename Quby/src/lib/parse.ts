@@ -3815,7 +3815,12 @@ module parse {
          * This also works recursively, so arrays of arrays of
          * matches is turned into terminals.
          */
-        terminals(obj) {
+        terminals(t: Term): Term;
+        terminals(t: string): Term;
+        terminals(t: any[]): Term;
+        terminals(t: TerminalFunction): Term;
+        terminals(t: Object): any;
+        terminals(obj:any): any {
             return terminalsInner(this, obj, null);
         }
     }
@@ -3872,11 +3877,11 @@ module parse {
         )
 
     /**
-    * Code checking utility functions.
-    * 
-    * Each of these functions must be given the 'charCodeAt' value,
-    * from a string, to check. Hence why they are listed under 'code'.
-    */
+     * Code checking utility functions.
+     * 
+     * Each of these functions must be given the 'charCodeAt' value,
+     * from a string, to check. Hence why they are listed under 'code'.
+     */
     export var code = {
         'isNumeric': isNumericCode,
         'isHex': isHexCode,
@@ -3884,16 +3889,21 @@ module parse {
         'isAlphaNumeric': isAlphaNumericCode
     };
 
+    export function terminals(t: Term): Term;
+    export function terminals(t: string): Term;
+    export function terminals(t: any[]): Term;
+    export function terminals(t: TerminalFunction): Term;
+    export function terminals(t: Object): any;
     export function terminals( obj ) {
         return terminalsInner( pInstance, obj, null );
     }
 
     /**
-    * A terminal for capturing tabs and spaces. It does _not_ include
-    * end of lines.
-    * 
-    * For the end of line version, use Parse.WHITESPACE_AND_END_OF_LINE
-    */
+     * A terminal for capturing tabs and spaces. It does _not_ include
+     * end of lines.
+     * 
+     * For the end of line version, use Parse.WHITESPACE_AND_END_OF_LINE
+     */
 
     export var terminal = ( () => {
         /**

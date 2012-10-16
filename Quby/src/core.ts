@@ -123,7 +123,7 @@ module quby.core {
         private funCount: number;
 
         private lateUsedFuns: LateFunctionBinder;
-        private currentFun: quby.ast.Function;
+        private currentFun: quby.ast.FunctionDeclaration;
         private currentClass: ClassValidator;
         private rootClass: RootClassProxy;
         private symbols: SymbolTable;
@@ -209,7 +209,7 @@ module quby.core {
             this.preInlines = [];
 
             // When 0, we are outside of a function's scope.
-            // The scope is added when we enter a function definition.
+            // The scope is added when we enter a function declaration.
             // From then on every extra layer of scope increments it further,
             // and every time we move down it is decremented until we exit the function.
 
@@ -247,7 +247,7 @@ module quby.core {
             return this.inConstructor;
         }
 
-        setClass(klass:quby.ast.IClassDefinition) {
+        setClass(klass:quby.ast.IClassDeclaration) {
             if (this.currentClass != null) {
                 this.parseError( klass.getOffset(), "Class '" + klass.getName() + "' is defined inside '" + this.currentClass.getClass().getName() + "', cannot define a class within a class." );
             }
@@ -323,7 +323,7 @@ module quby.core {
             return this.isParameters && !this.isFunParameters;
         }
 
-        isInsideClassDefinition() {
+        isInsideClassDeclaration() {
             return this.isInsideClass() && !this.isInsideFun();
         }
 
@@ -407,10 +407,10 @@ module quby.core {
             return this.currentFun !== null && this.currentFun.isConstructor();
         }
 
-        assignVar(variable:quby.ast.Variable) {
+        assignVar(variable:quby.ast.LocalVariable) {
             this.vars[this.vars.length - 1][variable.getCallName()] = variable;
         }
-        containsVar(variable:quby.ast.Variable) : bool {
+        containsVar(variable:quby.ast.LocalVariable) : bool {
             var id = variable.getCallName();
 
             var stop:number = this.isInsideFun() ?
@@ -425,7 +425,7 @@ module quby.core {
 
             return false;
         }
-        containsLocalVar(variable:quby.ast.Variable) : bool {
+        containsLocalVar(variable:quby.ast.LocalVariable) : bool {
             var id = variable.getCallName();
             var scope = this.vars[this.vars.length - 1];
 
@@ -459,7 +459,7 @@ module quby.core {
          *
          * @param func
          */
-        defineFun(fun:quby.ast.IFunctionDeclaration) {
+        defineFun(fun:quby.ast.IFunctionMeta) {
             var klass = this.currentClass;
 
             // Methods / Constructors
@@ -677,7 +677,7 @@ module quby.core {
                 /* Ensure all called methods do exist (somewhere) */
                 for (var methodI in this.calledMethods) {
                     var methodFound = false;
-                    var method:quby.ast.IFunctionDeclaration = this.calledMethods[methodI];
+                    var method:quby.ast.IFunctionMeta = this.calledMethods[methodI];
 
                     for (var klassI in this.classes) {
                         if (this.classes[klassI].hasFun(method)) {
@@ -687,7 +687,7 @@ module quby.core {
                     }
 
                     if (!methodFound) {
-                        var found:quby.ast.IFunctionDeclaration = this.searchForMethodLike(method),
+                        var found:quby.ast.IFunctionMeta = this.searchForMethodLike(method),
                             name = method.getName().toLowerCase(),
                             errMsg:string = null;
 
@@ -868,12 +868,12 @@ module quby.core {
          * @param method The method to search for one similar too.
          * @param klassVal An optional ClassValidator to restrict the search, otherwise searches through all classes.
          */
-        searchForMethodLike(method:quby.ast.IFunctionDeclaration, klassVal?:ClassValidator):quby.ast.IFunctionDeclaration {
+        searchForMethodLike(method:quby.ast.IFunctionMeta, klassVal?:ClassValidator):quby.ast.IFunctionMeta {
             if (klassVal) {
                 return this.searchMissingFun(method, klassVal.getFunctions());
             } else {
                 var searchKlassVals = this.classes,
-                    altMethod:quby.ast.IFunctionDeclaration = null,
+                    altMethod:quby.ast.IFunctionMeta = null,
                     methodName = method.getName().toLowerCase();
                 // check for same method, but different number of parameters
 
@@ -902,9 +902,9 @@ module quby.core {
          * 'alternative name' is returned, only if 'incorrect parameters' does not come first.
          * Otherwise null is returned.
          */
-        searchMissingFunWithName(name:string, searchFuns:IFunctionDeclarationMap):quby.ast.IFunctionDeclaration {
+        searchMissingFunWithName(name:string, searchFuns:IFunctionDeclarationMap):quby.ast.IFunctionMeta {
             var altNames:string[] = [],
-                altFun:quby.ast.IFunctionDeclaration = null;
+                altFun:quby.ast.IFunctionMeta = null;
             var nameLen = name.length;
 
             if (
@@ -939,14 +939,14 @@ module quby.core {
             return altFun;
         }
 
-        searchMissingFun(fun:quby.ast.IFunctionDeclaration, searchFuns:IFunctionDeclarationMap) {
+        searchMissingFun(fun:quby.ast.IFunctionMeta, searchFuns:IFunctionDeclarationMap) {
             return this.searchMissingFunWithName(fun.getName().toLowerCase(), searchFuns);
         }
 
         /**
          *
          */
-        searchMissingFunAndError(fun:quby.ast.IFunctionDeclaration, searchFuns:IFunctionDeclarationMap, strFunctionType:string) {
+        searchMissingFunAndError(fun:quby.ast.IFunctionMeta, searchFuns:IFunctionDeclarationMap, strFunctionType:string) {
             var name = fun.getName(),
                 lower = name.toLowerCase(),
                 found = this.searchMissingFunWithName(name, searchFuns),
@@ -1165,18 +1165,18 @@ module quby.core {
         private isPrinted: bool = false;
 
         private validator: Validator;
-        private klass:quby.ast.IClassDefinition;
+        private klass:quby.ast.IClassDeclaration;
 
         private funs: IFunctionDeclarationMap;
         private usedFuns: IFunctionDeclarationMap;
-        private news : quby.ast.IFunctionDeclaration[];
+        private news : quby.ast.IFunctionMeta[];
 
         private usedFields: FieldVariableMap;
         private assignedFields: FieldVariableMap;
 
         private noMethPrintFuns: string[];
 
-        constructor(validator: Validator, klass:quby.ast.IClassDefinition) {
+        constructor(validator: Validator, klass:quby.ast.IClassDeclaration) {
             this.validator = validator;
             this.klass = klass;
 
@@ -1216,16 +1216,16 @@ module quby.core {
             return this.assignedFields[callName] !== undefined;
         }
 
-        addFun(fun:quby.ast.IFunctionDeclaration) {
+        addFun(fun:quby.ast.IFunctionMeta) {
             var index = fun.getCallName();
 
             if (this.funs.hasOwnProperty(index)) {
-                this.validator.parseError(fun.offset, "Duplicate method '" + fun.getName() + "' definition in class '" + this.klass.getName() + "'.");
+                this.validator.parseError(fun.offset, "Duplicate method '" + fun.getName() + "' declaration in class '" + this.klass.getName() + "'.");
             }
 
             this.funs[index] = fun;
         }
-        hasFunInHierarchy(fun:quby.ast.IFunctionDeclaration): bool {
+        hasFunInHierarchy(fun:quby.ast.IFunctionMeta): bool {
             if (this.hasFun(fun)) {
                 return true;
             } else {
@@ -1251,7 +1251,7 @@ module quby.core {
          *
          * Ignores parent classes.
          */
-        hasFun(fun:quby.ast.IFunctionDeclaration) {
+        hasFun(fun:quby.ast.IFunctionMeta) {
             return this.hasFunCallName(fun.getCallName());
         }
 
@@ -1263,7 +1263,7 @@ module quby.core {
         hasFunCallName(callName: string) {
             return this.funs.hasOwnProperty(callName);
         }
-        useFun(fun:quby.ast.IFunctionDeclaration) {
+        useFun(fun:quby.ast.IFunctionMeta) {
             var callName = fun.getCallName();
 
             if (!this.funs[callName]) {
@@ -1276,7 +1276,7 @@ module quby.core {
             return (f === undefined) ? null : f;
         }
 
-        addNew(fun:quby.ast.IFunctionDeclaration) {
+        addNew(fun:quby.ast.IFunctionMeta) {
             var index = fun.getNumParameters();
 
             if (this.news[index] !== undefined) {
@@ -1316,7 +1316,7 @@ module quby.core {
             }
         }
 
-        hasNew(fun:quby.ast.IFunctionDeclaration): bool {
+        hasNew(fun:quby.ast.IFunctionMeta): bool {
             return this.news[fun.getNumParameters()] !== undefined;
         }
         noNews(): bool {
@@ -1343,7 +1343,7 @@ module quby.core {
             var klassName = this.klass.getCallName();
             var superKlass = this.klass.getSuperCallName();
 
-            // class definition itself
+            // class declaration itself
             p.append('function ', klassName, '() {');
             if (superKlass != null) {
                 p.append(superKlass, '.apply(this);');
