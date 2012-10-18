@@ -291,6 +291,23 @@ module parse {
         idToTerms: Term[];
     }
 
+    /**
+     * Creates and returns a new Error object,
+     * containing the message given.
+     * 
+     * It also tacks on it's own information,
+     * making it clear that parse.js has crashed.
+     */
+    function newParseError( msg?:string ) : Error {
+        if (msg) {
+            msg += " (this is a bug in parse.js)";
+        } else {
+            msg = "a bug in parse.js has occurred";
+        }
+
+        return new Error(msg);
+    }
+
     var tabLog = function (indents: number): void {
         var str = '';
         for (var i = 0; i < indents; i++) {
@@ -2260,7 +2277,7 @@ module parse {
             return this;
         }
 
-        private errorIfInLeftBranch(rule) {
+        private errorIfInLeftBranch(rule:ParserRuleImplementation) {
             if (this.rules.length !== 0) {
                 var left = this.rules[0];
 

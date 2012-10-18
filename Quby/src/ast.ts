@@ -639,6 +639,23 @@ module quby.ast {
         }
     }
 
+    /**
+     * The classic switch-case statement, or in Ruby, case-when.
+     * Really it's just a big if-statement underneath, as JS's
+     * standard switch-case is much slower than if.
+     * 
+       Example Code:
+
+            case n
+                when 1, f(), 3 then doSomething()
+                when abc; doThat()
+                when 5
+                    doSomethingElse()
+                else
+                    blah()
+            end
+
+     */
     export class CaseWhen extends Syntax {
         private condition: IExpr;
         private whenClauses: WhenClause[];
