@@ -1072,13 +1072,14 @@ QubyHash.prototype.remove = function( key:any ) {
             var node = vals[ i ];
             
             if ( key == node.key ) {
-                vals.splice( i, 1 );
-                
-                // remove the empty hash array too
-                if ( vals.length === 0 ) {
-                    this.values.splice( keyHash, 1 );
+                // remove the whole hash bucket if it's the only entry
+                if ( vals.length === 1 ) {
+                    delete this.values[ keyHash ];
+                // delete it from the bucket, but more are remaining
+                } else {
+                    vals.splice( i, 1 );
                 }
-                
+
                 return node.value;
             }
         }
