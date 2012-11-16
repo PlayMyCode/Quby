@@ -2933,6 +2933,7 @@ module parse {
                 } else if (rule.id === peekID) {
                     args = [symbols.next()];
                 } else {
+                    this.isRecursive = symbolI;
                     if (this.recursiveCount > 0) {
                         this.recursiveCount--;
                     }
@@ -3042,6 +3043,7 @@ module parse {
                     return null;
                 } else {
                     this.isRecursive = NO_RECURSION;
+
                     return args;
                 }
             }
@@ -3135,7 +3137,7 @@ module parse {
                 } else {
                     // 'or' rules
                     if (rule instanceof Array) {
-                        var ruleLen = rule.length;
+                        var ruleLen:number = rule.length;
 
                         for (var j = 0; j < ruleLen; j++) {
                             var r = rule[j];
