@@ -325,7 +325,8 @@ module util {
             } else {
                 isFutureRunning = false;
             }
-        }
+        }
+
         export function getRequestAnimationFrame(): (callback: () =>void , element?: HTMLElement) => void {
             return requestAnimFrame;
         }

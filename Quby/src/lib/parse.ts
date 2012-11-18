@@ -924,7 +924,7 @@ module parse {
      * @param match The item to use for the matching test.
      * @param name Optional, a name for this terminal (for error reporting).
      */
-    class Term {
+    export class Term {
         /**
          * The id for being able to index this terminal.
          */
@@ -1305,7 +1305,7 @@ module parse {
      * has been requested, which in turn should only happen when there is an
      * error. This is to ensure it's never done unless needed.
      */
-    class SourceLines {
+    export class SourceLines {
         // altered when indexed ...
         private numLines = 0;
         private lineOffsets: number[] = null;
@@ -3615,12 +3615,9 @@ module parse {
     */
 
     var ignoreSingle: {
-        (ps: Parse, match: Term): void;
-        (ps: Parse, match: string): void;
-        (ps: Parse, match: number): void;
-        (ps: Parse, match: TerminalFunction): void;
         (ps: Parse, match: { [name: string]: any; } ): void;
         (ps: Parse, match: any[]): void;
+        (ps: Parse, match: any): void;
     } =
         function (ps: Parse, term: any) {
             if (term instanceof Term) {
@@ -3730,25 +3727,25 @@ module parse {
         }
 
         a(...args: any[]): ParserRule;
-        a() {
+        a() : ParserRule {
             return new ParserRuleImplementation(this).thenAll(arguments);
         }
 
         or(...args: any[]): ParserRule;
-        or() {
+        or(): ParserRule  {
             return new ParserRuleImplementation(this).orAll(arguments);
         }
         either(...args: any[]): ParserRule;
-        either() {
+        either(): ParserRule  {
             return new ParserRuleImplementation(this).orAll(arguments);
         }
 
         optional(...args: any[]): ParserRule;
-        optional() {
+        optional(): ParserRule  {
             return new ParserRuleImplementation(this).optionalAll(arguments);
         }
         maybe(...args: any[]): ParserRule;
-        maybe() {
+        maybe(): ParserRule  {
             return new ParserRuleImplementation(this).optionalAll(arguments);
         }
 
@@ -3795,11 +3792,11 @@ module parse {
          * Note how the comma is always between each variable. It won't match
          * commas on the outside.
          */
-        repeatSeperator(match, seperator) {
+        repeatSeperator(match, seperator): ParserRule  {
             return new ParserRuleImplementation(this).repeatSeperator(match, seperator);
         }
 
-        optionalSeperator(match, seperator) {
+        optionalSeperator(match, seperator): ParserRule  {
             return new ParserRuleImplementation(this).optionalSeperator(match, seperator);
         }
 
@@ -3812,12 +3809,12 @@ module parse {
          * It's onMatch is called multiple times, allowing you to build up
          */
         repeatEither(...args: any[]): ParserRule;
-        repeatEither() {
+        repeatEither(): ParserRule  {
             return new ParserRuleImplementation(this).cyclicOrAll(arguments);
         }
 
         repeat(...args: any[]): ParserRule;
-        repeat() {
+        repeat(): ParserRule  {
             return new ParserRuleImplementation(this).cyclicOrSingle(
                     new ParserRuleImplementation(this).thenAll(arguments)
             )
@@ -3851,19 +3848,19 @@ module parse {
     }
 
     export function a(...args: any[]): ParserRule;
-    export function a() {
+    export function a(): ParserRule  {
         return new ParserRuleImplementation(pInstance).thenAll(arguments);
     }
 
     export function either(...args: any[]): ParserRule;
-    export function either() {
+    export function either(): ParserRule  {
         return new ParserRuleImplementation(pInstance).orAll(arguments);
     }
 
     export var optional = either;
 
     export function maybe(...args: any[]): ParserRule;
-    export function maybe() {
+    export function maybe(): ParserRule  {
         return new ParserRuleImplementation(pInstance).optionalAll(arguments);
     }
 
@@ -3876,24 +3873,25 @@ module parse {
         return pInstance;
     }
 
-    export function repeatSeperator(match, seperator) {
+    export function repeatSeperator(match, seperator): ParserRule  {
         return new ParserRuleImplementation(pInstance).repeatSeperator(match, seperator);
     }
 
-    export function optionalSeperator(match, seperator) {
+    export function optionalSeperator(match, seperator): ParserRule  {
         return new ParserRuleImplementation(pInstance).optionalSeperator(match, seperator);
     }
 
     export function repeatEither(...args: any[]): ParserRule;
-    export function repeatEither() {
+    export function repeatEither(): ParserRule  {
         return new ParserRuleImplementation(pInstance).cyclicOrAll(arguments);
     }
 
     export function repeat(...args: any[]): ParserRule;
-    export function repeat() =>
-        new ParserRuleImplementation(pInstance).cyclicOrSingle(
+    export function repeat(): ParserRule {
+        return new ParserRuleImplementation(pInstance).cyclicOrSingle(
                 new ParserRuleImplementation(pInstance).thenAll(arguments)
         )
+    }
 
     /**
      * Code checking utility functions.

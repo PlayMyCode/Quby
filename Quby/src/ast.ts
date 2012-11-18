@@ -57,7 +57,7 @@ module quby.ast {
         isJSLiteral: () => bool;
     }
 
-    interface INamedExpr extends IExpr {
+    export interface INamedExpr extends IExpr {
         getName(): string;
         getCallName(): string;
     }
@@ -94,7 +94,7 @@ module quby.ast {
         setAssignment(v?:quby.core.Validator, parent?:Assignment): void;
     }
 
-    interface IPrecedence {
+    export interface IPrecedence {
         getPrecedence: () => number;
 
         rebalance(): IExpr;
@@ -201,7 +201,7 @@ module quby.ast {
      * ### PUBLIC ###
      */
 
-    class Syntax implements ISyntax {
+    export class Syntax implements ISyntax {
         public offset: parse.Symbol;
         private isJSLiteralFlag = false;
 
@@ -255,7 +255,7 @@ module quby.ast {
      * Just wraps an array of statements,
      * and passes the calls to validate and print on to them.
      */
-    class TransparentList implements ISyntax {
+    export class TransparentList implements ISyntax {
         public offset: parse.Symbol;
 
         private stmts: ISyntax[];
@@ -300,7 +300,7 @@ module quby.ast {
         }
     }
 
-    class SyntaxList implements IStatements {
+    export class SyntaxList implements IStatements {
         public length: number;
         public offset: parse.Symbol;
 
@@ -503,7 +503,7 @@ module quby.ast {
      * For example an if statement, while loop, until loop,
      * while until, and so on.
      */
-    class StmtBlock extends Syntax {
+    export class StmtBlock extends Syntax {
         private condition: IExpr;
         private stmts: IStatements;
 
@@ -858,7 +858,7 @@ module quby.ast {
         }
     }
 
-    class NamedSyntax extends Syntax {
+    export class NamedSyntax extends Syntax {
         private name: string;
         private callName: string;
 
@@ -1368,7 +1368,7 @@ module quby.ast {
      * @param offset The source code offset for this Expr.
      * @param isResultBool An optimization flag. Pass in true if the result of this Expression will always be a 'true' or 'false'. Optional, and defaults to false.
      */
-    class Expr extends Syntax implements IExpr {
+    export class Expr extends Syntax implements IExpr {
         private isResultBool: bool;
 
         constructor (offset: parse.Symbol, isResultBool?: bool = false) {
@@ -1386,7 +1386,7 @@ module quby.ast {
         }
     }
 
-    class NamedExpr extends NamedSyntax implements INamedExpr {
+    export class NamedExpr extends NamedSyntax implements INamedExpr {
         private isResultBool: bool;
 
         constructor(offset: parse.Symbol, name: string, callName: string, isResultBool?: bool = false) {
@@ -1947,7 +1947,7 @@ module quby.ast {
      * into the expression tree, and this then referenced the expression
      * tree now references the top of the tree.
      */
-    class BalancingExpr extends Expr {
+    export class BalancingExpr extends Expr {
         private balanceDone: bool;
         private proxyExpr: IExpr;
 
@@ -2044,7 +2044,7 @@ module quby.ast {
     /*
      * All single operations have precedence of 1.
      */
-    class SingleOp extends BalancingExpr implements IPrecedence {
+    export class SingleOp extends BalancingExpr implements IPrecedence {
         private expr : IExpr;
         private strOp: string;
 
@@ -2147,7 +2147,7 @@ module quby.ast {
      * @param isResultBool
      * @param precedence Lower is higher, must be a number.
      */
-    class Op extends BalancingExpr implements IPrecedence {
+    export class Op extends BalancingExpr implements IPrecedence {
         private left: IExpr;
         private right: IExpr;
         private strOp: string;
@@ -2357,7 +2357,7 @@ module quby.ast {
     export var BitAnd = newShortOp('&', 9, false);
     export var BitOr = newShortOp('|', 9, false);
 
-    class BoolOp extends Op {
+    export class BoolOp extends Op {
         private useSuperPrint:bool;
 
         constructor(left:IExpr, right:IExpr, syntax:string, precedence:number) {
@@ -2876,7 +2876,7 @@ module quby.ast {
     }
 
     /* Literals */
-    class Literal extends Expr {
+    export class Literal extends Expr {
         private isTrue:bool;
         private match:string;
 
@@ -3201,7 +3201,7 @@ module quby.ast {
                     FieldVariable
             )
 
-            this.withField((field: FieldVariable) => field.setAssignment(); );
+            this.withField((field: FieldVariable) => field.setAssignment() );
         }
 
         onEndValidate(v:quby.core.Validator) {

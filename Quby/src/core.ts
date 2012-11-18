@@ -286,7 +286,7 @@ module quby.core {
         getCurrentClass() {
             return this.currentClass;
         }
-        getRootClass() {
+        private getRootClass() {
             return this.rootClass;
         }
         unsetClass() {
@@ -1381,14 +1381,14 @@ module quby.core {
             // if no constructors, add a default no-args constructor
             // but only for non-core classes
             if (this.news.length == 0 && !this.klass.isExtensionClass) {
-                var constructor = new quby.ast.Constructor(
+                var constructorObj = new quby.ast.Constructor(
                         thisKlass.offset.clone("new"),
                         null,
                         null
                 );
-                constructor.setClass(thisKlass);
+                constructorObj.setClass(thisKlass);
 
-                this.addNew(constructor);
+                this.addNew(constructorObj);
             }
 
             // Check for circular inheritance trees.

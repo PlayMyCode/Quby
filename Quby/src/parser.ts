@@ -1437,7 +1437,7 @@ module quby.parser {
             optional( elseClause ).
             then( terminals.keywords.END ).
             onMatch( ( start, otherIfs, elses, end ) =>
-                new quby.ast.IfStmt( start, otherIfs, elses );
+                new quby.ast.IfStmt( start, otherIfs, elses )
             );
 
     var whileUntilStatement = parse.
