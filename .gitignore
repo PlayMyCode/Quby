@@ -48,7 +48,10 @@ local.properties
 **/[Rr]elease/
 **/Quby/[Rr]elease/
 **/Quby/Quby.csproj
-Quby.v11.suo
+Quby/*.csproj
+Quby/*.csproj.user
+*.v11.suo
+*.sln
 
 *_i.c
 *_p.c
