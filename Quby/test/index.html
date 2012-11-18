@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
     	<title>Quby Test Rig</title>
+
     	<style type="text/css">
             h1, h2, h3, h4, h5, a, div,
             input, html, body {
@@ -25,6 +29,7 @@
                 font-family: consolas;
                 font-size: 14px;
 
+                -webkit-box-sizing: border-box;
                 -moz-box-sizing: border-box;
                 box-sizing: border-box;
             }
@@ -36,6 +41,9 @@
                 background: #1a1a1a;
                 color: #dee;
                 border: 1px solid #111;
+
+                -webkit-border-radius: 2px;
+                -moz-border-radius: 2px;
                 border-radius: 2px;
             }
             h1 {
@@ -71,12 +79,12 @@
                 clear: both;
 
                 background: #ffffff; /* Old browsers */
-                background: -moz-linear-gradient(top,  #ffffff 0%, #ededed 100%); /* FF3.6+ */
-                background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffffff), color-stop(100%,#ededed)); /* Chrome,Safari4+ */
-                background: -webkit-linear-gradient(top,  #ffffff 0%,#ededed 100%); /* Chrome10+,Safari5.1+ */
-                background: -o-linear-gradient(top,  #ffffff 0%,#ededed 100%); /* Opera 11.10+ */
-                background: -ms-linear-gradient(top,  #ffffff 0%,#ededed 100%); /* IE10+ */
-                background: linear-gradient(to bottom,  #ffffff 0%,#ededed 100%); /* W3C */
+                background: -moz-linear-gradient(top,  #ffffff 0, #ededed 100%); /* FF3.6+ */
+                background: -webkit-gradient(linear, left top, left bottom, color-stop(0,#ffffff), color-stop(100%,#ededed)); /* Chrome,Safari4+ */
+                background: -webkit-linear-gradient(top,  #ffffff 0,#ededed 100%); /* Chrome10+,Safari5.1+ */
+                background: -o-linear-gradient(top,  #ffffff 0,#ededed 100%); /* Opera 11.10+ */
+                background: -ms-linear-gradient(top,  #ffffff 0,#ededed 100%); /* IE10+ */
+                background: linear-gradient(to bottom,  #ffffff 0,#ededed 100%); /* W3C */
 
                 border-bottom: 1px solid #aaa;
 
@@ -110,11 +118,13 @@
                     width : 120px;
                     height: 90px;
 
+                    -moz-opacity: 0.75;
                     opacity: 0.75;
 
                     cursor: pointer;
                 }
                 .controls-button:hover {
+                    -moz-opacity: 1;
                     opacity: 1;
                 }
                 .button-parse {
@@ -156,8 +166,14 @@
             .codeBox {
                 padding-left: 48px;
 
+                -webkit-border-top-left-radius: 0;
+                -moz-border-top-left-radius: 0;
                 border-top-left-radius: 0;
+
+                -webkit-border-bottom-left-radius: 0;
+                -moz-border-bottom-left-radius: 0;
                 border-bottom-left-radius: 0;
+
                 border-left: none;
                 width: 100%;
             }
@@ -167,6 +183,7 @@
                 .right_30 {
                     position: relative;
 
+                    -webkit-box-sizing: border-box;
                     -moz-box-sizing: border-box;
                     box-sizing: border-box;
     		}
@@ -214,7 +231,7 @@
             .footer {
                 width: 100%;
                 text-align: center;
-                color: #000;
+                color: #888;
                 float: left;
                 clear: both;
                 font-size: 18px;
@@ -225,22 +242,51 @@
     
     <body>
         <script>
-            var addScripts = function( prefix, libs ) {
+            /**
+             * Performs a document.write to inject the script given.
+             * 
+             * This is used because it adds on a timestamp,
+             * to prevent caching.
+             */
+            var addScripts = function( prefix, libs, type ) {
                 var time = new Date();
+                var scriptTag = '';
                 
+                if ( typeof libs === 'string' || (libs instanceof String ) ) {
+                    libs = [ libs ];
+                }
+
+                // generate the script tags to insert, then insert them
                 for ( var i = 0; i < libs.length; i++ ) {
                     var lib = libs[i];
-                    
-                    document.write([
-                            '<sc', 'ript src="',
-                                prefix + '/' + lib + '#' + time.getTime(),
-                            '">',
-                            '</', 'scr', 'ipt>'
-                    ].join(''));
+
+                    scriptTag += '<scr' + 'ipt src="' +
+                                prefix + '/' + lib + '?' + time.getTime() +
+                                '"'
+
+                    if (type) {
+                        scriptTag += ' type="' + type + '"';
+                    }
+
+                    scriptTag += '></scr' + 'ipt>';
                 }
+
+                console.log(scriptTag);
+                document.write( scriptTag );
             }
             
-            addScripts('./../release/', ['quby.js']);
+            // pulls a compiled version from somewhere
+            if (true) {
+                addScripts('.', 'compile.php');
+                //addScripts('./../release/', 'quby.js');
+            // builds within the browser using typescript
+            } else {
+                addScripts('./..', ['quby.ts'], 'text/typescript');
+                addScripts('.', [
+                        'typescript.js',
+                        'typescript.compile.js'
+                ]);
+            }
         </script>
         <script>//<![CDATA[
             var includeCore = false;
@@ -275,83 +321,85 @@
             var _result = null;
         
             function parseCode( callback ) {
-                var sourceCode    = document.getElementById("sourceCode"),
-                    outputCode    = document.getElementById("outputCode"),
-                    outputError   = document.getElementById("outputError"),
-                    outputSymbols = document.getElementById("outputSymbols");
+                setTimeout(function() {
+                    var sourceCode = document.getElementById("sourceCode"),
+                        outputCode = document.getElementById("outputCode"),
+                        outputError = document.getElementById("outputError"),
+                        outputSymbols = document.getElementById("outputSymbols");
 
-                outputSymbols.value = '';
+                    outputSymbols.value = '';
 
-                var parser = new quby.main.Parser();
+                    var parser = new quby.main.Parser();
 
-                var compileTime = 0,
-                    symbolsTime = 0,
-                    rulesTime   = 0,
-                    totalTime   = 0;
+                    var compileTime = 0,
+                        symbolsTime = 0,
+                        rulesTime = 0,
+                        totalTime = 0;
 
-                var updateControlsTime = function() {
-                    document.getElementsByClassName( 'controls-time-info' )[0].innerHTML =
-                            "compile " + compileTime + "ms<br/>" +
-                            "symbols " + symbolsTime + "ms<br/>" +
-                            "rules "   + rulesTime   + "ms<br/>" +
-                            "total "   + totalTime   + "ms" ;
-                };
+                    var updateControlsTime = function() {
+                        document.getElementsByClassName('controls-time-info')[0].innerHTML =
+                                "compile " + compileTime + "ms<br/>" +
+                                "symbols " + symbolsTime + "ms<br/>" +
+                                "rules " + rulesTime + "ms<br/>" +
+                                "total " + totalTime + "ms";
+                    };
 
-                if ( includeCore ) {
-                    var core = getSourceFile("./core.qb");
+                    if (includeCore) {
+                        var core = getSourceFile("./core.qb");
+
+                        parser.
+                                parse(core).
+                                adminMode(true).
+                                onDebug(function(symbols, times) {
+                                    compileTime += times.compile;
+                                    symbolsTime += times.symbols;
+                                    rulesTime += times.rules;
+                                    totalTime += times.total;
+
+                                    updateControlsTime();
+                                });
+                    }
+
+                    if (debugMode) {
+                        parser.
+                                parse(sourceCode.value).
+                                adminMode(isAdmin).
+                                onDebug(function(symbols, times) {
+                                    var displaySymbols = new Array(symbols.length);
+
+                                    for (var i = 0; i < symbols.length; i++) {
+                                        displaySymbols[i] = symbols[i].name();
+                                    }
+
+                                    outputSymbols.value = displaySymbols.join("\n");
+
+                                    compileTime += times.compile;
+                                    symbolsTime += times.symbols;
+                                    rulesTime += times.rules;
+                                    totalTime += times.total;
+
+                                    updateControlsTime();
+                                });
+                    } else {
+                        parser.
+                                parse(sourceCode.value).
+                                adminMode(isAdmin);
+                    }
 
                     parser.
-                            parse( core ).
-                            adminMode( true ).
-                            onDebug( function(symbols, times) {
-                                compileTime += times.compile;
-                                symbolsTime += times.symbols;
-                                rulesTime   += times.rules;
-                                totalTime   += times.total;
+                            finalize(function(result) {
+                                outputCode.value = result.getCode();
+                                outputError.value = result.hasErrors() ?
+                                        result.errors.map(function(e) { return e.message }).join("\r\n") + "\r\n" :
+                                        '';
 
-                                updateControlsTime();
-                            } );
-                }
+                                _result = result;
 
-                if ( debugMode ) {
-                    parser.
-                            parse( sourceCode.value ).
-                            adminMode( isAdmin ).
-                            onDebug( function(symbols, times) {
-                                var displaySymbols = new Array( symbols.length );
-
-                                for ( var i = 0; i < symbols.length; i++ ) {
-                                    displaySymbols[i] = symbols[i].name();
+                                if (callback) {
+                                    callback();
                                 }
-
-                                outputSymbols.value = displaySymbols.join( "\n" );
-
-                                compileTime += times.compile;
-                                symbolsTime += times.symbols;
-                                rulesTime   += times.rules;
-                                totalTime   += times.total;
-
-                                updateControlsTime();
                             });
-                } else {
-                    parser.
-                            parse( sourceCode.value ).
-                            adminMode( isAdmin );
-                }
-
-                parser.
-                        finalize( function(result) {
-                            outputCode.value  = result.getCode();
-                            outputError.value = result.hasErrors() ?
-                                    result.errors.map(function(e) { return e.message }).join("\r\n") + "\r\n" :
-                                    '' ;
-                            
-                            _result = result;
-                            
-                            if ( callback ) {
-                                callback();
-                            }
-                        } );
+                });
             }
 
             function runCode() {
@@ -4098,8 +4146,8 @@ end
                     }
                 }
             }
+
             document.getElementById("sourceCode").value = lines.join("\n");
-                    ;
     	//]]></script>
 
         <!-- Add line numbers to the text bits -->
@@ -4118,7 +4166,7 @@ end
         </script>
         
         <script>
-            parseCode();
+            //parseCode();
         </script>
     </body>
 </html>
