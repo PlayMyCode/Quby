@@ -1166,6 +1166,10 @@ module parse {
             this.termName = name;
         }
 
+        getName(): string {
+            return this.termName;
+        }
+
         setID(id: number) {
             this.id = id;
 
@@ -1284,7 +1288,11 @@ module parse {
         constructor (symbol: Symbol) {
             super(symbol.offset, symbol.source, symbol.match);
 
-            this.terminal = symbol.terminal;
+            var term = symbol.terminal;
+
+            this.terminal = term;
+            this.terminalName = term.getName();
+            this.isLiteral = term.isLiteral;
         }
     };
 
