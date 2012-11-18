@@ -1526,7 +1526,10 @@ module quby.parser {
             onFinish: ( program: quby.ast.ISyntax, errors ) => void ,
             onDebug: parse.DebugCallback
     ) {
-        console.log(src);
+        if (onDebug !== null) {
+            console.log(src);
+        }
+
         statements.parse( {
             name: name,
             src: src,
