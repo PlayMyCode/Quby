@@ -1135,10 +1135,11 @@ module quby.core {
         private rootClass: ClassValidator;
 
         constructor() {
+            this.rootClass = null;
         }
 
         setClass(klass:ClassValidator) {
-            if (this.rootClass == null) {
+            if (this.rootClass === null) {
                 this.rootClass = klass;
             }
         }
@@ -1153,7 +1154,7 @@ module quby.core {
          * todo: this should be moved so it's neater
          */
         getPrintStmts() : quby.ast.ISyntax[] {
-            if (this.rootClass == null) {
+            if (this.rootClass === null) {
                 return [];
             } else {
                 return this.rootClass.getClass().getStatements().getStmts();
@@ -1162,7 +1163,7 @@ module quby.core {
     }
 
     export class ClassValidator {
-        private isPrinted: bool = false;
+        private isPrinted: bool;
 
         private validator: Validator;
         private klass:quby.ast.IClassDeclaration;
@@ -1177,6 +1178,8 @@ module quby.core {
         private noMethPrintFuns: string[];
 
         constructor(validator: Validator, klass:quby.ast.IClassDeclaration) {
+            this.isPrinted = false;
+
             this.validator = validator;
             this.klass = klass;
 

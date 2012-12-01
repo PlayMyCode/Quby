@@ -851,7 +851,7 @@ module quby.parser {
 
     var statements = parse.
             optional( statementSeperator ).
-            optional( repeatStatement ).
+            optional( repeatStatement    ).
             optional( statementSeperator ).
             onMatch( function( onStart, stmts, endEnd ) {
                 if ( stmts === null ) {

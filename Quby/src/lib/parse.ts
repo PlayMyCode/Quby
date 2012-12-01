@@ -2089,10 +2089,14 @@ module parse {
          * 'thenOr' is an alias for 'thenEither'.
          */
         thenOr() {
-            return this.endCurrentOr().orAll(arguments);
+            return this.
+                    endCurrentOr().
+                    orAll(arguments);
         }
         thenEither() {
-            return this.endCurrentOr().orAll(arguments);
+            return this.
+                    endCurrentOr().
+                    orAll(arguments);
         }
 
         /**
@@ -2126,9 +2130,11 @@ module parse {
          *
          */
         onMatch(callback: (...args: any[]) => any): ParserRule {
+            this.endCurrentOr();
+
             this.finallyFun = callback;
 
-            return this.endCurrentOr();
+            return this;
         }
 
         /**
@@ -2224,11 +2230,11 @@ module parse {
         }
 
         optionalThis() {
-            return this.endCurrentOr().optionalSingle(this);
+            return this.optionalSingle(this);
         }
 
         maybeThis() {
-            return this.endCurrentOr().optionalSingle(this);
+            return this.optionalSingle(this);
         }
 
         orThis() {
@@ -2418,7 +2424,9 @@ module parse {
         };
 
         thenAll(obj: IArguments): ParserRuleImplementation {
-            return this.endCurrentOr().helperAll('thenSingle', obj);
+            return this.
+                    endCurrentOr().
+                    helperAll('thenSingle', obj);
         }
 
         private helperAll(singleMethod: string, obj: IArguments): ParserRuleImplementation {
@@ -3868,12 +3876,12 @@ module parse {
         return new ParserRuleImplementation(pInstance).orAll(arguments);
     }
 
-    export var optional = either;
-
-    export function maybe(...args: any[]): ParserRule;
-    export function maybe(): ParserRule  {
+    export function optional(...args: any[]): ParserRule;
+    export function optional(): ParserRule  {
         return new ParserRuleImplementation(pInstance).optionalAll(arguments);
     }
+
+    export var maybe = optional;
 
     export function ignore(...args: any[]): Parse;
     export function ignore() {
