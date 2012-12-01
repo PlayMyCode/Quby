@@ -1544,7 +1544,8 @@ module parse {
         }
 
         maxSymbol() {
-            return this.symbols[this.maxID() - 1];
+            var maxID = Math.max(0, this.maxID() - 1);
+            return this.symbols[ maxID ];
         }
 
         hasErrors() {
@@ -2340,7 +2341,9 @@ module parse {
         }
 
         optionalAll(obj) {
-            return this.endCurrentOr().helperAll('optionalSingle', obj);
+            return this.
+                    endCurrentOr().
+                    helperAll( 'optionalSingle', obj );
         }
 
         private optionalSingle(obj) {
@@ -3122,6 +3125,13 @@ module parse {
 
                 if (rule === undefined) {
                     if (optional[i]) {
+                        if (args === null) {
+                            args = [null];
+                            this.isRecursive = NO_RECURSION;
+                        } else {
+                            args.push(null);
+                        }
+                    } else {
                         if (i !== 0) {
                             symbols.back(symbols.idIndex() - startSymbolI);
                         }
@@ -3134,13 +3144,6 @@ module parse {
 
                         args = null;
                         break;
-                    } else {
-                        if (args === null) {
-                            args = [null];
-                            this.isRecursive = NO_RECURSION;
-                        } else {
-                            args.push(null);
-                        }
                     }
                 } else {
                     // 'or' rules
