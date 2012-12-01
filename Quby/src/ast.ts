@@ -2083,8 +2083,8 @@ module quby.ast {
                 expr = (<BalancingExpr>expr).rebalance();
             }
 
-            if ( expr instanceof BalancingExpr ) {
-                var pExpr = <BalancingExpr> pExpr;
+            if ( expr['getPrecedence'] !== undefined) {
+                var pExpr = <IPrecedence><any>expr;
 
                 if (pExpr.getPrecedence() > 1) {
                     var copy: SingleOp = util.clone(this);
