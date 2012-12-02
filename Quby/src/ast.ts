@@ -685,12 +685,13 @@ module quby.ast {
                 if (whenClauses.length === 0) {
                     v.parseError(this.getOffset(), "case-when clause is entirely empty");
                 } else {
-                    v.parseError(this.getOffset(), "no value provided for case");
+                    v.parseError(this.getOffset(), "no expression provided for case");
                 }
 
                 return;
             } else if (whenClauses.length === 0) {
                 v.parseError(this.getOffset(), "no when clauses provided for case");
+
                 return;
             }
 
