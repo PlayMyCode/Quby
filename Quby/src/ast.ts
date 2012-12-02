@@ -2890,7 +2890,7 @@ module quby.ast {
         private match:string;
 
         constructor(sym:parse.Symbol, isTrue:bool, altMatch?:string) {
-            var match = altMatch ?
+            this.match = altMatch ?
                     altMatch  :
                     sym.match ;
 
