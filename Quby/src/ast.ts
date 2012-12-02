@@ -311,9 +311,18 @@ module quby.ast {
         constructor (strSeperator: string, appendToLast: bool, stmts?: ISyntax[] = []) {
             this.stmts = stmts;
             this.seperator = strSeperator;
-            this.offset = null;
-            this.length = 0;
             this.appendToLast = appendToLast;
+            this.offset = null;
+            this.length = stmts.length;
+
+            for (var i = 0; i < stmts.length; i++) {
+                var offset = stmts[i].getOffset();
+
+                if (offset) {
+                    this.offset = offset;
+                    break;
+                }
+            }
         }
 
         setSeperator(seperator: string) {
@@ -335,7 +344,7 @@ module quby.ast {
             return this;
         }
         ensureOffset(stmt: ISyntax) {
-            if (!this.offset) {
+            if (this.offset === null) {
                 this.offset = stmt.offset;
             }
         }
