@@ -476,17 +476,22 @@
             document.getElementById('outputError').value = '';
         </script>
         
-        <script id="example_code_" type="quby">//<![CDATA[
-            f() // issue with statements with no end-of-line before them
-
-            // issue with do blocks
-            fade() do
-                game()
+        <script id="example_code" type="quby">//<![CDATA[
+            a = 9
+            case a
+                when 0
+                    b = 2
+                when 1
+                    b = 3
+                when 2
+                    b = 4
+                else
+                    b = 5
             end
         //]]></script>
 
         <!-- Out example script code -->
-        <script id="example_code" type="quby">//<![CDATA[
+        <script id="example_code_" type="quby">//<![CDATA[
 /*     Space Snake Galaxies
  *
  * 
