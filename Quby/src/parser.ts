@@ -1482,10 +1482,11 @@ module quby.parser {
     var caseWhenStatement = parse.
             a(terminals.keywords.CASE).
             optional( expr ).
+            then( statementSeperator ).
             optional(whenStatements).
             optional(elseClause).
             then(terminals.keywords.END).
-            onMatch( (caseTerm, expr, whenClauses, elseClause, end) =>
+            onMatch( (caseTerm, expr, endOfStmt, whenClauses, elseClause, end) =>
                 new quby.ast.CaseWhen(caseTerm, expr, whenClauses, elseClause)
             );
         
