@@ -836,6 +836,7 @@ module quby.parser {
     /* Parser Rules */
 
     var statementSeperator = parse.
+            name( 'end of statement' ).
             either(
                     terminals.endOfLine,
                     terminals.endOfStatement
@@ -850,6 +851,7 @@ module quby.parser {
     );
 
     var statements = parse.
+            name( 'statements' ).
             optional( statementSeperator ).
             optional( repeatStatement    ).
             optional( statementSeperator ).
@@ -863,6 +865,7 @@ module quby.parser {
 
     var exprs = parse.
             repeatSeperator(expr, terminals.symbols.comma).
+            name( 'expressions' ).
             onMatch((exprs) => new quby.ast.Parameters(exprs));
 
     var variables = parse.
@@ -899,6 +902,7 @@ module quby.parser {
             } );
 
     var arrayAccessExtension = parse.
+            name( 'array access' ).
             a(
                     terminals.symbols.leftSquare,
                     expr
@@ -910,6 +914,7 @@ module quby.parser {
             } );
 
     var singleOpExpr = parse.
+            name( 'operator' ).
             either(
                     terminals.ops.plus,
                     terminals.ops.subtract,
@@ -932,6 +937,7 @@ module quby.parser {
             } );
 
     var arrayLiteral = parse.
+            name( 'new Array' ).
             a( terminals.symbols.leftSquare ).
             optional( exprs ).
             optional( terminals.endOfLine ).
@@ -945,6 +951,7 @@ module quby.parser {
             } );
 
     var hashMapping = parse.
+            name( 'hash mapping' ).
             a( expr ).
             either( terminals.ops.colon, terminals.ops.mapArrow ).
             then( expr ).
@@ -953,6 +960,7 @@ module quby.parser {
             } );
 
     var hashLiteral = parse.
+            name( 'new Hash' ).
             a( terminals.symbols.leftBrace ).
             optionalSeperator( hashMapping, terminals.symbols.comma ).
             optional( terminals.endOfLine ).
@@ -968,6 +976,7 @@ module quby.parser {
             } );
 
     var yieldExpr = parse.
+            name( 'yield' ).
             a( terminals.keywords.YIELD ).
             optional( exprs ).
             onMatch( function( yld, exprs ) {
@@ -979,6 +988,7 @@ module quby.parser {
             } );
 
     var returnStatement = parse.
+            name( 'return' ).
             a( terminals.keywords.RETURN ).
             optional( expr ).
             onMatch( function( rtn, expr ) {
@@ -1020,6 +1030,7 @@ module quby.parser {
      *  ( &a, &b, &c )  - 3 block parameters, although incorrect, this is allowed here
      */
     var parameterDefinition = parse.
+            name( 'parameters' ).
             a( terminals.symbols.leftBracket ).
             optional( parameterFields ).
             optional( terminals.endOfLine ). // needed to allow an end of line before the closing bracket
@@ -1043,6 +1054,7 @@ module quby.parser {
      *  ( "john", lastName() )  - a string and a function call
      */
     var parameterExprs = parse.
+            name( 'expressions' ).
             a( terminals.symbols.leftBracket ).
             optional( exprs ).
             optional( terminals.endOfLine ).
@@ -1061,6 +1073,7 @@ module quby.parser {
     );
 
     var blockParams = parse.
+            name( 'block parameters' ).
             a( terminals.ops.bitwiseOr ).
             optional( blockParamVariables ).
             optional( terminals.endOfLine ).
@@ -1074,6 +1087,7 @@ module quby.parser {
             } );
 
     var block = parse.
+            name('block').
             either(
                     terminals.symbols.leftBrace,
                     terminals.keywords.DO
@@ -1110,6 +1124,7 @@ module quby.parser {
             } );
 
     var lambda = parse.
+            name('lambda').
             a( terminals.keywords.DEF, parameterDefinition ).
             optional( statements ).
             then( terminals.keywords.END ).
@@ -1118,6 +1133,7 @@ module quby.parser {
             )
 
     var functionCall = parse.
+            name('function call').
             a( terminals.identifiers.variableName ).
             then( parameterExprs ).
             optional( block ).
@@ -1161,6 +1177,7 @@ module quby.parser {
             );
 
     var newInstance = parse.
+            name( 'new object' ).
             a( terminals.keywords.NEW ).
             either(
                     parse.
@@ -1310,6 +1327,7 @@ module quby.parser {
             );
 
     expr.
+            name( 'expression' ).
             either(
                     singleOpExpr,
                     arrayLiteral,
@@ -1346,6 +1364,7 @@ module quby.parser {
      */
 
     var classHeader = parse.
+            name( 'class header' ).
             a( terminals.identifiers.variableName ).
             optional(
                     parse.
@@ -1359,6 +1378,7 @@ module quby.parser {
             } );
 
     var moduleDeclaration = parse.
+            name( 'Module' ).
             a( terminals.keywords.MODULE ).
             then( terminals.identifiers.variableName ).
             optional( statements ).
@@ -1368,6 +1388,7 @@ module quby.parser {
             } );
 
     var classDeclaration = parse.
+            name( 'Class Declaration' ).
             a( terminals.keywords.CLASS ).
             then( classHeader ).
             optional( statements ).
@@ -1377,6 +1398,7 @@ module quby.parser {
             } );
 
     var functionDeclaration = parse.
+            name( 'Function Declaration' ).
             either( terminals.keywords.DEF, terminals.admin.hashDef ).
             thenEither( terminals.keywords.NEW, terminals.identifiers.variableName ).
             then( parameterDefinition ).
@@ -1402,6 +1424,7 @@ module quby.parser {
      */
 
     var ifStart = parse.
+            name( 'if statement' ).
             a(terminals.keywords.IF).
             then(expr).
             optional(terminals.keywords.THEN).
@@ -1411,6 +1434,7 @@ module quby.parser {
             )
 
     var ifElseIf = parse.
+            name( 'else-if statement' ).
             either(
                     terminals.keywords.ELSE_IF,
                     terminals.keywords.ELSEIF,
@@ -1425,13 +1449,16 @@ module quby.parser {
 
     var ifElseIfs = parse.
             repeat(ifElseIf).
+            name( 'else-if statements' ).
             onMatch( (elseIfs) => new quby.ast.IfElseIfs(elseIfs) );
 
     var elseClause = parse.
+            name( 'else statement' ).
             a( terminals.keywords.ELSE, statements ).
             onMatch( (els, stmts) => stmts );
 
     var ifStatement = parse.
+            name( 'if statement' ).
             a( ifStart ).
             optional( ifElseIfs ).
             optional( elseClause ).
@@ -1441,6 +1468,7 @@ module quby.parser {
             );
 
     var whileUntilStatement = parse.
+            name( 'while/until statement' ).
             either( terminals.keywords.WHILE, terminals.keywords.UNTIL ).
             then( expr, statements ).
             then( terminals.keywords.END ).
@@ -1453,6 +1481,7 @@ module quby.parser {
             } );
 
     var loopStatement = parse.
+            name( 'loop statement' ).
             a( terminals.keywords.LOOP ).
             then( statements ).
             then( terminals.keywords.END ).
@@ -1467,6 +1496,7 @@ module quby.parser {
             } );
 
     var whenStatement = parse.
+            name( 'when statement' ).
             a(terminals.keywords.WHEN).
             then(exprs).
             thenEither(
@@ -1480,6 +1510,7 @@ module quby.parser {
             repeat(whenStatement);
     
     var caseWhenStatement = parse.
+            name( 'case-when' ).
             a(terminals.keywords.CASE).
             optional( expr ).
             then( statementSeperator ).

@@ -279,6 +279,11 @@ module parse {
         total: number;
     }
 
+    export interface NamedItem {
+        name(name: string): NamedItem;
+        name(): string;
+    }
+
     export interface DebugCallback { (terms: Term[], times: TimeResult): void; }
 
     export interface SymbolizeCallback { (terminals: Term[], errors: SymbolError[]): void; };
@@ -1158,8 +1163,15 @@ module parse {
             this.terminalParent = parent;
         }
 
-        name() {
-            return this.termName;
+        name(name: string): Term;
+        name(): string;
+        name(name?:string ) : any {
+            if (name === undefined) {
+                return this.termName;
+            } else {
+                this.termName = name;
+                return this;
+            }
         }
 
         setName(name: string) {
@@ -1267,6 +1279,13 @@ module parse {
         }
     }
 
+    /**
+     * This is a type of error generated when parsing the
+     * source code, into a list of symbols.
+     * 
+     * That is during the symbolization stage, before the
+     * grammar rules are checked.
+     */
     export class SymbolError extends ParserError {
         isSymbol = true;
 
@@ -1277,6 +1296,10 @@ module parse {
         }
     }
 
+    /**
+     * This is a type of error generated whilst the grammar
+     * rules are worked on.
+     */
     export class TerminalError extends ParserError {
         isTerminal = true;
 
@@ -1285,7 +1308,9 @@ module parse {
 
         isLiteral: bool;
 
-        constructor (symbol: Symbol) {
+        expected: string[];
+
+        constructor (symbol: Symbol, expected: string[]) {
             super(symbol.offset, symbol.source, symbol.match);
 
             var term = symbol.terminal;
@@ -1293,6 +1318,7 @@ module parse {
             this.terminal = term;
             this.terminalName = term.getName();
             this.isLiteral = term.isLiteral;
+            this.expected = expected;
         }
     };
 
@@ -1449,6 +1475,24 @@ module parse {
         }
     }
 
+    function findPossibleTerms(arr: NamedItem[], terms: Object);
+    function findPossibleTerms(t: NamedItem, terms: Object);
+    function findPossibleTerms(e:any, terms: Object) {
+        if (e instanceof Array) {
+            for (var i = 0; i < e.length; i++) {
+                findPossibleTerms(e[i], terms);
+            }
+        } else {
+            var name = e.name();
+
+            if (name) {
+                terms[name] = true;
+            } else if (e instanceof ParserRuleImplementation) {
+                findPossibleTerms(e, terms);
+            }
+        }
+    }
+
     /**
      * This wraps the output from parsing the symbols.
      *
@@ -1488,9 +1532,18 @@ module parse {
         i: number;
         maxI: number;
 
+
+        /**
+         * The last rule reached, when parsing, before an error has occurred.
+         */
+        maxRule: ParserRuleImplementation;
+        maxRuleI: number;
+
         currentString: string;
         currentID: number;
         stringI: number;
+
+        symbolIDToTerms: Term[];
 
         constructor (
                 errors,
@@ -1498,7 +1551,9 @@ module parse {
                 symbols,
                 symbolIDs,
 
-                symbolLength
+                symbolLength,
+
+                symbolIDToTerms 
         ) {
             this.errors = errors;
 
@@ -1515,20 +1570,34 @@ module parse {
 
             this.currentID = INVALID_TERMINAL;
 
+            this.symbolIDToTerms = symbolIDToTerms;
+
             if (symbolLength > 0) {
                 this.currentID = this.symbolIDs[0];
             }
         }
 
-        /**
-         * If i has moved past maxI,
-         * then this will update maxI to the i value.
-         * 
-         * Otherwise i is left unchanged.
-         */
-        updateMax() {
-            if (this.i > this.maxI) {
-                this.maxI = this.i;
+        expected() : string[] {
+            if (this.maxRule === null) {
+                return [];
+            } else {
+                var rules = this.maxRule.compiledLookups[this.maxRuleI],
+                    terms = {},
+                    termsArr:string[] = [];
+
+                for ( var k in rules ) {
+                    if (k.search(/^[0-9]+/) !== -1) {
+                        findPossibleTerms(rules[k], terms);
+                    }
+                }
+
+                for (var k in terms) {
+                    if (terms.hasOwnProperty(k)) {
+                        termsArr.push(k);
+                    }
+                }
+
+                return termsArr;
             }
         }
 
@@ -1604,11 +1673,13 @@ module parse {
             }
         }
 
-        back(increments: number) {
+        back(increments: number, maxRule: ParserRuleImplementation, maxRuleI: number) {
             var i = this.i;
 
             if (i > this.maxI) {
                 this.maxI = i;
+                this.maxRule  = maxRule;
+                this.maxRuleI = maxRuleI;
             }
 
             this.i = (i -= increments);
@@ -1852,7 +1923,7 @@ module parse {
      */
     var NO_COMPILE_ID = -1;
 
-    export interface ParserRule {
+    export interface ParserRule extends NamedItem {
         repeatSeperator(match, seperator): ParserRule;
         optionalSeperator(match, seperator): ParserRule;
         seperatingRule(match, seperator): ParserRule;
@@ -1863,12 +1934,16 @@ module parse {
         thenEither(...args: any[]): ParserRule;
         optional(...args: any[]): ParserRule;
         maybe(...args: any[]): ParserRule;
+        a(...args: any[]): ParserRule;
         then(...args: any[]): ParserRule;
         onMatch(callback: (...args: any[]) => any): ParserRule;
 
         optionalThis(...args: any[]): ParserRule;
         maybeThis(...args: any[]): ParserRule;
         orThis(...args: any[]): ParserRule;
+
+        name(name: string): ParserRule;
+        name(): string;
 
         parse(options: {
             src: string;
@@ -1922,7 +1997,7 @@ module parse {
         * null, it has.
         */
         compiled: CompiledTerminals = null;
-        compiledLookups: any[] = null;
+        compiledLookups: any[][] = null;
 
         /**
         * Records how long the call to 'compile' takes to execute.
@@ -2004,8 +2079,23 @@ module parse {
 
         hasBeenUsed = false;
 
+        strName: string;
+
         constructor (parse: Parse) {
             this.parseParent = parse;
+
+            this.strName = '';
+        }
+
+        name(name: string): ParserRule;
+        name(): string;
+        name(name?: string) : any {
+            if (name !== undefined) {
+                this.strName = name;
+                return this;
+            } else {
+                return this.strName;
+            }
         }
 
         /**
@@ -2117,6 +2207,12 @@ module parse {
          */
         maybe() {
             return this.optionalAll(arguments);
+        }
+        /**
+         * States the next items to parse.
+         */
+        a() {
+            return this.thenAll(arguments);
         }
 
         /**
@@ -2760,10 +2856,10 @@ module parse {
                             errors: errors
                         };
                     } else {
-                        errors.push(new TerminalError(symbols.maxSymbol()));
+                        errors.push(new TerminalError(symbols.maxSymbol(), symbols.expected()));
                     }
                 } else {
-                    errors.push(new TerminalError(symbols.maxSymbol()));
+                    errors.push(new TerminalError(symbols.maxSymbol(), symbols.expected()));
                 }
             }
 
@@ -3003,13 +3099,13 @@ module parse {
                         rule = rules[peekID];
 
                         if (rule === undefined) {
-                            symbols.back(symbols.idIndex() - symbolI);
+                            symbols.back(symbols.idIndex() - symbolI, this, 0);
                             break;
                         } else if (rule instanceof ParserRuleImplementation) {
                             onFinish = rule.ruleTest(symbols, inputSrc);
 
                             if (onFinish === null) {
-                                symbols.back(symbols.idIndex() - symbolI);
+                                symbols.back(symbols.idIndex() - symbolI, this, 0);
                                 break;
                             } else {
                                 args.push(onFinish);
@@ -3037,13 +3133,13 @@ module parse {
                             }
 
                             if (!success) {
-                                symbols.back(symbols.idIndex() - symbolI);
+                                symbols.back(symbols.idIndex() - symbolI, this, 0);
                                 break;
                             }
                         } else if (rule.id === peekID) {
                             args.push(symbols.next());
                         } else {
-                            symbols.back(symbols.idIndex() - symbolI);
+                            symbols.back(symbols.idIndex() - symbolI, this, 0);
                             break;
                         }
                     } else {
@@ -3141,7 +3237,7 @@ module parse {
                         }
                     } else {
                         if (i !== 0) {
-                            symbols.back(symbols.idIndex() - startSymbolI);
+                            symbols.back(symbols.idIndex() - startSymbolI, this, i);
                         }
 
                         // needs to remember it's recursive position when we leave
@@ -3183,7 +3279,7 @@ module parse {
                     // it is only the first iteration where recursiveness is not allowed,
                     // so we always turn it off
                     if (onFinish === null && !optional[i]) {
-                        symbols.back(symbols.idIndex() - startSymbolI);
+                        symbols.back(symbols.idIndex() - startSymbolI, this, i);
 
                         // needs to remember it's recursive position when we leave
                         this.isRecursive = startSymbolI;
@@ -3298,39 +3394,39 @@ module parse {
 
                 len = src.length,
 
-            symbols: Symbol[] = [],
-            symbolIDs: number[] = [],
+                symbols: Symbol[] = [],
+                symbolIDs: number[] = [],
 
-            ignores: Term[] = getIgnores(this.parseParent),
-            literals: Term[] = this.compiled.literals,
-            terminals: Term[] = this.compiled.terminals,
+                ignores: Term[] = getIgnores(this.parseParent),
+                literals: Term[] = this.compiled.literals,
+                terminals: Term[] = this.compiled.terminals,
 
-            allTerms: Term[] = ignores.concat(literals, terminals),
+                allTerms: Term[] = ignores.concat(literals, terminals),
 
                 ignoresLen = ignores.length,
                 literalsLen = ignoresLen + literals.length,
                 termsLen = literalsLen + terminals.length,
 
-            ignoresTests: TerminalFunction[] = new Array(ignoresLen),
+                ignoresTests: TerminalFunction[] = new Array(ignoresLen),
                 literalsData = new Array(literalsLen),
                 literalsMatches = new Array(literalsLen),
                 literalsType = new Array(literalsLen),
 
                 symbolIDToTerms = this.compiled.idToTerms,
 
-            postMatches: TerminalFunction[] = new Array(termsLen),
+                postMatches: TerminalFunction[] = new Array(termsLen),
 
-            termTests: TerminalFunction[] = new Array(termsLen),
-            termIDs: number[] = new Array(termsLen),
-            multipleIgnores: bool = (ignores.length > 1),
+                termTests: TerminalFunction[] = new Array(termsLen),
+                termIDs: number[] = new Array(termsLen),
+                multipleIgnores: bool = (ignores.length > 1),
 
-            /**
-             * An invalid index in the string, used to denote
-             * no error.
-             *
-             * @const
-             * @private
-             */
+                /**
+                 * An invalid index in the string, used to denote
+                 * no error.
+                 *
+                 * @const
+                 * @private
+                 */
                 NO_ERROR = -1,
                 errorStart = NO_ERROR,
                 errors = [];
@@ -3608,7 +3704,9 @@ module parse {
                         symbols,
                         symbolIDs,
 
-                        symbolI
+                        symbolI,
+
+                        symbolIDToTerms 
                 );
             }
         }
@@ -3745,6 +3843,10 @@ module parse {
             return new ParserRuleImplementation(this);
         }
 
+        name(name: string): ParserRule {
+            return new ParserRuleImplementation(this).name(name);
+        }
+
         a(...args: any[]): ParserRule;
         a() : ParserRule {
             return new ParserRuleImplementation(this).thenAll(arguments);
@@ -3864,6 +3966,10 @@ module parse {
 
     export function rule(): ParserRule {
         return new ParserRuleImplementation(pInstance);
+    }
+
+    export function name(name: string): ParserRule {
+        return new ParserRuleImplementation(pInstance).name(name);
     }
 
     export function a(...args: any[]): ParserRule;

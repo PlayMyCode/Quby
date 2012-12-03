@@ -83,6 +83,16 @@ module quby.core {
             } else {
                 strErr = "syntax error near " + termError.terminalName + " '" + error.match + "'";
             }
+
+            var expected = termError.expected;
+            if (expected.length > 0) {
+                strErr += ', expected ';
+                if (expected.length > 1) {
+                    strErr += expected.slice(0, expected.length - 1).join(', ') + ' or ' + expected[expected.length - 1];
+                } else {
+                    strErr += expected.join(' or ');
+                }
+            }
         } else {
             throw new Error("Unknown parse.js error given to format");
         }
