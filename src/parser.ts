@@ -520,6 +520,9 @@ module quby.parser {
             NULL: 'null',
             NIL: 'nil',
 
+            JSUndefined: '#undefined',
+            JSNull: '#null',
+
             symbol: function( src, i, code, len ) {
                 if ( code === COLON ) {
                     code = src.charCodeAt( i + 1 );
@@ -814,6 +817,12 @@ module quby.parser {
     } );
     terminals.literals.NIL.onMatch( function( symbol ) {
         return new quby.ast.Null( symbol );
+    } );;
+    terminals.literals.JSUndefined.onMatch( function( symbol ) {
+        return new quby.ast.JSUndefined( symbol );
+    } );
+    terminals.literals.JSNull.onMatch( function( symbol ) {
+        return new quby.ast.JSNull( symbol );
     } );
     terminals.literals.symbol.onMatch( function( symbol ) {
         return new quby.ast.Symbol( symbol );

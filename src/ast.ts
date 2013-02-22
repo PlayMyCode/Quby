@@ -3022,6 +3022,30 @@ module quby.ast {
         }
     }
 
+    export class JSLiteral extends Literal {
+        constructor( sym:parse.Symbol, str:string ) {
+            super(sym, false, str);
+        }
+
+        validate(v: quby.core.Validator) {
+            if (v.ensureAdminMode(this, "JS literals cannot be used outside of sandbox mode")) {
+                super.validate(v);
+            }
+        }
+    }
+
+    export class JSUndefined extends JSLiteral {
+        constructor(sym: parse.Symbol) {
+            super(sym, 'undefined');
+        }
+    }
+
+    export class JSNull extends JSLiteral {
+        constructor(sym: parse.Symbol) {
+            super(sym, 'null');
+        }
+    }
+    
     /*
      * = Function Generating Stuff =
      */
