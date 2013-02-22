@@ -1039,18 +1039,27 @@ module quby.parser {
      *  ( &a, &b, &c )  - 3 block parameters, although incorrect, this is allowed here
      */
     var parameterDefinition = parse.
-            name( 'parameters' ).
-            a( terminals.symbols.leftBracket ).
-            optional( parameterFields ).
-            optional( terminals.endOfLine ). // needed to allow an end of line before the closing bracket
-            then( terminals.symbols.rightBracket ).
-            onMatch( function( lParen, params, end, rParen ) : quby.ast.ISyntax {
-                if ( params === null ) {
-                    return new quby.ast.Parameters();
-                } else {
-                    return params;
-                }
-            } );
+            name('parameters').
+            either(
+                    parse.
+                            a(terminals.symbols.leftBracket).
+                            optional(parameterFields).
+                            optional(terminals.endOfLine). // needed to allow an end of line before the closing bracket
+                            then(terminals.symbols.rightBracket).
+                            onMatch(function (lParen, params, end, rParen): quby.ast.ISyntax {
+                                if (params === null) {
+                                    return new quby.ast.Parameters();
+                                } else {
+                                    return params;
+                                }
+                            }),
+
+                    parse.a(parameterFields),
+
+                    parse.
+                            a(statementSeperator).
+                            onMatch(() => new quby.ast.Parameters())
+            );
 
     /**
      * Theser are the expressions used as parameters, such as for a function call.
