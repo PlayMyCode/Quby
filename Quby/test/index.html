@@ -226,8 +226,26 @@
                     padding: 6px 12px;
                 }
     		#outputError {
-                    color: #c63;
+                color: #c63;
+
+                z-index: 1;
+
+                -webkit-transition: width 200ms linear, color 200ms linear;
+                -moz-transition: width 200ms linear, color 200ms linear;
+                -o-transition: width 200ms linear, color 200ms linear;
+                transition: width 200ms linear, color 200ms linear;
+
+                position: absolute;
+                width: 100%;
     		}
+            /*
+             * This makes it also cover the symbols section.
+             */
+    		#outputError.error {
+                width: 143%;
+                color: #f42;
+            }
+
             .footer {
                 width: 100%;
                 text-align: center;
@@ -242,6 +260,24 @@
     
     <body>
         <script>
+            var scriptsLoading = 0,
+                scriptsLoadFun = null;
+
+            var scriptLoad = function( inc ) {
+                if ( typeof inc === 'number' ) {
+                    scriptsLoading += inc;
+
+                    if ( scriptsLoading === 0 && scriptsLoadFun ) {
+                        scriptsLoadFun();
+                    }
+                } else if ( inc instanceof Function ) {
+                    scriptsLoadFun = inc;
+                } else {
+                    console.log( inc );
+                    throw new Error( "unknown parameter given " + inc );
+                }
+            }
+
             /**
              * Performs a document.write to inject the script given.
              * 
@@ -249,43 +285,82 @@
              * to prevent caching.
              */
             var addScripts = function( prefix, libs, type ) {
-                var time = new Date();
-                var scriptTag = '';
+                var time = Date.now();
                 
                 if ( typeof libs === 'string' || (libs instanceof String ) ) {
                     libs = [ libs ];
                 }
 
-                // generate the script tags to insert, then insert them
-                for ( var i = 0; i < libs.length; i++ ) {
-                    var lib = libs[i];
-
-                    scriptTag += '<scr' + 'ipt src="' +
-                                prefix + '/' + lib + '?' + time.getTime() +
-                                '"'
-
-                    if (type) {
-                        scriptTag += ' type="' + type + '"';
-                    }
-
-                    scriptTag += '></scr' + 'ipt>';
+                // ensure it ends with a slash
+                if ( prefix !== '' && prefix.charAt(prefix.length-1) !== '/' ) {
+                    prefix += '/';
                 }
 
-                console.log(scriptTag);
-                document.write( scriptTag );
+                // generate the script tags to insert, then insert them
+                for ( var i = 0; i < libs.length; i++ ) {
+                    (function(prefix, lib, type) {
+                        scriptLoad( 1 );
+
+                        var ajaxObj = new XMLHttpRequest();
+
+                        ajaxObj.onreadystatechange = function() {
+                            if ( ajaxObj.readyState === 4 ) {
+                                var err    = undefined,
+                                    status = ajaxObj.status;
+
+                                // ERROR!
+                                if ( ! (status >= 200 && status < 300 || status === 304) ) {
+                                    console.error([
+                                            '-----------------------',
+                                            '  error ' + lib,
+                                            '-----------------------',
+                                            '',
+                                            ajaxObj.responseText,
+                                            ''
+                                    ].join("\n"))
+
+                                    scriptLoad( -1 );
+
+                                // SUCCESS!
+                                } else {
+                                    var scriptTag = document.createElement( 'script' );
+                                    scriptTag.innerHTML = ajaxObj.responseText;
+
+                                    if ( type ) {
+                                        scriptTag.setAttribute( 'type', type );
+                                    }
+
+                                    setTimeout( function() {
+                                        scriptLoad( -1 );
+                                    }, 0 );
+
+                                    document.head.appendChild( scriptTag );
+                                }
+                            }
+                        }
+
+                        ajaxObj.open( 'GET', prefix + lib + '?' + time, true );
+
+                        ajaxObj.send( '' );
+                    })( prefix, libs[i], type );
+                }
             }
             
             // pulls a compiled version from somewhere
             if (true) {
                 addScripts('.', 'compile' );
-                //addScripts('./../release/', 'quby.js');
             // builds within the browser using typescript
             } else {
+                // this never worked, TS seemed to just crash. I think it's an old version.
+                // this also will not work with the new ajaxy loading of scripts.
+
+                /*
                 addScripts('./..', ['quby.ts'], 'text/typescript');
                 addScripts('.', [
                         'typescript.js',
                         'typescript.compile.js'
                 ]);
+                */
             }
         </script>
         <script>//<![CDATA[
@@ -319,86 +394,111 @@
             }
                 
             var _result = null;
+
+            function handleError( err, isNormal ) {
+                var strErr = [
+                        err.message,
+                        err.stack
+                ].join("\n");
+
+                var outputError = document.getElementById("outputError")
+                outputError.value = strErr;
+
+                if ( isNormal ) {
+                    outputError.classList.remove( 'error' );
+                } else {
+                    outputError.classList.add( 'error' );
+                }
+
+                console.error( strErr );
+            }
         
             function parseCode( callback ) {
                 setTimeout(function() {
-                    var sourceCode = document.getElementById("sourceCode"),
-                        outputCode = document.getElementById("outputCode"),
-                        outputError = document.getElementById("outputError"),
-                        outputSymbols = document.getElementById("outputSymbols");
+                    try {
+                        var sourceCode = document.getElementById("sourceCode"),
+                            outputCode = document.getElementById("outputCode"),
+                            outputError = document.getElementById("outputError"),
+                            outputSymbols = document.getElementById("outputSymbols");
 
-                    outputSymbols.value = '';
+                        outputSymbols.value = '';
 
-                    var parser = new quby.main.Parser();
+                        var parser = new quby.main.Parser();
 
-                    var compileTime = 0,
-                        symbolsTime = 0,
-                        rulesTime = 0,
-                        totalTime = 0;
+                        var compileTime = 0,
+                            symbolsTime = 0,
+                            rulesTime = 0,
+                            totalTime = 0;
 
-                    var updateControlsTime = function() {
-                        document.getElementsByClassName('controls-time-info')[0].innerHTML =
-                                "compile " + compileTime + "ms<br/>" +
-                                "symbols " + symbolsTime + "ms<br/>" +
-                                "rules " + rulesTime + "ms<br/>" +
-                                "total " + totalTime + "ms";
-                    };
+                        var updateControlsTime = function() {
+                            document.getElementsByClassName('controls-time-info')[0].innerHTML =
+                                    "compile " + compileTime + "ms<br/>" +
+                                    "symbols " + symbolsTime + "ms<br/>" +
+                                    "rules " + rulesTime + "ms<br/>" +
+                                    "total " + totalTime + "ms";
+                        };
 
-                    if (includeCore) {
-                        var core = getSourceFile("./core.qb");
+                        if (includeCore) {
+                            var core = getSourceFile("./core.qb");
+
+                            parser.
+                                    parse(core).
+                                    adminMode(true).
+                                    onDebug(function(symbols, times) {
+                                        compileTime += times.compile;
+                                        symbolsTime += times.symbols;
+                                        rulesTime += times.rules;
+                                        totalTime += times.total;
+
+                                        updateControlsTime();
+                                    });
+                        }
+
+                        if (debugMode) {
+                            parser.
+                                    parse(sourceCode.value).
+                                    adminMode(isAdmin).
+                                    onDebug(function(symbols, times) {
+                                        var displaySymbols = new Array(symbols.length);
+
+                                        for (var i = 0; i < symbols.length; i++) {
+                                            displaySymbols[i] = symbols[i].name();
+                                        }
+
+                                        outputSymbols.value = displaySymbols.join("\n");
+
+                                        compileTime += times.compile;
+                                        symbolsTime += times.symbols;
+                                        rulesTime += times.rules;
+                                        totalTime += times.total;
+
+                                        updateControlsTime();
+                                    });
+                        } else {
+                            parser.
+                                    parse(sourceCode.value).
+                                    adminMode(isAdmin);
+                        }
 
                         parser.
-                                parse(core).
-                                adminMode(true).
-                                onDebug(function(symbols, times) {
-                                    compileTime += times.compile;
-                                    symbolsTime += times.symbols;
-                                    rulesTime += times.rules;
-                                    totalTime += times.total;
+                                finalize(function(result) {
+                                    outputCode.value = result.getCode();
+                                    handleError(
+                                            ( outputError.value = result.hasErrors() ?
+                                                    result.errors.map(function(e) { return e.message }).join("\r\n") + "\r\n" :
+                                                    '' ),
+                                            true
+                                    );
 
-                                    updateControlsTime();
-                                });
-                    }
+                                    _result = result;
 
-                    if (debugMode) {
-                        parser.
-                                parse(sourceCode.value).
-                                adminMode(isAdmin).
-                                onDebug(function(symbols, times) {
-                                    var displaySymbols = new Array(symbols.length);
-
-                                    for (var i = 0; i < symbols.length; i++) {
-                                        displaySymbols[i] = symbols[i].name();
+                                    if (callback) {
+                                        callback();
                                     }
-
-                                    outputSymbols.value = displaySymbols.join("\n");
-
-                                    compileTime += times.compile;
-                                    symbolsTime += times.symbols;
-                                    rulesTime += times.rules;
-                                    totalTime += times.total;
-
-                                    updateControlsTime();
                                 });
-                    } else {
-                        parser.
-                                parse(sourceCode.value).
-                                adminMode(isAdmin);
+                    } catch ( err ) {
+                        handleError( err );
                     }
-
-                    parser.
-                            finalize(function(result) {
-                                outputCode.value = result.getCode();
-                                outputError.value = result.hasErrors() ?
-                                        result.errors.map(function(e) { return e.message }).join("\r\n") + "\r\n" :
-                                        '';
-
-                                _result = result;
-
-                                if (callback) {
-                                    callback();
-                                }
-                            });
                 });
             }
 
@@ -4176,7 +4276,9 @@ end
         </script>
         
         <script>
-            parseCode();
+            scriptLoad( function() {
+                window.parseCode();
+            } );
         </script>
     </body>
 </html>
