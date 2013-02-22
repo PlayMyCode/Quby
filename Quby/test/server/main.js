@@ -34,22 +34,22 @@ rockServer.route({
                     ]
             );
 
-            res.contentType( 'application/javascript' );
-            var success = true;
+            var err = '';
             compile.stderr.on( 'data', function(data) {
-                console.log( "\t" + data );
-                success = false;
+                err += data;
             } );
-            compile.stdout.on( 'data', function(data) {
-                console.log( "\t" + data );
-            } );
-            compile.on( 'exit', function() {
-                if ( success ) {
+
+            compile.on( 'exit', function(code) {
+                if ( code === 0 ) {
                     console.log( 'compile exit... serve!' );
+
+                    res.status( 200, 'application/javascript' );
                     rockServer.serveFile( './../release/quby.js', req, res );
                 } else {
                     console.log( 'compile exit... fail :(' );
 
+                    res.status( 500, 'text/text' );
+                    res.write( err );
                     res.end();
                 }
             } );
