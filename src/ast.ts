@@ -48,13 +48,18 @@ module quby.ast {
         validate: (v: quby.core.Validator) => void;
         print: (p: quby.core.Printer) => void;
         getOffset: () => parse.Symbol;
+
+        /**
+         * A 'JS Literal' is any native JS Syntax.
+         * For exmaple, JS variables, or creating
+         * classes in a JS way.
+         */
+        isJSLiteral: () => bool;
+        setJSLiteral: (isLit: bool) => void;
     }
 
     export interface IExpr extends ISyntax {
         printAsCondition: (p: quby.core.Printer) => void;
-
-        setJSLiteral: () => void;
-        isJSLiteral: () => bool;
     }
 
     export interface INamedExpr extends IExpr {
@@ -115,14 +120,25 @@ module quby.ast {
     class EmptyStub implements ISyntax {
         public offset: parse.Symbol;
 
+        private isJSLiteralFlag: bool;
+
         constructor (offset?: parse.Symbol = null) {
             this.offset = offset;
+            this.isJSLiteralFlag = false;
         }
 
         validate(v: quby.core.Validator) { }
         print(p: quby.core.Printer) { }
         getOffset() {
             return this.offset;
+        }
+
+        isJSLiteral() {
+            return this.isJSLiteralFlag;
+        }
+
+        setJSLiteral(isLit: bool) {
+            this.isJSLiteralFlag = isLit;
         }
     }
 
@@ -234,10 +250,24 @@ module quby.ast {
             quby.runtime.error("Internal", "Error, validate has not been overridden");
         }
 
+        /**
+         * By 'offset', it means the offset within the source
+         * file, that this comes from.
+         *  
+         * This allows an offset to be set; either the first
+         * offset this has seen, or an entirely new one to replace
+         * an existing offset.
+         * 
+         * @param offset The Symbol for use for displaying the file offset information.
+         */ 
         setOffset(offset: parse.Symbol) {
             this.offset = offset;
         }
-        getOffset() {
+
+        /**
+         * @return Null if no offset, and otherwise an offset object. 
+         */
+        getOffset() : parse.Symbol {
             return this.offset;
         }
 
@@ -245,8 +275,8 @@ module quby.ast {
             return this.isJSLiteralFlag;
         }
 
-        setJSLiteral() {
-            this.isJSLiteralFlag = true;
+        setJSLiteral(isLit: bool) {
+            this.isJSLiteralFlag = isLit;
         }
     }
 
@@ -259,6 +289,7 @@ module quby.ast {
         public offset: parse.Symbol;
 
         private stmts: ISyntax[];
+        private isJSLiteralFlag: bool;
 
         constructor (stmts: ISyntax[]) {
             this.stmts = stmts;
@@ -272,6 +303,16 @@ module quby.ast {
                     break;
                 }
             }
+
+            this.isJSLiteralFlag = false;
+        }
+
+        isJSLiteral(): bool {
+            return this.isJSLiteralFlag;
+        }
+
+        setJSLiteral(isLit: bool) {
+            this.isJSLiteralFlag = isLit;
         }
 
         getStmts(): ISyntax[] {
@@ -308,6 +349,8 @@ module quby.ast {
         private appendToLast: bool;
         private stmts: ISyntax[];
 
+        private isJSLiteralFlag: bool;
+
         constructor (strSeperator: string, appendToLast: bool, stmts?: ISyntax[] = []) {
             this.stmts = stmts;
             this.seperator = strSeperator;
@@ -323,6 +366,14 @@ module quby.ast {
                     break;
                 }
             }
+        }
+
+        isJSLiteral() {
+            return this.isJSLiteralFlag;
+        }
+
+        setJSLiteral(isLit: bool) {
+            this.isJSLiteralFlag = isLit;
         }
 
         setSeperator(seperator: string) {
@@ -1672,12 +1723,22 @@ module quby.ast {
         }
     }
 
+    export class JSFunctionCall extends FunctionCall {
+        constructor (sym: parse.Symbol, parameters: Parameters, block: FunctionBlock) {
+            super(sym, parameters, block);
+
+            this.setJSLiteral(true);
+        }
+    }
+
     /**
      * // todo
      */
     export class JSMethodCall extends FunctionCall {
         constructor( expr: IExpr, sym: parse.Symbol, params: Parameters, block: FunctionBlock ) {
             super(sym, params, block);
+
+            this.setJSLiteral(true);
         }
     }
 
@@ -1687,53 +1748,34 @@ module quby.ast {
     export class JSProperty extends Expr {
         constructor( expr: IExpr, sym: parse.Symbol ) {
             super(sym);
+
+            this.setJSLiteral(true);
         }
     }
 
-    export class NewJSInstance extends Syntax implements IExpr {
+    export class JSNewInstance extends Syntax implements IExpr {
         private expr: IExpr;
-        private block: FunctionBlock;
-        private parameters: Parameters;
 
-        constructor( expr:IExpr, parameters: Parameters, block: FunctionBlock) {
+        constructor( expr:IExpr ) {
             super(expr.getOffset());
 
             this.expr = expr;
-            this.block = block;
-            this.parameters = parameters;
+            this.setJSLiteral(true);
         }
 
         validate(v: quby.core.Validator) {
-            if (v.ensureAdminMode(this, "cannot create JS instances in Sandbox mode")) {
-                this.expr.setJSLiteral();
-                this.expr.validate(v);
-            }
-
-            if (this.parameters !== null) {
-                this.parameters.validate(v);
-            }
-
-            if (this.block !== null) {
-                this.block.validate(v);
+            if (this.expr.isJSLiteral()) {
+                if (v.ensureAdminMode(this, "cannot create JS instances in Sandbox mode")) {
+                    this.expr.validate(v);
+                }
+            } else {
+                v.parseError(this.getOffset(), "invalid 'new' instance expression");
             }
         }
 
         print(p: quby.core.Printer) {
-            p.append('new ');
-            this.expr.print(p)
-            p.append('(');
-
-            if (this.parameters !== null) {
-                this.parameters.print(p);
-
-                if (this.block !== null) {
-                    p.append(',');
-                    this.block.print(p);
-                }
-            } else {
-                this.block.print(p);
-            }
-
+            p.append('(new ');
+            this.expr.print(p);
             p.append(')');
         }
     }
@@ -1791,7 +1833,7 @@ module quby.ast {
                         || (klassVal.noNews() && this.getNumParameters() > 0)
                     ) {
                         if (klassVal.noNews() && klass.isExtensionClass) {
-                            v.parseError(this.offset, "Cannot manually create new instances of '" + klass.getName() + "', it doesn't have a constructor.");
+                            v.parseError(this.getOffset(), "Cannot manually create new instances of '" + klass.getName() + "', it doesn't have a constructor.");
                         } else {
                             v.parseError(this.offset, "Called constructor for class '" + klass.getName() + "' with wrong number of parameters: " + this.getNumParameters());
                         }
@@ -2080,9 +2122,9 @@ module quby.ast {
         }
 
         print(p: quby.core.Printer) {
-            p.append('(', this.strOp);
+            p.append('(', this.strOp, ' ');
             this.expr.print(p);
-            p.append(')');
+            p.append(' )');
         }
 
         onRebalance(): IExpr {
@@ -2330,31 +2372,26 @@ module quby.ast {
         constructor(left, right) {
             super( left, right, 'instanceof', true, 7);
 
-            if (this.getRight().isJSLiteral()) {
-                this.setJSLiteral();
-            }
+            this.setJSLiteral(true);
         }
 
         validate(v:quby.core.Validator) {
             if (v.ensureAdminMode(this, "JS instanceof is not allowed in Sandbox mode")) {
-                v.parseError(this.getOffset(), "'is' is not yet implemented");
-                return;
+                super.validate(v);
+            }
+        }
+    }
 
-                if (this.isJSLiteral()) {
-                    if (v.ensureAdminMode(this, 'JS inlining for instance check, is not allowed in Sandbox mode')) {
-                        // todo, check if the class exists
-                        this.getRight().validate(v);
-                        this.getLeft().validate(v);
-                    }
+    export class JSTypeOf extends SingleOp {
+        constructor(right: IExpr) {
+            super(right, "typeof", false);
 
-                    // todo : if a Foo.class class literal, then just do the test
-                    // also add 'foo.class' to the literals list in the parser
-                    // otherwise if an IExpr, ensure it results in a class, and then test
-                } else if (this.getRight() instanceof LocalVariable) {
-                    // todo, no need for any side swapping here
-                } else {
-                    v.parseError(this.offset, "expecting a class name for instance check");
-                }
+            this.setJSLiteral(true);
+        }
+
+        validate(v: quby.core.Validator) {
+            if (v.ensureAdminMode(this, "JS typeof is not allowed in Sandbox mode")) {
+                super.validate(v);
             }
         }
     }
@@ -2557,29 +2594,30 @@ module quby.ast {
             // assigning to this variable
             if (this.isAssignment()) {
                 v.assignVar(this);
+
                 // blocks can alter local variables, allowing var prevents this.
                 this.useVar = !v.isInsideBlock();
-                // reading from this variable
-            } else {
-                if (v.isInsideParameters()) {
-                    // it presumes scope has already been pushed by the function it's within
-                    if (v.containsLocalVar(this)) {
-                        v.parseError(this.offset, "parameter variable name used multiple times '" + this.getName() + "'");
-                    }
 
-                    v.assignVar(this);
-                } else {
-                    if (!v.containsVar(this)) {
-                        if (!this.isJSLiteral()) {
-                            v.parseError(this.offset, "variable used before it's assigned to '" + this.getName() + "'");
-                        } else if (window[this.getCallName()] === undefined) {
-                            v.parseError(this.offset, "JS variable used before it's assigned to, '" + this.getName() + "'");
-                        }
-                    }
+            // used as a parameter
+            } else if (v.isInsideParameters()) {
+                // it presumes scope has already been pushed by the function it's within
+                if (v.containsLocalVar(this)) {
+                    v.parseError(this.offset, "parameter variable name used multiple times '" + this.getName() + "'");
                 }
+
+                v.assignVar(this);
+
+            // read from this, as non-parameter
+            } else if (!this.isJSLiteral() && !v.containsVar(this)) {
+                v.parseError(this.offset, "variable used before it's assigned to '" + this.getName() + "'");
             }
         }
 
+        /**
+         * When called, this will not validate that this
+         * variable really does exist. Instead it will
+         * presume it exists, with no check done at compile time.
+         */
         print(p:quby.core.Printer) {
             if (this.isAssignment() && this.useVar) {
                 p.append('var ');
@@ -2753,11 +2791,10 @@ module quby.ast {
             super( identifier );
 
             this.setCallName(identifier.match);
+            this.setJSLiteral(true);
         }
 
         validate(v:quby.core.Validator) {
-            this.setJSLiteral();
-
             if (
                     v.ensureOutBlock(this, "JS variable used as block parameter") &&
                     v.ensureAdminMode(this, "inlining JS values not allowed in sandboxed mode")
@@ -3013,6 +3050,8 @@ module quby.ast {
 
         private numParams: number;
 
+        private isJSLiteralFlag: bool;
+
         constructor(obj:FunctionCall, methodName: string, numParams: number) {
             this.offset = obj.offset;
 
@@ -3026,6 +3065,16 @@ module quby.ast {
             this.numParams = numParams;
 
             this.callName = quby.runtime.formatFun(methodName, numParams);
+
+            this.isJSLiteralFlag = false;
+        }
+
+        isJSLiteral() {
+            return this.isJSLiteralFlag;
+        }
+
+        setJSLiteral(isLit: bool) {
+            this.isJSLiteralFlag = isLit;
         }
 
         isConstructor() {

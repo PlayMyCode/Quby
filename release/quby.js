@@ -2434,6 +2434,7 @@ var quby;
             function EmptyStub(offset) {
                 if (typeof offset === "undefined") { offset = null; }
                 this.offset = offset;
+                this.isJSLiteralFlag = false;
             }
             EmptyStub.prototype.validate = function (v) {
             };
@@ -2441,6 +2442,12 @@ var quby;
             };
             EmptyStub.prototype.getOffset = function () {
                 return this.offset;
+            };
+            EmptyStub.prototype.isJSLiteral = function () {
+                return this.isJSLiteralFlag;
+            };
+            EmptyStub.prototype.setJSLiteral = function (isLit) {
+                this.isJSLiteralFlag = isLit;
             };
             return EmptyStub;
         })();        
@@ -2515,8 +2522,8 @@ var quby;
             Syntax.prototype.isJSLiteral = function () {
                 return this.isJSLiteralFlag;
             };
-            Syntax.prototype.setJSLiteral = function () {
-                this.isJSLiteralFlag = true;
+            Syntax.prototype.setJSLiteral = function (isLit) {
+                this.isJSLiteralFlag = isLit;
             };
             return Syntax;
         })();
@@ -2532,7 +2539,14 @@ var quby;
                         break;
                     }
                 }
+                this.isJSLiteralFlag = false;
             }
+            TransparentList.prototype.isJSLiteral = function () {
+                return this.isJSLiteralFlag;
+            };
+            TransparentList.prototype.setJSLiteral = function (isLit) {
+                this.isJSLiteralFlag = isLit;
+            };
             TransparentList.prototype.getStmts = function () {
                 return this.stmts;
             };
@@ -2571,6 +2585,12 @@ var quby;
                     }
                 }
             }
+            SyntaxList.prototype.isJSLiteral = function () {
+                return this.isJSLiteralFlag;
+            };
+            SyntaxList.prototype.setJSLiteral = function (isLit) {
+                this.isJSLiteralFlag = isLit;
+            };
             SyntaxList.prototype.setSeperator = function (seperator) {
                 this.seperator = seperator;
             };
@@ -3543,10 +3563,20 @@ var quby;
             return SuperCall;
         })(FunctionCall);
         ast.SuperCall = SuperCall;        
+        var JSFunctionCall = (function (_super) {
+            __extends(JSFunctionCall, _super);
+            function JSFunctionCall(sym, parameters, block) {
+                        _super.call(this, sym, parameters, block);
+                this.setJSLiteral(true);
+            }
+            return JSFunctionCall;
+        })(FunctionCall);
+        ast.JSFunctionCall = JSFunctionCall;        
         var JSMethodCall = (function (_super) {
             __extends(JSMethodCall, _super);
             function JSMethodCall(expr, sym, params, block) {
                         _super.call(this, sym, params, block);
+                this.setJSLiteral(true);
             }
             return JSMethodCall;
         })(FunctionCall);
@@ -3555,48 +3585,35 @@ var quby;
             __extends(JSProperty, _super);
             function JSProperty(expr, sym) {
                         _super.call(this, sym);
+                this.setJSLiteral(true);
             }
             return JSProperty;
         })(Expr);
         ast.JSProperty = JSProperty;        
-        var NewJSInstance = (function (_super) {
-            __extends(NewJSInstance, _super);
-            function NewJSInstance(expr, parameters, block) {
+        var JSNewInstance = (function (_super) {
+            __extends(JSNewInstance, _super);
+            function JSNewInstance(expr) {
                         _super.call(this, expr.getOffset());
                 this.expr = expr;
-                this.block = block;
-                this.parameters = parameters;
+                this.setJSLiteral(true);
             }
-            NewJSInstance.prototype.validate = function (v) {
-                if(v.ensureAdminMode(this, "cannot create JS instances in Sandbox mode")) {
-                    this.expr.setJSLiteral();
-                    this.expr.validate(v);
-                }
-                if(this.parameters !== null) {
-                    this.parameters.validate(v);
-                }
-                if(this.block !== null) {
-                    this.block.validate(v);
-                }
-            };
-            NewJSInstance.prototype.print = function (p) {
-                p.append('new ');
-                this.expr.print(p);
-                p.append('(');
-                if(this.parameters !== null) {
-                    this.parameters.print(p);
-                    if(this.block !== null) {
-                        p.append(',');
-                        this.block.print(p);
+            JSNewInstance.prototype.validate = function (v) {
+                if(this.expr.isJSLiteral()) {
+                    if(v.ensureAdminMode(this, "cannot create JS instances in Sandbox mode")) {
+                        this.expr.validate(v);
                     }
                 } else {
-                    this.block.print(p);
+                    v.parseError(this.getOffset(), "invalid 'new' instance expression");
                 }
+            };
+            JSNewInstance.prototype.print = function (p) {
+                p.append('(new ');
+                this.expr.print(p);
                 p.append(')');
             };
-            return NewJSInstance;
+            return JSNewInstance;
         })(Syntax);
-        ast.NewJSInstance = NewJSInstance;        
+        ast.JSNewInstance = JSNewInstance;        
         var NewInstance = (function (_super) {
             __extends(NewInstance, _super);
             function NewInstance(name, parameters, block) {
@@ -3628,7 +3645,7 @@ var quby;
                         var klass = klassVal.getClass();
                         if((!klassVal.hasNew(_this)) || (klassVal.noNews() && _this.getNumParameters() > 0)) {
                             if(klassVal.noNews() && klass.isExtensionClass) {
-                                v.parseError(_this.offset, "Cannot manually create new instances of '" + klass.getName() + "', it doesn't have a constructor.");
+                                v.parseError(_this.getOffset(), "Cannot manually create new instances of '" + klass.getName() + "', it doesn't have a constructor.");
                             } else {
                                 v.parseError(_this.offset, "Called constructor for class '" + klass.getName() + "' with wrong number of parameters: " + _this.getNumParameters());
                             }
@@ -3842,9 +3859,9 @@ var quby;
                 }
             };
             SingleOp.prototype.print = function (p) {
-                p.append('(', this.strOp);
+                p.append('(', this.strOp, ' ');
                 this.expr.print(p);
-                p.append(')');
+                p.append(' )');
             };
             SingleOp.prototype.onRebalance = function () {
                 var expr = this.expr;
@@ -4004,30 +4021,30 @@ var quby;
             __extends(JSInstanceOf, _super);
             function JSInstanceOf(left, right) {
                         _super.call(this, left, right, 'instanceof', true, 7);
-                if(this.getRight().isJSLiteral()) {
-                    this.setJSLiteral();
-                }
+                this.setJSLiteral(true);
             }
             JSInstanceOf.prototype.validate = function (v) {
                 if(v.ensureAdminMode(this, "JS instanceof is not allowed in Sandbox mode")) {
-                    v.parseError(this.getOffset(), "'is' is not yet implemented");
-                    return;
-                    if(this.isJSLiteral()) {
-                        if(v.ensureAdminMode(this, 'JS inlining for instance check, is not allowed in Sandbox mode')) {
-                            this.getRight().validate(v);
-                            this.getLeft().validate(v);
-                        }
-                    } else {
-                        if(this.getRight() instanceof LocalVariable) {
-                        } else {
-                            v.parseError(this.offset, "expecting a class name for instance check");
-                        }
-                    }
+                    _super.prototype.validate.call(this, v);
                 }
             };
             return JSInstanceOf;
         })(Op);
         ast.JSInstanceOf = JSInstanceOf;        
+        var JSTypeOf = (function (_super) {
+            __extends(JSTypeOf, _super);
+            function JSTypeOf(right) {
+                        _super.call(this, right, "typeof", false);
+                this.setJSLiteral(true);
+            }
+            JSTypeOf.prototype.validate = function (v) {
+                if(v.ensureAdminMode(this, "JS typeof is not allowed in Sandbox mode")) {
+                    _super.prototype.validate.call(this, v);
+                }
+            };
+            return JSTypeOf;
+        })(SingleOp);
+        ast.JSTypeOf = JSTypeOf;        
         ast.Equality = newShortOp("==", 8, true);
         ast.NotEquality = newShortOp("!=", 8, true);
         ast.BitAnd = newShortOp('&', 9, false);
@@ -4188,14 +4205,8 @@ var quby;
                         }
                         v.assignVar(this);
                     } else {
-                        if(!v.containsVar(this)) {
-                            if(!this.isJSLiteral()) {
-                                v.parseError(this.offset, "variable used before it's assigned to '" + this.getName() + "'");
-                            } else {
-                                if(window[this.getCallName()] === undefined) {
-                                    v.parseError(this.offset, "JS variable used before it's assigned to, '" + this.getName() + "'");
-                                }
-                            }
+                        if(!this.isJSLiteral() && !v.containsVar(this)) {
+                            v.parseError(this.offset, "variable used before it's assigned to '" + this.getName() + "'");
                         }
                     }
                 }
@@ -4323,9 +4334,9 @@ var quby;
             function JSVariable(identifier) {
                         _super.call(this, identifier);
                 this.setCallName(identifier.match);
+                this.setJSLiteral(true);
             }
             JSVariable.prototype.validate = function (v) {
-                this.setJSLiteral();
                 if(v.ensureOutBlock(this, "JS variable used as block parameter") && v.ensureAdminMode(this, "inlining JS values not allowed in sandboxed mode")) {
                     _super.prototype.validate.call(this, v);
                 }
@@ -4513,7 +4524,14 @@ var quby;
                 this.name = methodName;
                 this.numParams = numParams;
                 this.callName = quby.runtime.formatFun(methodName, numParams);
+                this.isJSLiteralFlag = false;
             }
+            FunctionGenerator.prototype.isJSLiteral = function () {
+                return this.isJSLiteralFlag;
+            };
+            FunctionGenerator.prototype.setJSLiteral = function (isLit) {
+                this.isJSLiteralFlag = isLit;
+            };
             FunctionGenerator.prototype.isConstructor = function () {
                 return false;
             };
@@ -6549,6 +6567,7 @@ var quby;
             admin: {
                 hashDef: '#def',
                 jsInstanceOf: '#instanceof',
+                jsTypeOf: '#typeof',
                 inline: function (src, i, code, len) {
                     if(code === HASH && src.charCodeAt(i + 1) === LESS_THAN && src.charCodeAt(i + 2) === HASH) {
                         i += 2;
@@ -6706,7 +6725,7 @@ var quby;
         var arrayAccessExtension = parse.name('array access').a(terminals.symbols.leftSquare, expr).optional(terminals.endOfLine).then(terminals.symbols.rightSquare).onMatch(function (leftSquare, keyExpr, endOfLine, rightSquare) {
             return new quby.ast.ArrayAccess(null, keyExpr);
         });
-        var singleOpExpr = parse.name('operator').either(terminals.ops.plus, terminals.ops.subtract, terminals.ops.not).then(expr).onMatch(function (op, expr) {
+        var singleOpExpr = parse.name('operator').either(terminals.ops.plus, terminals.ops.subtract, terminals.ops.not, terminals.admin.jsTypeOf).then(expr).onMatch(function (op, expr) {
             var term = op.terminal;
             if(term === ops.not) {
                 return new quby.ast.Not(expr);
@@ -6717,8 +6736,12 @@ var quby;
                     if(term === ops.plus) {
                         return expr;
                     } else {
-                        log(op);
-                        throw new Error("Unknown singleOpExpr match");
+                        if(term === terminals.admin.jsTypeOf) {
+                            return new quby.ast.JSTypeOf(expr);
+                        } else {
+                            log(op);
+                            throw new Error("Unknown singleOpExpr match");
+                        }
                     }
                 }
             }
@@ -6791,11 +6814,15 @@ var quby;
         var lambda = parse.name('lambda').a(terminals.keywords.DEF, parameterDefinition).optional(statements).then(terminals.keywords.END).onMatch(function (def, params, stmts, end) {
             return new quby.ast.Lambda(params, stmts);
         });
-        var functionCall = parse.name('function call').a(terminals.identifiers.variableName).then(parameterExprs).optional(block).onMatch(function (name, exprs, block) {
-            if(name.getLower() === quby.runtime.SUPER_KEYWORD) {
-                return new quby.ast.SuperCall(name, exprs, block);
+        var functionCall = parse.name('function call').optional(terminals.ops.hash).then(terminals.identifiers.variableName).then(parameterExprs).optional(block).onMatch(function (hash, name, exprs, block) {
+            if(hash !== null) {
+                return new quby.ast.JSFunctionCall(name, exprs, block);
             } else {
-                return new quby.ast.FunctionCall(name, exprs, block);
+                if(name.getLower() === quby.runtime.SUPER_KEYWORD) {
+                    return new quby.ast.SuperCall(name, exprs, block);
+                } else {
+                    return new quby.ast.FunctionCall(name, exprs, block);
+                }
             }
         });
         var jsExtension = parse.a(terminals.ops.hash).either(terminals.identifiers.variableName, terminals.identifiers.global).optional(parse.a(parameterExprs).optional(block).onMatch(function (exprs, block) {
@@ -6810,13 +6837,17 @@ var quby;
                 return new quby.ast.JSProperty(null, name);
             }
         });
-        var methodCallExtension = parse.a(terminals.ops.dot).then(terminals.identifiers.variableName).then(parameterExprs).optional(block).onMatch(function (dot, name, exprs, block) {
-            return new quby.ast.MethodCall(null, name, exprs, block);
+        var methodCallExtension = parse.a(terminals.ops.dot).optional(terminals.ops.hash).then(terminals.identifiers.variableName).then(parameterExprs).optional(block).onMatch(function (dot, hash, name, exprs, block) {
+            if(hash === null) {
+                return new quby.ast.MethodCall(null, name, exprs, block);
+            } else {
+                return new quby.ast.JSMethodCall(null, name, exprs, block);
+            }
         });
-        var newInstance = parse.name('new object').a(terminals.keywords.NEW).either(parse.a(terminals.ops.hash).then(expr).then(parameterExprs).optional(block).onMatch(function (hash, expr, params, block) {
-            return new quby.ast.NewJSInstance(expr, params, block);
-        }), parse.a(terminals.identifiers.variableName).then(parameterExprs).optional(block).onMatch(function (name, params, block) {
+        var newInstance = parse.name('new object').a(terminals.keywords.NEW).either(parse.a(terminals.identifiers.variableName).then(parameterExprs).optional(block).onMatch(function (name, params, block) {
             return new quby.ast.NewInstance(name, params, block);
+        }), parse.a(expr).onMatch(function (expr) {
+            return new quby.ast.JSNewInstance(expr);
         })).onMatch(function (nw, newInstance) {
             return newInstance;
         });

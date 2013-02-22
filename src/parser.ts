@@ -638,6 +638,7 @@ module quby.parser {
             hashDef: '#def',
 
             jsInstanceOf: '#instanceof',
+            jsTypeOf    : '#typeof',
 
             inline: function( src, i, code, len ) {
                 // #<# random( javascript.code ) #>#
@@ -875,6 +876,10 @@ module quby.parser {
                     parse.
                             a( terminals.ops.hash ).
                             either(
+                                    /*
+                                     * Global is included, to capture the use
+                                     * of a starting dollar symbol.
+                                     */
                                     terminals.identifiers.variableName,
                                     terminals.identifiers.global
                             ).
@@ -918,7 +923,9 @@ module quby.parser {
             either(
                     terminals.ops.plus,
                     terminals.ops.subtract,
-                    terminals.ops.not
+                    terminals.ops.not,
+
+                    terminals.admin.jsTypeOf
             ).
             then( expr ).
             onMatch( function( op, expr ) {
@@ -930,6 +937,8 @@ module quby.parser {
                     return new quby.ast.SingleSub( expr );
                 } else if ( term === ops.plus ) {
                     return expr;
+                } else if ( term === terminals.admin.jsTypeOf ) {
+                    return new quby.ast.JSTypeOf( expr );
                 } else {
                     log( op );
                     throw new Error( "Unknown singleOpExpr match" );
@@ -1134,16 +1143,21 @@ module quby.parser {
 
     var functionCall = parse.
             name('function call').
-            a( terminals.identifiers.variableName ).
-            then( parameterExprs ).
-            optional( block ).
-            onMatch( function( name, exprs, block ) : quby.ast.ISyntax {
-                if ( name.getLower() === quby.runtime.SUPER_KEYWORD ) {
-                    return new quby.ast.SuperCall( name, exprs, block );
+            optional( terminals.ops.hash ).
+            then(terminals.identifiers.variableName).
+            then(parameterExprs).
+            optional(block).
+            onMatch(function (hash, name, exprs, block): quby.ast.ISyntax {
+                if (hash !== null) {
+                    return new quby.ast.JSFunctionCall(name, exprs, block);
                 } else {
-                    return new quby.ast.FunctionCall( name, exprs, block );
+                    if (name.getLower() === quby.runtime.SUPER_KEYWORD) {
+                        return new quby.ast.SuperCall(name, exprs, block);
+                    } else {
+                        return new quby.ast.FunctionCall(name, exprs, block);
+                    }
                 }
-            } );
+            });
 
     var jsExtension = parse.
             a( terminals.ops.hash ).
@@ -1169,32 +1183,34 @@ module quby.parser {
 
     var methodCallExtension = parse.
             a( terminals.ops.dot ).
+            optional( terminals.ops.hash ).
             then( terminals.identifiers.variableName ).
             then( parameterExprs ).
             optional( block ).
-            onMatch( (dot, name, exprs, block) =>
-                new quby.ast.MethodCall( null, name, exprs, block )
-            );
+            onMatch( function(dot, hash, name, exprs, block):quby.ast.FunctionCall {
+                if (hash === null) {
+                    return new quby.ast.MethodCall(null, name, exprs, block)
+                } else {
+                    return new quby.ast.JSMethodCall(null, name, exprs, block)
+                }
+            } );
 
     var newInstance = parse.
             name( 'new object' ).
             a( terminals.keywords.NEW ).
             either(
                     parse.
-                            a( terminals.ops.hash ).
-                            then( expr ).
-                            then( parameterExprs ).
-                            optional( block ).
-                            onMatch( (hash, expr, params, block) =>
-                                new quby.ast.NewJSInstance( expr, params, block )
-                            ),
-
-                    parse.
                             a( terminals.identifiers.variableName ).
                             then( parameterExprs ).
                             optional( block ).
                             onMatch( (name, params, block) =>
                                 new quby.ast.NewInstance( name, params, block )
+                            ),
+
+                    parse.
+                            a( expr ).
+                            onMatch( (expr) =>
+                                new quby.ast.JSNewInstance( expr )
                             )
             ).
             onMatch( (nw, newInstance) => newInstance )
