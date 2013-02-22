@@ -1575,6 +1575,8 @@ module parse {
             if (symbolLength > 0) {
                 this.currentID = this.symbolIDs[0];
             }
+
+            this.maxRule = null;
         }
 
         expected() : string[] {
@@ -2207,7 +2209,8 @@ module parse {
          */
         maybe() {
             return this.optionalAll(arguments);
-        }
+        }
+
         /**
          * States the next items to parse.
          */
