@@ -407,6 +407,7 @@
                     outputError.classList.add( 'error' );
                     outputError.value = strErr;
                     console.error( strErr );
+                    console.log( err.stack );
                 } else {
                     outputError.classList.remove( 'error' );
                     outputError.value = err;
@@ -424,6 +425,7 @@
                         outputSymbols.value = '';
 
                         var parser = new quby.main.Parser();
+                        parser.errorHandler( handleError );
 
                         var compileTime = 0,
                             symbolsTime = 0,
@@ -4276,7 +4278,9 @@ end
         
         <script>
             scriptLoad( function() {
-                window.parseCode();
+                if ( window.quby ) {
+                    window.parseCode();
+                }
             } );
         </script>
     </body>

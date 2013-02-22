@@ -115,6 +115,14 @@ module quby.main {
         parser.finalize(callback);
     }
 
+    function handleError( errHandler:(err:Error) => void, err: Error): void {
+        if (errHandler !== null) {
+            errHandler(err);
+        } else {
+            throw err;
+        }
+    }
+
     export class ParserInstance {
         private isStrictFlag:bool;
         private isAdminFlag:bool;
@@ -268,18 +276,29 @@ module quby.main {
     export class Parser {
         private validator: quby.core.Validator;
         private isStrict: bool;
+        private errHandler: (err: Error) => void;
 
         constructor() {
             this.validator = new quby.core.Validator();
             this.isStrict = true;
+            this.errHandler = null;
         }
 
         private newParserInstance(src: string = null) : ParserInstance {
-            var instance = new ParserInstance(src);
+            try {
+                var instance = new ParserInstance(src);
+                instance.strictMode(this.isStrict);
 
-            instance.strictMode(this.isStrict);
+                return instance;
+            } catch (err) {
+                handleError(this.errHandler, err);
+            }
 
-            return instance;
+            return null;
+        }
+
+        public errorHandler(handler: (err: Error) => void ) : void {
+            this.errHandler = handler;
         }
 
         /**
@@ -303,9 +322,10 @@ module quby.main {
             var instance = this.newParserInstance(source),
                 validator = this.validator;
 
+            var self = this;
             util.future.run(
                     function() {
-                        quby.core.runParser(instance, validator);
+                        quby.core.runParser(instance, validator, self.errHandler);
                     }
             );
 
@@ -328,7 +348,7 @@ module quby.main {
                     url,
                     function(status, text) {
                         if (status >= 200 && status < 400) {
-                            quby.core.runParser(instance, validator);
+                            quby.core.runParser(instance, validator, this.errHandler);
                         } else {
                             throw new Error("failed to load script: " + url);
                         }

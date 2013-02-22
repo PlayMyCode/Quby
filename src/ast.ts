@@ -104,7 +104,9 @@ module quby.ast {
 
         rebalance(): IExpr;
         onRebalance(): IExpr;
-        performBalanceSwap(newLeft: BalancingExpr, precedence: number): IExpr ;
+
+        testSwap(other: IExpr): bool;
+        swapExpr(other: IExpr): IExpr;
     }
 
     /**
@@ -1999,71 +2001,48 @@ module quby.ast {
      * into the expression tree, and this then referenced the expression
      * tree now references the top of the tree.
      */
-    export class BalancingExpr extends Expr {
+    export class GenericOp extends Expr implements IPrecedence {
         private balanceDone: bool;
-        private proxyExpr: IExpr;
+        private precedence: number;
 
-        constructor (offset: parse.Symbol, isResultBool) {
+        constructor (offset: parse.Symbol, isResultBool:bool, precedence:number) {
             super(offset, isResultBool);
 
             this.balanceDone = false;
-            this.proxyExpr = null;
+            this.precedence = precedence;
         }
 
-        isBalanced(v: quby.core.Validator): bool {
-            if (this.balanceDone) {
-                return true;
-            } else {
-                var newExpr = this.rebalance();
+        getPrecedence(): number {
+            return this.precedence;
+        }
 
-                if (newExpr !== this) {
-                    newExpr.validate(v);
+        testSwap(other: IExpr): bool {
+            if (other instanceof GenericOp) {
+                var precedence = (<IPrecedence> <any> other).getPrecedence();
 
-                    return false;
-                } else {
-                    return true;
+                if (precedence !== undefined) {
+                    return this.precedence < precedence;
                 }
             }
-        }
 
-        validate(v: quby.core.Validator) {
-            if (this.proxyExpr !== null) {
-                this.proxyExpr.validate(v);
-            } else {
-                super.validate(v);
-            }
-        }
-        print(p: quby.core.Printer) {
-            if (this.proxyExpr !== null) {
-                this.proxyExpr.print(p);
-            } else {
-                super.print(p);
-            }
-        }
-        printAsCondition(p: quby.core.Printer) {
-            if (this.proxyExpr !== null) {
-                this.proxyExpr.printAsCondition(p);
-            } else {
-                super.printAsCondition(p);
-            }
+            return false;
         }
 
         rebalance(): IExpr {
-            this.balanceDone = true;
-
-            var expr = this.onRebalance();
-
-            if (expr !== this) {
-                this.proxyExpr = expr;
-
+            if (this.balanceDone) {
                 return this;
             } else {
-                return this;
+                this.balanceDone = true;
+                return this.onRebalance();
             }
         }
 
+        swapExpr(other: IExpr): IExpr {
+            throw new Error("swapExpr is not implemented");
+        }
+
         onRebalance(): IExpr {
-            throw new Error("rebalance is not implemented");
+            throw new Error("onRebalance is not implemented");
         }
     }
 
@@ -2096,19 +2075,15 @@ module quby.ast {
     /*
      * All single operations have precedence of 1.
      */
-    export class SingleOp extends BalancingExpr implements IPrecedence {
+    export class SingleOp extends GenericOp {
         private expr : IExpr;
         private strOp: string;
 
         constructor (expr: IExpr, strOp: string, isResultBool: bool) {
-            super(expr.offset, isResultBool);
+            super(expr.offset, isResultBool, 1);
 
             this.expr = expr;
             this.strOp = strOp;
-        }
-
-        getPrecedence() {
-            return 1;
         }
 
         getExpr() {
@@ -2116,9 +2091,8 @@ module quby.ast {
         }
 
         validate(v: quby.core.Validator) {
-            if (this.isBalanced(v)) {
-                this.expr.validate(v);
-            }
+            this.rebalance();
+            this.expr.validate(v);
         }
 
         print(p: quby.core.Printer) {
@@ -2127,31 +2101,28 @@ module quby.ast {
             p.append(' )');
         }
 
+        swapExpr(other: IExpr) {
+            var temp = this.expr;
+            this.expr = other;
+            return temp;
+        }
+
         onRebalance(): IExpr {
             // swap if expr has higher precedence then this
             var expr = this.expr;
 
-            if (expr instanceof BalancingExpr) {
-                expr = (<BalancingExpr>expr).rebalance();
+            if (expr instanceof GenericOp) {
+                expr = (<GenericOp>expr).rebalance();
             }
 
-            if ( expr['getPrecedence'] !== undefined) {
-                var pExpr = <IPrecedence><any>expr;
-
-                if (pExpr.getPrecedence() > 1) {
-                    var copy: SingleOp = util.clone(this);
-
-                    copy.expr = pExpr.performBalanceSwap(copy, 1);
-
-                    return expr;
-                }
+            // todo
+            if (this.testSwap(expr)) {
+                this.expr = (<GenericOp> expr).swapExpr(this);
             } else {
+                this.expr = expr;
+
                 return this;
             }
-        }
-
-        performBalanceSwap(newLeft: BalancingExpr, precedence: number): IExpr {
-            return this;
         }
     }
 
@@ -2199,21 +2170,19 @@ module quby.ast {
      * @param isResultBool
      * @param precedence Lower is higher, must be a number.
      */
-    export class Op extends BalancingExpr implements IPrecedence {
+    export class Op extends GenericOp {
         private left: IExpr;
         private right: IExpr;
         private strOp: string;
-        private precedence: number;
 
         constructor (left: IExpr, right: IExpr, strOp: string, isResultBool: bool, precedence: number) {
             var offset = left ? left.offset : null;
 
-            super(offset, isResultBool);
-
             if (precedence === undefined) {
                 throw new Error("undefined precedence given.");
             }
-            this.precedence = precedence;
+
+            super(offset, isResultBool, precedence);
 
             this.left = left;
             this.right = right;
@@ -2256,62 +2225,43 @@ module quby.ast {
         }
 
         validate(v: quby.core.Validator) {
-            if (this.isBalanced(v)) {
-                this.right.validate(v);
-                this.left.validate(v);
-            }
+            this.rebalance();
+
+            this.right.validate(v);
+            this.left.validate(v);
+        }
+
+        swapExpr(other: IExpr): IExpr {
+            var left = this.left;
+            this.left = other;
+            return left;
         }
 
         onRebalance(): IExpr {
             var right = this.right;
 
-            if ( right instanceof BalancingExpr ) {
-                right = ( <BalancingExpr> <any> right ).rebalance();
+            if ( right instanceof GenericOp ) {
+                right = ( <GenericOp> <any> right ).rebalance();
 
-                if (right instanceof BalancingExpr) {
-                    var rightP = <IPrecedence> <any> right,
-                        intPrecedence = this.precedence;
-
-                    if (rightP.getPrecedence() > intPrecedence) {
-                        var copy = <Op> util.clone(this);
-                        copy.right = rightP.performBalanceSwap(copy, intPrecedence);
-
+                if (right instanceof GenericOp) {
+                    /*
+                     * Either we swap with right,
+                     * in which a replacement will be returned.
+                     */
+                    if (this.testSwap(right)) {
+                        this.right = ( <GenericOp> <any> right ).swapExpr(this);
                         return right;
+
+                    /*
+                     * Or no swapping should take place.
+                     */
+                    } else {
+                        this.right = right;
                     }
                 }
             }
 
             return this;
-        }
-
-        performBalanceSwap(newLeft: BalancingExpr, precedence: number): IExpr {
-            var left = this.left,
-                oldLeft;
-
-            /*
-             * Left is either an node,
-             * or it has higher precedence.
-             */
-            if ( this.left instanceof BalancingExpr ) {
-                if ((<IPrecedence> <any> (left)).getPrecedence() <= precedence) {
-                    oldLeft = left;
-
-                    this.left = newLeft;
-
-                    return oldLeft;
-                } else {
-                    return (<IPrecedence> <any> left).performBalanceSwap( newLeft, precedence );
-                }
-            } else {
-                oldLeft = this.left;
-                this.left = newLeft;
-
-                return oldLeft;
-            }
-        }
-
-        getPrecedence() {
-            return this.precedence;
         }
 
         appendLeft(left: IExpr) {

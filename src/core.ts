@@ -19,6 +19,16 @@
 module quby.core {
     var STATEMENT_END = ';\n';
 
+    function handleError(errHandler: (err: Error) => void , err: Error, throwErr:bool = true) {
+        if (errHandler !== null) {
+            errHandler(err);
+        }
+
+        if (throwErr) {
+            throw err;
+        }
+    }
+
     /**
      * This is the point that joins together
      * quby.main to quby.core.
@@ -33,7 +43,7 @@ module quby.core {
      * their access from teh public API (namely
      * the ParserInstance).
      */
-    export function runParser(instance:quby.main.ParserInstance, validator: Validator) {
+    export function runParser(instance:quby.main.ParserInstance, validator: Validator, errHandler:(err:Error) => void) {
         instance.lock();
 
         quby.parser.parseSource(
@@ -41,10 +51,16 @@ module quby.core {
                 instance.getName(),
 
                 function(program:quby.ast.ISyntax, errors) {
+                    validator.errorHandler(errHandler);
                     validator.adminMode( instance.isAdmin() );
                     validator.strictMode( instance.isStrict() );
 
-                    validator.validate(program, errors);
+                    try {
+                        validator.validate(program, errors);
+                    } catch (err) {
+                        console.log('kdkd');
+                        handleError( this.errHandler, err );
+                    }
 
                     var callback = instance.getFinishedFun();
 
@@ -173,6 +189,8 @@ module quby.core {
         private globals: BoolMap;
         private usedGlobals: GlobalVariableMap;
 
+        private errHandler: (err: Error) => void;
+
         constructor() {
             // the various program trees that have been parsed
             this.programs = [];
@@ -229,9 +247,15 @@ module quby.core {
             this.currentFun = null;
             this.isAdminMode = false;
 
+            this.errHandler = null;
+
             this.symbols = new SymbolTable();
 
             this.pushScope();
+        }
+
+        errorHandler(errHandler: (err: Error) => void ): void {
+            this.errHandler = errHandler;
         }
 
         strictMode( mode:bool ) {
@@ -259,7 +283,7 @@ module quby.core {
 
         setClass(klass:quby.ast.IClassDeclaration) {
             if (this.currentClass != null) {
-                this.parseError( klass.getOffset(), "Class '" + klass.getName() + "' is defined inside '" + this.currentClass.getClass().getName() + "', cannot define a class within a class." );
+                this.parseError(klass.getOffset(), "Class '" + klass.getName() + "' is defined inside '" + this.currentClass.getClass().getName() + "', cannot define a class within a class.");
             }
 
             var klassName = klass.getCallName();
@@ -275,7 +299,7 @@ module quby.core {
 
                 // if super relationship is set later in the app
                 if (!oldKlassHead.hasSuper() && klassHead.hasSuper()) {
-                    oldKlass.setHeader( klassHead );
+                    oldKlass.setHeader(klassHead);
                 } else if (oldKlassHead.hasSuper() && klassHead.hasSuper()) {
                     if (oldKlassHead.getSuperCallName() != klassHead.getSuperCallName()) {
                         this.parseError(klass.offset, "Super class cannot be redefined for class '" + klass.getName() + "'.");
@@ -628,11 +652,14 @@ module quby.core {
                 } else {
                     try {
                         program.validate(this);
+
                         this.programs.push(program);
                     } catch (err) {
                         this.parseError(null, 'Unknown issue with your code has caused the parser to crash!');
 
                         if (window.console && window.console.log) {
+                            handleError(this.errHandler, err, false);
+
                             window.console.log(err);
 
                             if (err.stack) {
@@ -727,6 +754,8 @@ module quby.core {
                 this.parseError(null, 'Unknown issue with your code has caused the parser to crash!');
 
                 if (window.console && window.console.log) {
+                    handleError(this.errHandler, err, false);
+
                     if (err.stack) {
                         window.console.log(err.stack);
                     } else {
@@ -740,14 +769,18 @@ module quby.core {
          * Turns all stored programs into
          */
         generateCode() {
-            var printer = new Printer();
+            try {
+                var printer = new Printer();
 
-            printer.setCodeMode(false);
-            this.generatePreCode(printer);
-            printer.setCodeMode(true);
+                printer.setCodeMode(false);
+                this.generatePreCode(printer);
+                printer.setCodeMode(true);
 
-            for (var i = 0; i < this.programs.length; i++) {
-                this.programs[i].print(printer);
+                for (var i = 0; i < this.programs.length; i++) {
+                    this.programs[i].print(printer);
+                }
+            } catch (err) {
+                handleError(this.errHandler, err);
             }
 
             return printer.toString();
