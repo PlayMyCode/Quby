@@ -874,8 +874,8 @@ module quby.parser {
             } );
 
     var exprs = parse.
-            repeatSeperator(expr, terminals.symbols.comma).
             name( 'expressions' ).
+            repeatSeperator(expr, terminals.symbols.comma).
             onMatch((exprs) => new quby.ast.Parameters(exprs));
 
     var variables = parse.
@@ -1555,7 +1555,9 @@ module quby.parser {
                 new quby.ast.CaseWhen(caseTerm, expr, whenClauses, elseClause)
             );
         
-    statement.either(
+    statement.
+            name( 'statement' ).
+            either(
                 functionDeclaration,
                 classDeclaration,
                 moduleDeclaration,
