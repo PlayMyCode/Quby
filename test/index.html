@@ -410,7 +410,9 @@
                     outputError.classList.add( 'error' );
                 }
 
-                console.error( strErr );
+                if ( strErr !== '' ) {
+                    console.error( strErr );
+                }
             }
         
             function parseCode( callback ) {
