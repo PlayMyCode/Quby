@@ -48,8 +48,9 @@ local.properties
 ./[Oo]bj/
 ./[Rr]elease/
 
-./*.csproj
-./*.csproj.user
+*.csproj
+*.csproj.user
+
 *.v11.suo
 *.sln
 
