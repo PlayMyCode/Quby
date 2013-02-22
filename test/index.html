@@ -395,23 +395,21 @@
                 
             var _result = null;
 
-            function handleError( err, isNormal ) {
-                var strErr = [
-                        err.message,
-                        err.stack
-                ].join("\n");
-
+            function handleError( err ) {
                 var outputError = document.getElementById("outputError")
-                outputError.value = strErr;
 
-                if ( isNormal ) {
-                    outputError.classList.remove( 'error' );
-                } else {
+                if ( err instanceof Error ) {
+                    var strErr = [
+                            err.message,
+                            err.stack
+                    ].join("\n");
+
                     outputError.classList.add( 'error' );
-                }
-
-                if ( strErr !== '' ) {
+                    outputError.value = strErr;
                     console.error( strErr );
+                } else {
+                    outputError.classList.remove( 'error' );
+                    outputError.value = err;
                 }
             }
         
@@ -488,8 +486,7 @@
                                     handleError(
                                             ( outputError.value = result.hasErrors() ?
                                                     result.errors.map(function(e) { return e.message }).join("\r\n") + "\r\n" :
-                                                    '' ),
-                                            true
+                                                    '' )
                                     );
 
                                     _result = result;
