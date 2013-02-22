@@ -1488,7 +1488,7 @@ module parse {
             if (name) {
                 terms[name] = true;
             } else if (e instanceof ParserRuleImplementation) {
-                findPossibleTerms(e, terms);
+                findPossibleTerms((<ParserRuleImplementation>e).rules, terms);
             }
         }
     }
