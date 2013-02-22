@@ -22,7 +22,7 @@ if defined TSC_COMPILER (
     
     rem ensure the folder exists
     rem if it already exists, it'll just do nothing (but warn)
-    mkdir %~dp0\..\release
+    mkdir %~dp0\..\release 2> NUL
 
     @echo on
     %TSC_COMPILER% --out %~dp0\..\release\quby.js %~dp0\..\quby.ts
