@@ -46,7 +46,10 @@ local.properties
 # Build results
 ./[Dd]ebug/
 ./[Oo]bj/
+
 ./[Rr]elease/
+./[Rr]elease/*
+./[Rr]elease/quby.js
 
 *.csproj
 *.csproj.user
