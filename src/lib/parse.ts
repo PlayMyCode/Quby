@@ -2735,7 +2735,7 @@ module parse {
                 compileTime = this.compileTime,
                 start = Date.now();
 
-            this.parseSymbols(input, parseInput, function (symbols, symbolsTime) {
+            this.parseSymbols(input, parseInput, name, function (symbols, symbolsTime) {
                 if (symbols.hasErrors()) {
                     callback([], symbols.getErrors());
                     callParseDebug(debugCallback, symbols,
@@ -2763,7 +2763,7 @@ module parse {
         }
 
         private symbolizeInner(input: string, parseInput: string, callback: SymbolizeCallback): void {
-            this.parseSymbols(input, parseInput, function (symbols) {
+            this.parseSymbols(input, parseInput, null, function (symbols) {
                 callback(symbols.getTerminals(), symbols.getErrors());
             });
         }
@@ -2775,7 +2775,7 @@ module parse {
          * Callbacks are used internally, so it gets spread across
          * multiple JS executions.
          */
-        private parseSymbols(input: string, parseInput: string, callback: { (symbols: SymbolResult, time: number): void; }): void {
+        private parseSymbols(input: string, parseInput: string, name, callback: { (symbols: SymbolResult, time: number): void; }): void {
             if (!isFunction(callback)) {
                 throw new Error("No callback provided for parsing");
             }
