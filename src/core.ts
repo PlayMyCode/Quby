@@ -58,8 +58,7 @@ module quby.core {
                     try {
                         validator.validate(program, errors);
                     } catch (err) {
-                        console.log('kdkd');
-                        handleError( this.errHandler, err );
+                        handleError( errHandler, err );
                     }
 
                     var callback = instance.getFinishedFun();

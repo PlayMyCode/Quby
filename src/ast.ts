@@ -1993,59 +1993,6 @@ module quby.ast {
         }
     }
 
-    /**
-     * This is to allow an expression, mostly an operation, to swap it's
-     * self out and rebalance the expression tree.
-     *
-     * It does this by copying it's self, then inserting the copy deeper
-     * into the expression tree, and this then referenced the expression
-     * tree now references the top of the tree.
-     */
-    export class GenericOp extends Expr implements IPrecedence {
-        private balanceDone: bool;
-        private precedence: number;
-
-        constructor (offset: parse.Symbol, isResultBool:bool, precedence:number) {
-            super(offset, isResultBool);
-
-            this.balanceDone = false;
-            this.precedence = precedence;
-        }
-
-        getPrecedence(): number {
-            return this.precedence;
-        }
-
-        testSwap(other: IExpr): bool {
-            if (other instanceof GenericOp) {
-                var precedence = (<IPrecedence> <any> other).getPrecedence();
-
-                if (precedence !== undefined) {
-                    return this.precedence < precedence;
-                }
-            }
-
-            return false;
-        }
-
-        rebalance(): IExpr {
-            if (this.balanceDone) {
-                return this;
-            } else {
-                this.balanceDone = true;
-                return this.onRebalance();
-            }
-        }
-
-        swapExpr(other: IExpr): IExpr {
-            throw new Error("swapExpr is not implemented");
-        }
-
-        onRebalance(): IExpr {
-            throw new Error("onRebalance is not implemented");
-        }
-    }
-
     export class ExprParenthesis extends Syntax implements IExpr {
         private expr: IExpr;
 
@@ -2072,6 +2019,112 @@ module quby.ast {
         }
     }
 
+    /**
+     * This is to allow an expression, mostly an operation, to swap it's
+     * self out and rebalance the expression tree.
+     *
+     * It does this by copying it's self, then inserting the copy deeper
+     * into the expression tree, and this then referenced the expression
+     * tree now references the top of the tree.
+     */
+    export class GenericOp extends Expr implements IPrecedence {
+        private balanceDone: bool;
+        private precedence: number;
+
+        private proxy: ISyntax;
+
+        constructor (offset: parse.Symbol, isResultBool:bool, precedence:number) {
+            super(offset, isResultBool);
+
+            this.balanceDone = false;
+            this.precedence = precedence;
+            this.proxy = null;
+        }
+
+        setProxy(other: ISyntax) {
+            this.proxy = other;
+        }
+
+        validateOp(v: quby.core.Validator) {
+            // do nothing
+        }
+
+        printOp(p: quby.core.Printer) {
+            // do nothing
+        }
+
+        printAsConditionOp(p: quby.core.Printer) {
+            super.printAsCondition(p);
+        }
+
+        validate(v: quby.core.Validator) {
+            if (this.proxy !== null) {
+                this.proxy.validate(v);
+            } else if (this.balanceDone) {
+                this.validateOp(v);
+            } else {
+                var self = this.rebalance();
+
+                if (self !== this) {
+                    this.proxy = self;
+
+                    self.validate(v);
+                } else {
+                    this.validateOp(v);
+                }
+            }
+        }
+
+        print(p: quby.core.Printer) {
+            if (this.proxy === null) {
+                this.printOp(p);
+            } else {
+                this.proxy.print(p);
+            }
+        }
+
+        printAsCondition(p: quby.core.Printer) {
+            this.printAsConditionOp(p);
+        }
+
+        getPrecedence(): number {
+            return this.precedence;
+        }
+
+        testSwap(other: IExpr): bool {
+            if (other instanceof GenericOp) {
+                var precedence = (<IPrecedence> <any> other).getPrecedence();
+
+                if (precedence !== undefined) {
+                    return this.precedence < precedence;
+                }
+            }
+
+            return false;
+        }
+
+        isBalanced(): bool {
+            return this.balanceDone;
+        }
+
+        rebalance(): IExpr {
+            if (this.balanceDone) {
+                return this;
+            } else {
+                this.balanceDone = true;
+                return this.onRebalance();
+            }
+        }
+
+        swapExpr(other: IExpr): IExpr {
+            throw new Error("swapExpr is not implemented");
+        }
+
+        onRebalance(): IExpr {
+            throw new Error("onRebalance is not implemented");
+        }
+    }
+
     /*
      * All single operations have precedence of 1.
      */
@@ -2090,12 +2143,11 @@ module quby.ast {
             return this.expr;
         }
 
-        validate(v: quby.core.Validator) {
-            this.rebalance();
+        validateOp(v: quby.core.Validator) {
             this.expr.validate(v);
         }
 
-        print(p: quby.core.Printer) {
+        printOp(p: quby.core.Printer) {
             p.append('(', this.strOp, ' ');
             this.expr.print(p);
             p.append(' )');
@@ -2118,6 +2170,8 @@ module quby.ast {
             // todo
             if (this.testSwap(expr)) {
                 this.expr = (<GenericOp> expr).swapExpr(this);
+
+                return expr;
             } else {
                 this.expr = expr;
 
@@ -2137,7 +2191,7 @@ module quby.ast {
             super(expr, "!", true);
         }
 
-        print(p: quby.core.Printer) {
+        printOp(p: quby.core.Printer) {
             var temp = p.getTempVariable();
 
             p.appendPre('var ', temp, ';');
@@ -2198,7 +2252,7 @@ module quby.ast {
             return this.right;
         }
 
-        print(p: quby.core.Printer) {
+        printOp(p: quby.core.Printer) {
             var bracket = quby.compilation.hints.doubleBracketOps();
 
             if (bracket) {
@@ -2224,9 +2278,7 @@ module quby.ast {
             }
         }
 
-        validate(v: quby.core.Validator) {
-            this.rebalance();
-
+        validateOp(v: quby.core.Validator) {
             this.right.validate(v);
             this.left.validate(v);
         }
@@ -2249,15 +2301,17 @@ module quby.ast {
                      * in which a replacement will be returned.
                      */
                     if (this.testSwap(right)) {
-                        this.right = ( <GenericOp> <any> right ).swapExpr(this);
+                        this.right = (<GenericOp> <any> right).swapExpr(this);
                         return right;
 
-                    /*
-                     * Or no swapping should take place.
-                     */
+                        /*
+                         * Or no swapping should take place.
+                         */
                     } else {
                         this.right = right;
                     }
+                } else {
+                    this.right = right;
                 }
             }
 
@@ -2325,9 +2379,9 @@ module quby.ast {
             this.setJSLiteral(true);
         }
 
-        validate(v:quby.core.Validator) {
+        validateOp(v:quby.core.Validator) {
             if (v.ensureAdminMode(this, "JS instanceof is not allowed in Sandbox mode")) {
-                super.validate(v);
+                super.validateOp(v);
             }
         }
     }
@@ -2339,9 +2393,9 @@ module quby.ast {
             this.setJSLiteral(true);
         }
 
-        validate(v: quby.core.Validator) {
+        validateOp(v: quby.core.Validator) {
             if (v.ensureAdminMode(this, "JS typeof is not allowed in Sandbox mode")) {
-                super.validate(v);
+                super.validateOp(v);
             }
         }
     }
@@ -2367,9 +2421,9 @@ module quby.ast {
          * Temporarily swap to the old print, then print as a condition,
          * then swap back.
          */
-        print(p:quby.core.Printer) {
+        printOp(p:quby.core.Printer) {
             if (this.useSuperPrint) {
-                super.print( p );
+                super.printOp( p );
             } else {
                 this.useSuperPrint = true;
                 this.printAsCondition( p );
@@ -2383,7 +2437,7 @@ module quby.ast {
             super( left, right, '||', 12 );
         }
 
-        print(p:quby.core.Printer) {
+        printOp(p:quby.core.Printer) {
             var temp = p.getTempVariable();
 
             p.appendPre('var ', temp, ';');
@@ -2404,7 +2458,7 @@ module quby.ast {
             super( left, right, '&&', 11 );
         }
 
-        print(p:quby.core.Printer) {
+        printOp(p:quby.core.Printer) {
             var temp = p.getTempVariable();
 
             p.appendPre('var ', temp, ';');
@@ -2433,7 +2487,7 @@ module quby.ast {
             super( left, right, "**", false, 2 );
         }
 
-        print(p:quby.core.Printer) {
+        printOp(p:quby.core.Printer) {
             p.append('Math.pow(');
             this.getLeft().print(p);
             p.append(',');
@@ -2454,7 +2508,7 @@ module quby.ast {
             super( left, right, ':', false, 100 );
         }
 
-        print(p:quby.core.Printer) {
+        printOp(p:quby.core.Printer) {
             this.getLeft().print(p);
             p.append(',');
             this.getRight().print(p);
@@ -2474,7 +2528,7 @@ module quby.ast {
             this.isCollectionAssignment = true;
         }
 
-        validate( v:quby.core.Validator ) {
+        validateOp( v:quby.core.Validator ) {
             var left = this.getLeft();
 
             if ( left['setAssignment'] === undefined ) {
@@ -2482,11 +2536,11 @@ module quby.ast {
             } else {
                 (<IAssignable>left).setAssignment(v, this);
 
-                super.validate(v);
+                super.validateOp(v);
             }
         }
 
-        print( p:quby.core.Printer ) {
+        printOp( p:quby.core.Printer ) {
             if ( this.isCollectionAssignment ) {
                 p.append('quby_setCollection(');
                 this.getLeft().print(p);
