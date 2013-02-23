@@ -8,8 +8,12 @@ rem then we try pre-known locations, hard coded in
 for %%X in (tsc.exe) do (set TSC_COMPILER=%%~$PATH:X)
 
 if not defined TSC_COMPILER (
-    if exist "C:\Program Files (x86)\Microsoft SDKs\TypeScript\0.8.1.0\tsc.exe" (
-        set TSC_COMPILER="C:\Program Files (x86)\Microsoft SDKs\TypeScript\0.8.1.0\tsc.exe"
+    for %%X in (tsc) do (set TSC_COMPILER=%%~$PATH:X)
+
+    if not defined TSC_COMPILER (
+        if exist "C:\Program Files (x86)\Microsoft SDKs\TypeScript\0.8.1.0\tsc.exe" (
+            set TSC_COMPILER="C:\Program Files (x86)\Microsoft SDKs\TypeScript\0.8.1.0\tsc.exe"
+        )
     )
 ) else (
     set TSC_COMPILER="%TSC_COMPILER%"
