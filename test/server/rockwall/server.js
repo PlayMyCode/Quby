@@ -123,7 +123,7 @@ exports.Server = (function() {
     var runNotFound = function( url, req, res, fun ) {
         res.status( 404, 'text/html' );
 
-        console.log( 'unknown ' + req.url );
+        console.log( '    404 ' + req.url );
 
         if ( fun ) {
             fun( url, req, res );
@@ -273,12 +273,12 @@ exports.Server = (function() {
             }
 
             fs.realpath( this.realPublicFolder + fileUrl, function(err, path) {
-                path = path.replace( /\\/g, "/" );
-
                 if ( err ) {
                     ifNotFound.call( self, err );
                 } else {
-                   serveFileInner( self, fileUrl, path, req, res, success, ifNotFound );
+                    path = path.replace( /\\/g, "/" );
+
+                    serveFileInner( self, fileUrl, path, req, res, success, ifNotFound );
                 }
             } )
         },
@@ -400,7 +400,8 @@ exports.Server = (function() {
                 }
             }).listen( port );
 
-            console.log( 'server listening on port ' + port );
+            console.log( 'server listening on port, ' + port );
+            console.log( 'public folder, ' + this.realPublicFolder );
         }
     }
 

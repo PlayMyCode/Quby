@@ -1,6 +1,6 @@
 "use strict";
 
-var PUBLIC_FOLDER = './..';
+var PUBLIC_FOLDER = __dirname + '/./..';
 
 var rockwall = require( './rockwall/rockwall.js' );
 
