@@ -956,15 +956,16 @@ module quby.parser {
 
     var arrayLiteral = parse.
             name( 'new Array' ).
-            a( terminals.symbols.leftSquare ).
+            optional( terminals.ops.hash ).
+            then( terminals.symbols.leftSquare ).
             optional( exprs ).
             optional( terminals.endOfLine ).
             then( terminals.symbols.rightSquare ).
-            onMatch( function( lSquare, exprs, endOfLine, rSquare ) {
-                if ( exprs !== null ) {
-                    return new quby.ast.ArrayLiteral( exprs );
+            onMatch( function( hash, lSquare, exprs, endOfLine, rSquare ) {
+                if ( hash !== null ) {
+                    return new quby.ast.JSArrayLiteral( exprs );
                 } else {
-                    return new quby.ast.ArrayLiteral();
+                    return new quby.ast.ArrayLiteral( exprs );
                 }
             } );
 
@@ -979,17 +980,20 @@ module quby.parser {
 
     var hashLiteral = parse.
             name( 'new Hash' ).
-            a( terminals.symbols.leftBrace ).
+            optional( terminals.ops.hash ).
+            then( terminals.symbols.leftBrace ).
             optionalSeperator( hashMapping, terminals.symbols.comma ).
             optional( terminals.endOfLine ).
             then( terminals.symbols.rightBrace ).
-            onMatch( function( lBrace, mappings, endOfLine, rBrace ) {
+            onMatch( function( hash, lBrace, mappings, endOfLine, rBrace ) {
                 if ( mappings !== null ) {
-                    return new quby.ast.HashLiteral(
-                            new quby.ast.Mappings( mappings )
-                    );
+                    mappings = new quby.ast.Mappings( mappings );
+                }
+
+                if ( hash !== null ) {
+                    return new quby.ast.JSObjectLiteral( mappings );
                 } else {
-                    return new quby.ast.HashLiteral();
+                    return new quby.ast.HashLiteral( mappings );
                 }
             } );
 

@@ -2870,10 +2870,20 @@ module quby.ast {
         }
     }
 
-    export class ArrayLiteral extends Syntax {
+    /**
+     * Complex Literal is the super class for 'complex'
+     * data structures, namely arrays, hashes, and
+     * JS objects.
+     * 
+     * Essentially any object, that holds a list of
+     * expressions, when defined.
+     */
+    export class ComplexLiteral extends Syntax {
         private parameters:IStatements;
+        private pre:String;
+        private post:String;
 
-        constructor(parameters?:IStatements) {
+        constructor(pre:String, parameters:IStatements, post:String) {
             var offset;
             if (parameters) {
                 offset = parameters.offset;
@@ -2885,6 +2895,9 @@ module quby.ast {
             super( offset );
 
             this.parameters = parameters;
+
+            this.pre  = pre;
+            this.post = post;
         }
 
         getParameters() {
@@ -2908,25 +2921,37 @@ module quby.ast {
         }
     }
 
+    export class ArrayLiteral extends ComplexLiteral {
+        constructor(params:IStatements) {
+            super( '(new QubyArray([', params, ']))' );
+        }
+    }
+
     export class HashLiteral extends ArrayLiteral {
         constructor(parameters?:Mappings) {
-            super(parameters);
+            super( '(new QubyHash(', parameters, '))' );
+        }
+    }
+
+    export class JSArrayLiteral extends ArrayLiteral {
+        constructor(params?:IStatements) {
+            super( '([', params, '])' );
         }
 
-        print(p:quby.core.Printer) {
-            p.append('(new QubyHash(');
+        validate(v:quby.core.Validator) {
+            v.ensureAdminMode(this, "cannot create JS array literals outside of admin mode");
+            super.validate( v );
+        }
+    }
 
-            var parameters = this.getParameters();
-
-            if ( parameters !== null) {
-                parameters.print(p);
-            }
-
-            p.append('))');
+    export class JSObjectLiteral extends ArrayLiteral {
+        constructor(parameters?:Mappings) {
+            super( '({', parameters, '})' );
         }
     }
 
     /* Literals */
+
     export class Literal extends Expr {
         private isTrue:bool;
         private match:string;
