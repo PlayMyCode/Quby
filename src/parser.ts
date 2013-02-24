@@ -1595,7 +1595,7 @@ module quby.parser {
     export function parseSource(
             src: string,
             name: string,
-            onFinish: ( program: quby.ast.ISyntax, errors ) => void ,
+            onFinish: ( program: quby.ast.ISyntax, errors:parse.ParseError[] ) => void ,
             onDebug: parse.DebugCallback
     ) {
         if (onDebug !== null) {
@@ -1607,9 +1607,7 @@ module quby.parser {
             src: src,
             inputSrc: preParse( src ),
 
-            onFinish: function( program:quby.ast.ISyntax, errors ) {
-                onFinish( program, errors );
-            },
+            onFinish: onFinish,
             onDebug: onDebug || null
         } );
     }

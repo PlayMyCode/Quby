@@ -50,7 +50,7 @@ module quby.core {
                 instance.getSource(),
                 instance.getName(),
 
-                function(program:quby.ast.ISyntax, errors) {
+                function(program:quby.ast.ISyntax, errors:parse.ParseError[]) {
                     validator.errorHandler(errHandler);
                     validator.adminMode( instance.isAdmin() );
                     validator.strictMode( instance.isStrict() );
