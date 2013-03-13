@@ -18,11 +18,24 @@ class App
 
     @running = false
 
-    def initialize( args, stdin=$stdin )
+    def initialize args, stdin=$stdin
         if args.empty?
             raise Exception.new "no commands given"
         else
-            @prog   = args[0]
+            cmd = args[0]
+
+            if cmd['\\']
+                cmdParts = cmd.split('\\')
+            else
+                cmdParts = cmd.split('/' )
+            end
+
+            @prog = cmdParts[-1]
+
+            if args[0][' ']
+                args[0] = "\"#{args[0]}\""
+            end
+
             @cmd    = args.join ' '
             @stdin  = stdin
         end
@@ -50,6 +63,18 @@ class App
         end
     end
 
+    def fail err
+        puts
+        puts '-----------------------'
+        puts '         FAIL'
+        puts
+
+        puts err || 'application failed to start'
+        puts
+        puts '-----------------------'
+        puts
+    end
+
     # Actual Program
 
     def run
@@ -68,8 +93,12 @@ class App
                 puts '-----------------------'
 
                 t = Thread.new do
-                    obj = IO.popen( @cmd ) do |app|
-                        app.each { |line| puts line }
+                    begin
+                        obj = IO.popen( @cmd ) do |app|
+                            app.each { |line| puts line }
+                        end
+                    rescue
+                        self.fail $!
                     end
                 end
 
