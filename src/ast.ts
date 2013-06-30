@@ -41,7 +41,7 @@
  * They are 'context unique' because one context prefix does not clash with
  * another contexts prefix.
  */
-module quby.ast {
+export module quby.ast {
     export interface ISyntax {
         offset: parse.Symbol;
 
@@ -124,7 +124,7 @@ module quby.ast {
 
         private isJSLiteralFlag: bool;
 
-        constructor (offset?: parse.Symbol = null) {
+        constructor (offset: parse.Symbol = null) {
             this.offset = offset;
             this.isJSLiteralFlag = false;
         }
@@ -223,7 +223,7 @@ module quby.ast {
         public offset: parse.Symbol;
         private isJSLiteralFlag = false;
 
-        constructor (offset?:parse.Symbol = null) {
+        constructor (offset:parse.Symbol = null) {
             this.offset = offset;
             this.isJSLiteralFlag = false;
         }
@@ -353,7 +353,7 @@ module quby.ast {
 
         private isJSLiteralFlag: bool;
 
-        constructor (strSeperator: string, appendToLast: bool, stmts?: ISyntax[] = []) {
+        constructor (strSeperator: string, appendToLast: bool, stmts: ISyntax[] = []) {
             this.stmts = stmts;
             this.seperator = strSeperator;
             this.appendToLast = appendToLast;
@@ -1434,7 +1434,7 @@ module quby.ast {
     export class Expr extends Syntax implements IExpr {
         private isResultBool: bool;
 
-        constructor (offset: parse.Symbol, isResultBool?: bool = false) {
+        constructor (offset: parse.Symbol, isResultBool: bool = false) {
             super(offset);
 
             this.isResultBool = isResultBool;
@@ -1452,7 +1452,7 @@ module quby.ast {
     export class NamedExpr extends NamedSyntax implements INamedExpr {
         private isResultBool: bool;
 
-        constructor(offset: parse.Symbol, name: string, callName: string, isResultBool?: bool = false) {
+        constructor(offset: parse.Symbol, name: string, callName: string, isResultBool: bool = false) {
             super(offset, name, callName);
 
             this.isResultBool = isResultBool;
@@ -1875,7 +1875,7 @@ module quby.ast {
     export class YieldStmt extends Syntax {
         private parameters: Parameters;
 
-        constructor (offsetObj, args?: Parameters = null) {
+        constructor (offsetObj, args: Parameters = null) {
             super(offsetObj);
 
             this.parameters = args;

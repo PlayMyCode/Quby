@@ -2,7 +2,7 @@
 
 ///<reference path='lib/util.ts' />
 
-module quby.compilation {
+export module quby.compilation {
     /**
      * Compilation contains information and utility functions for the compilation of Quby.
      */

@@ -2,7 +2,7 @@
 
 ///<reference path='../quby.ts' />
 
-module quby.parser {
+export module quby.parser {
     /**
      * quby.parse
      *

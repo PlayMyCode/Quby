@@ -16,8 +16,15 @@
  * whilst not really belonging in any other
  * section.
  */
-module quby.core {
+export module quby.core {
     var STATEMENT_END = ';\n';
+
+    /**
+     * An interface for objects, so we can use them as maps.
+     */
+    interface MapObj<T> {
+        [key: string]: T;
+    }
 
     function handleError(errHandler: (err: Error) => void , err: Error, throwErr:bool = true) {
         if (errHandler !== null) {
@@ -153,7 +160,7 @@ module quby.core {
         private rootClass: RootClassProxy;
         private symbols: SymbolTable;
 
-        private classes: ClassValidatorMap;
+        private classes: MapObj<quby.core.ClassValidator>;
 
         private endValidateCallbacks: { (v: Validator): void; }[];
 
@@ -162,19 +169,19 @@ module quby.core {
         /**
          * Stores scope of variables in general.
          */
-        private vars: VariableMap[];
+        private vars: MapObj<quby.ast.LocalVariable>[];
 
         /**
          * Stores scope levels specifically within current function.
          */
-        private funVars: VariableMap[];
+        private funVars: MapObj<quby.ast.LocalVariable>[];
 
         /**
          * These all bind in the form:
          *  { callname -> Function }
          */
-        private funs: IFunctionDeclarationMap;
-        private calledMethods: IFunctionDeclarationMap;
+        private funs: MapObj<quby.ast.IFunctionMeta>;
+        private calledMethods: MapObj<quby.ast.IFunctionMeta>;
         private methodNames: FunctionTable;
 
         private usedFunsStack: quby.ast.FunctionCall[];
@@ -185,8 +192,8 @@ module quby.core {
          * These both hold:
          *  { callName -> GlobalVariable }
          */
-        private globals: BoolMap;
-        private usedGlobals: GlobalVariableMap;
+        private globals: MapObj<bool>;
+        private usedGlobals: MapObj<quby.ast.GlobalVariable>;
 
         private errHandler: (err: Error) => void;
 
@@ -944,7 +951,7 @@ module quby.core {
          * 'alternative name' is returned, only if 'incorrect parameters' does not come first.
          * Otherwise null is returned.
          */
-        searchMissingFunWithName(name:string, searchFuns:IFunctionDeclarationMap):quby.ast.IFunctionMeta {
+        searchMissingFunWithName(name:string, searchFuns:MapObj<quby.ast.IFunctionMeta>):quby.ast.IFunctionMeta {
             var altNames:string[] = [],
                 altFun:quby.ast.IFunctionMeta = null;
             var nameLen = name.length;
@@ -981,14 +988,14 @@ module quby.core {
             return altFun;
         }
 
-        searchMissingFun(fun:quby.ast.IFunctionMeta, searchFuns:IFunctionDeclarationMap) {
+        searchMissingFun(fun:quby.ast.IFunctionMeta, searchFuns:MapObj<quby.ast.IFunctionMeta>) {
             return this.searchMissingFunWithName(fun.getName().toLowerCase(), searchFuns);
         }
 
         /**
          *
          */
-        searchMissingFunAndError(fun:quby.ast.IFunctionMeta, searchFuns:IFunctionDeclarationMap, strFunctionType:string) {
+        searchMissingFunAndError(fun:quby.ast.IFunctionMeta, searchFuns:MapObj<quby.ast.IFunctionMeta>, strFunctionType:string) {
             var name = fun.getName(),
                 lower = name.toLowerCase(),
                 found = this.searchMissingFunWithName(name, searchFuns),
@@ -1022,8 +1029,8 @@ module quby.core {
     class LateFunctionBinder {
         private validator: Validator;
 
-        private classVals:ClassValidatorMap;
-        private classFuns:FunctionCallArrayMapMap;
+        private classVals: MapObj<quby.core.ClassValidator>;
+        private classFuns: MapObj<MapObj<quby.ast.FunctionCall[]>>;
 
         private currentClassV: ClassValidator = null;
 
@@ -1059,7 +1066,7 @@ module quby.core {
             innerFuns.push(fun);
         }
 
-        endValidate(globalFuns:IFunctionDeclarationMap) {
+        endValidate(globalFuns:MapObj<quby.ast.IFunctionMeta>) {
             for (var className in this.classVals) {
                 var klassV = this.classVals[className];
                 var funs = this.classFuns[className];
@@ -1091,7 +1098,7 @@ module quby.core {
      * have been called but don't exist on the object.
      */
     class FunctionTable {
-        private funs:StringMap;
+        private funs: MapObj<string>;
         private size: number;
 
         constructor() {
@@ -1146,7 +1153,7 @@ module quby.core {
      * This is printed into the resulting code for use at runtime.
      */
     class SymbolTable {
-        private symbols: StringMap;
+        private symbols: MapObj<string>;
 
         constructor() {
             this.symbols = {};
@@ -1210,12 +1217,12 @@ module quby.core {
         private validator: Validator;
         private klass:quby.ast.IClassDeclaration;
 
-        private funs: IFunctionDeclarationMap;
-        private usedFuns: IFunctionDeclarationMap;
+        private funs: MapObj<quby.ast.IFunctionMeta>;
+        private usedFuns: MapObj<quby.ast.IFunctionMeta>;
         private news : quby.ast.IFunctionMeta[];
 
-        private usedFields: FieldVariableMap;
-        private assignedFields: FieldVariableMap;
+        private usedFields: MapObj<quby.ast.FieldVariable>;
+        private assignedFields: MapObj<quby.ast.FieldVariable>;
 
         private noMethPrintFuns: string[];
 

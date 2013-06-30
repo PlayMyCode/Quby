@@ -263,7 +263,7 @@
  * but only one 'if' terminal, which is used to find them all.
  */
 
-module parse {
+export module parse {
     export interface TerminalFunction {
         (src: string, i: number, code: number, len: number): number;
     }
@@ -2520,7 +2520,7 @@ module parse {
             }
 
             return this;
-        };
+        }
 
         thenAll(obj: IArguments): ParserRuleImplementation {
             return this.
@@ -2719,8 +2719,8 @@ module parse {
         }
 
         private parseInner(input: string, parseInput: string, callback: FinishCallback, debugCallback?: DebugCallback, name?: string): void {
-            if (typeof input !== 'string' && !(input instanceof String)) {
-                throw new Error("Non-string source given as input");
+            if (input === undefined || input === null) {
+                throw new Error("no 'input' value provided");
             }
 
             if (
@@ -2870,7 +2870,7 @@ module parse {
                 result: null,
                 errors: errors
             };
-        };
+        }
 
         private ruleTest(symbols: SymbolResult, inputSrc: string): () =>any {
             if (this.isSeperator || this.isCyclic) {
@@ -3731,8 +3731,8 @@ module parse {
      *  **  **  **  **  **  **  **  **  **  **  **  **  */
 
     /**
-    * PRIVATE
-    */
+     * PRIVATE
+     */
 
     var ignoreSingle: {
         (ps: Parse, match: { [name: string]: any; } ): void;
@@ -3762,29 +3762,34 @@ module parse {
         };
 
     /**
-    * @return A list of all ignores set to be used.
-    */
-    var getIgnores = function (ps: Parse) {
+     * @return A list of all ignores set to be used.
+     */
+    function getIgnores(ps: Parse) : Term[] {
         return ps.ignores;
     }
 
-    var ingoreInner = function (ps: Parse, t: Term) {
+    function ingoreInner(ps: Parse, t: Term) : void {
         ps.ignores.push(t);
     }
 
-    var terminalsInner = function (ps: Parse, obj, termName?: string) {
-        if (obj instanceof Object && !isFunction(obj) && !(obj instanceof Array)) {
+    function terminalsInner(ps: Parse, t: Term, termName?: string): Term;
+    function terminalsInner(ps: Parse, t: string, termName?: string): Term;
+    function terminalsInner(ps: Parse, t: any[], termName?: string): Term;
+    function terminalsInner(ps: Parse, t: TerminalFunction, termName?: string): Term;
+    function terminalsInner(ps: Parse, t: Object, termName?: string): Object;
+    function terminalsInner(ps: Parse, t: any, termName?: string):any {
+        if (t instanceof Object && !isFunction(t) && !(t instanceof Array)) {
             var terminals = {};
 
-            for (var name in obj) {
-                if (obj.hasOwnProperty(name)) {
-                    terminals[name] = terminalsInner(ps, obj[name], name);
+            for (var name in t) {
+                if (t.hasOwnProperty(name)) {
+                    terminals[name] = terminalsInner(ps, t[name], name);
                 }
             }
 
             return terminals;
         } else {
-            var term = new Term(obj, termName).setID(ps.terminalID++);
+            var term = new Term(t, termName).setID(ps.terminalID++);
 
             if (termName !== undefined) {
                 term.setName(formatTerminalName(termName));
@@ -4038,9 +4043,8 @@ module parse {
     export function terminals(t: string): Term;
     export function terminals(t: any[]): Term;
     export function terminals(t: TerminalFunction): Term;
-    export function terminals(t: Object): any;
-    export function terminals( obj ) {
-        return terminalsInner( pInstance, obj, null );
+    export function terminals( t:Object ) : any {
+        return terminalsInner( pInstance, t, null );
     }
 
     /**
@@ -4050,36 +4054,23 @@ module parse {
      * For the end of line version, use Parse.WHITESPACE_AND_END_OF_LINE
      */
 
-    export var terminal = ( () => {
-        /**
-         * Turns the given item into a single terminal.
-         *
-         * @param match The item used for this terminal to match against.
-         * @param termName Optional, a name for this terminal, for error reporting.
-         */
-        var terminal: {
-                ( match:Term, termName?:string ): Term;
-                ( match:string, termName?:string ): Term;
-                ( match:number, termName?:string ): Term;
-                ( match:TerminalFunction, termName?:string ): Term;
-                ( match:any[], termName?:string ): Term;
+    export function terminal( match:Term, termName?:string ): Term;
+    export function terminal( match:string, termName?:string ): Term;
+    export function terminal( match:number, termName?:string ): Term;
+    export function terminal( match:TerminalFunction, termName?:string ): Term;
+    export function terminal( match:any[], termName?:string ): Term;
+    export function terminal( match: Object, termName?:string ): Object;
+    export function terminal( match:any, termName?:string ) : any {
+        return terminalsInner( pInstance, match, termName );
+    }
 
-                WHITESPACE: TerminalFunction;
-                WHITESPACE_END_OF_LINE: TerminalFunction;
-                NUMBER: TerminalFunction;
-                C_SINGLE_LINE_COMMENT: TerminalFunction;
-                C_MULTI_LINE_COMMENT: TerminalFunction;
-                STRING: TerminalFunction;
-        } = <any> function( match:any, termName?:string ) : Term {
-            return terminalsInner( pInstance, match, termName );
-        }
-
+    export module terminal {
         /*
         * These are the terminals provided by Parse,
         * which people can use to quickly build a language.
         */
 
-        terminal.WHITESPACE = function( src, i, code, len ) {
+        export var WHITESPACE:TerminalFunction = function( src, i, code, len ) {
             while ( code === SPACE || code === TAB ) {
                 i++;
                 code = src.charCodeAt( i );
@@ -4091,19 +4082,19 @@ module parse {
         /**
         * A terminal that matches: tabs, spaces, \n and \r characters.
         */
-        terminal.WHITESPACE_END_OF_LINE = function( src, i, code, len ) {
-            while ( code === SPACE || code === TAB || code === SLASH_N || code === SLASH_R ) {
+        export var WHITESPACE_END_OF_LINE:TerminalFunction = function (src, i, code, len) {
+            while (code === SPACE || code === TAB || code === SLASH_N || code === SLASH_R) {
                 i++;
-                code = src.charCodeAt( i );
+                code = src.charCodeAt(i);
             }
 
             return i;
-        };
+        }
 
         /**
         * A number terminal.
         */
-        terminal.NUMBER = function( src, i, code, len ) {
+        export var NUMBER:TerminalFunction = function( src, i, code, len ) {
             if ( code < ZERO || code > NINE ) {
                 return;
                 // 0x hex number
@@ -4150,14 +4141,14 @@ module parse {
             }
 
             return i;
-        };
+        }
 
         /**
         * A C-style single line comment terminal.
         * 
         * Matches everything from a // onwards.
         */
-        terminal.C_SINGLE_LINE_COMMENT = function( src, i, code, len ) {
+        export var C_SINGLE_LINE_COMMENT:TerminalFunction = function( src, i, code, len ) {
             if ( code === SLASH && src.charCodeAt( i + 1 ) === SLASH ) {
                 i++;
 
@@ -4171,12 +4162,12 @@ module parse {
 
                 return i;
             }
-        };
+        }
 
         /**
         * A C-like multi line comment, matches everything from '/ *' to a '* /', (without the spaces).
         */
-        terminal.C_MULTI_LINE_COMMENT = function( src, i, code, len ) {
+        export var C_MULTI_LINE_COMMENT:TerminalFunction = function( src, i, code, len ) {
             if ( code === SLASH && src.charCodeAt( i + 1 ) === STAR ) {
                 // this is so we end up skipping two characters,
                 // the / and the *, before we hit the next char to check
@@ -4197,12 +4188,12 @@ module parse {
                 // plus 2 to include the end of the comment
                 return i + 2;
             }
-        };
+        }
 
         /**
         * A terminal for a string, double or single quoted.
         */
-        terminal.STRING = function( src, i, code, len ) {
+        export var STRING:TerminalFunction = function( src, i, code, len ) {
             var start = i;
 
             // double quote string
@@ -4237,7 +4228,5 @@ module parse {
                 return i + 1;
             }
         }
-
-        return terminal;
-    } )();
+    }
 }

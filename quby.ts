@@ -29,14 +29,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-///<reference path='src/lib/util.ts' />
-///<reference path='src/lib/parse.ts' />
+///<reference path='./src/lib/util.ts' />
+///<reference path='./src/lib/parse.ts' />
 
-///<reference path='src/map-interfaces.ts' />
-
-///<reference path='src/ast.ts' />
-///<reference path='src/compilation.ts' />
-///<reference path='src/core.ts' />
-///<reference path='src/main.ts' />
-///<reference path='src/parser.ts' />
-///<reference path='src/runtime.ts' />
+///<reference path='./src/ast.ts' />
+///<reference path='./src/compilation.ts' />
+///<reference path='./src/core.ts' />
+///<reference path='./src/main.ts' />
+///<reference path='./src/parser.ts' />
+///<reference path='./src/runtime.ts' />

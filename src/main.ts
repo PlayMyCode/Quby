@@ -12,7 +12,7 @@
  * Users should simply call the 'parse' entry point
  * function for starting the parser.
  */
-module quby.main {
+export module quby.main {
     export function runScriptTagsDisplay() {
         runScriptTags(function(r:Result) {
             r.runOrDisplayErrors();
@@ -158,7 +158,7 @@ module quby.main {
             }
         }
 
-        adminMode(isAdmin?: bool = true) {
+        adminMode(isAdmin: bool = true) {
             this.ensureCanParse();
 
             return this;
@@ -187,7 +187,7 @@ module quby.main {
          *
          * The name can be anything you want.
          */
-        name(name: string, isExplicitelyNamed?: bool = true) {
+        name(name: string, isExplicitelyNamed: bool = true) {
             this.ensureCanParse();
 
             this.strName = name;
@@ -440,7 +440,7 @@ module quby.main {
 
                 alert(errorMessage);
             };
-        };
+        }
 
         /**
          * Sets the function to run when this fails to run.

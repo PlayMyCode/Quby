@@ -1,7 +1,5 @@
 "use strict";
 
-var exports = window['exports'] || {};
-
 (function(Date) {
     if ( Date.now === undefined ) {
         Date.now = function() {
@@ -10,21 +8,7 @@ var exports = window['exports'] || {};
     }
 })(window['Date']);
 
-(function(Object) {
-    if ( Object.preventExtensions === undefined ) {
-        /**
-         * AFAIK Object.preventExtensions cannot be faked,
-         * so we just add an empty stub,
-         * so we can still call it where it's not supported.
-         *
-         * Personally I don't really care if it's not always
-         * supported, as long as it works when I am developing.
-         */
-        Object.preventExtensions = function() { /* do nothing */ }
-    }
-})(window['Object']);
-
-module util {
+export module util {
     var calculateName = function () {
         if (navigator.appName === 'Opera') {
             return 'opera';
@@ -159,7 +143,7 @@ module util {
         * 10 elements) and in those situations a brute force approach is actually
         * much faster!
         */
-        export function argumentsToArray(args: IArguments, i?: number = 0): any[] {
+        export function argumentsToArray(args: IArguments, i: number = 0): any[] {
             var len, arr;
 
             // iterating from the start to the end

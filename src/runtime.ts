@@ -164,7 +164,7 @@ function quby_getCollection( collection: { get: ( key:any ) => any; }, key:any )
 * this is due to limitations in using JSON objects for
 * namespaces.
 */
-module quby.runtime {
+export module quby.runtime {
     export var FUNCTION_DEFAULT_TABLE_NAME = '_q_no_funs',
         
         FUNCTION_TABLE_NAME = '_q_funs',
@@ -890,7 +890,7 @@ function QubyObject() {
  * @constructor
  * @param values Optionally takes an array of values, set as the default values for this array.
  */
-function QubyArray( values:any[] ) {
+function QubyArray( values:any[] ) : void {
     if ( values === undefined ) {
         this.values = <any[]> [];
     } else {
@@ -951,7 +951,7 @@ QubyArray.prototype.get = function (key) {
  * 
  * @constructor
  */
-function QubyHash() {
+function QubyHash() : void {
     this.values = [];
     
     for ( var i = 0, argsLen = arguments.length; i < argsLen; i += 2 ) {
@@ -960,8 +960,6 @@ function QubyHash() {
         
         this.set( key, value );
     }
-	
-    return this;
 }
 QubyHash.prototype.hash = function(val:any) : number {
     if ( val == null ) {
