@@ -11,8 +11,8 @@ if not defined TSC_COMPILER (
     for %%X in (tsc) do (set TSC_COMPILER=%%~$PATH:X)
 
     if not defined TSC_COMPILER (
-        if exist "C:\Program Files (x86)\Microsoft SDKs\TypeScript\0.8.1.0\tsc.exe" (
-            set TSC_COMPILER="C:\Program Files (x86)\Microsoft SDKs\TypeScript\0.8.1.0\tsc.exe"
+        if exist "C:\Program Files (x86)\Microsoft SDKs\TypeScript\tsc.exe" (
+            set TSC_COMPILER="C:\Program Files (x86)\Microsoft SDKs\TypeScript\tsc.exe"
         )
     )
 ) else (
