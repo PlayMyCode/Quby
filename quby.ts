@@ -1,5 +1,3 @@
-"use strict";
-
 /**
  * @license
  * 
@@ -38,3 +36,5 @@
 ///<reference path='./src/main.ts' />
 ///<reference path='./src/parser.ts' />
 ///<reference path='./src/runtime.ts' />
+
+"use strict";

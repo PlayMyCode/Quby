@@ -1,8 +1,8 @@
-"use strict";
-
 ///<reference path='../quby.ts' />
 
-export module quby.parser {
+"use strict";
+
+module quby.parser {
     /**
      * quby.parse
      *
@@ -118,7 +118,7 @@ export module quby.parser {
      * @param {number} code
      * @return {boolean}
      */
-    var isAlphaNumericCode = function( code: number ): bool {
+    var isAlphaNumericCode = function( code: number ): boolean {
         return (
                 ( code >= LOWER_A && code <= LOWER_Z ) || // lower case letter
                 ( code === UNDERSCORE ) ||
@@ -126,7 +126,7 @@ export module quby.parser {
         );
     };
 
-    var isAlphaCode = function( code: number ): bool {
+    var isAlphaCode = function( code: number ): boolean {
         return ( code >= LOWER_A && code <= LOWER_Z );
     }
 
@@ -140,7 +140,7 @@ export module quby.parser {
      * @param {number} i
      * @return {boolean}
      */
-    var isAlphaNumeric = function( src: string, i: number ): bool {
+    var isAlphaNumeric = function( src: string, i: number ): boolean {
         var code = src.charCodeAt( i + src.length );
 
         return isAlphaNumericCode( code );
@@ -412,7 +412,7 @@ export module quby.parser {
      * WARNING! The terminal names used here are also used for display purposes.
      *          So give them meaningful names!
      */
-    var terminals = parse.terminals( {
+    var terminals : any = parse.terminals( <any> {
         /**
          * Matches an end of line,
          * and also chomps on whitespace.

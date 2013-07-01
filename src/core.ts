@@ -1,6 +1,6 @@
-"use strict";
-
 ///<reference path='../quby.ts' />
+
+"use strict";
 
 /**
  * quby.core
@@ -16,17 +16,17 @@
  * whilst not really belonging in any other
  * section.
  */
-export module quby.core {
+module quby.core {
     var STATEMENT_END = ';\n';
 
     /**
      * An interface for objects, so we can use them as maps.
      */
-    interface MapObj<T> {
+    export interface MapObj<T> {
         [key: string]: T;
     }
 
-    function handleError(errHandler: (err: Error) => void , err: Error, throwErr:bool = true) {
+    function handleError(errHandler: (err: Error) => void , err: Error, throwErr:boolean = true) {
         if (errHandler !== null) {
             errHandler(err);
         }
@@ -91,7 +91,7 @@ export module quby.core {
      * @param error The error to parse.
      * @return Info on the error, for display purposes.
      */
-    var formatError = function(error:parse.ParserError): { line: number; msg: string; } {
+    var formatError = function(error:parse.ParseError): { line: number; msg: string; } {
         var errLine = error.getLine(),
             strErr;
 
@@ -143,14 +143,14 @@ export module quby.core {
          */
         private lastErrorName: string;
 
-        private isStrict: bool;
-        private isAdminMode: bool;
+        private isStrict: boolean;
+        private isAdminMode: boolean;
 
-        private isParameters: bool;
-        private isFunParameters: bool;
-        private inConstructor: bool;
+        private isParameters: boolean;
+        private isFunParameters: boolean;
+        private inConstructor: boolean;
 
-        private isBlockArr: bool[];
+        private isBlockArr: boolean[];
 
         private funCount: number;
 
@@ -192,7 +192,7 @@ export module quby.core {
          * These both hold:
          *  { callName -> GlobalVariable }
          */
-        private globals: MapObj<bool>;
+        private globals: MapObj<boolean>;
         private usedGlobals: MapObj<quby.ast.GlobalVariable>;
 
         private errHandler: (err: Error) => void;
@@ -264,11 +264,11 @@ export module quby.core {
             this.errHandler = errHandler;
         }
 
-        strictMode( mode:bool ) {
+        strictMode( mode:boolean ) {
             this.isStrict = mode;
         }
 
-        adminMode( mode:bool ) {
+        adminMode( mode:boolean ) {
             this.isAdminMode = mode;
         }
 
@@ -280,10 +280,10 @@ export module quby.core {
             this.symbols.add(sym);
         }
 
-        setInConstructor( inC:bool ) {
+        setInConstructor( inC:boolean ) {
             this.inConstructor = inC;
         }
-        isInConstructor() : bool {
+        isInConstructor() : boolean {
             return this.inConstructor;
         }
 
@@ -332,10 +332,10 @@ export module quby.core {
         unsetClass() {
             this.currentClass = null;
         }
-        isInsideClass() : bool {
+        isInsideClass() : boolean {
             return this.currentClass !== null;
         }
-        isInsideExtensionClass() : bool {
+        isInsideExtensionClass() : boolean {
             return this.currentClass !== null && this.currentClass.getClass().isExtensionClass();
         }
         useField(field) {
@@ -348,7 +348,7 @@ export module quby.core {
             this.currentClass.useFun(fun);
         }
 
-        setParameters(isParameters:bool, isFun:bool) {
+        setParameters(isParameters:boolean, isFun:boolean) {
             this.isParameters = isParameters;
             this.isFunParameters = isFun;
         }
@@ -450,7 +450,7 @@ export module quby.core {
         assignVar(variable:quby.ast.LocalVariable) {
             this.vars[this.vars.length - 1][variable.getCallName()] = variable;
         }
-        containsVar(variable:quby.ast.LocalVariable) : bool {
+        containsVar(variable:quby.ast.LocalVariable) : boolean {
             var id = variable.getCallName();
 
             var stop:number = this.isInsideFun() ?
@@ -465,13 +465,13 @@ export module quby.core {
 
             return false;
         }
-        containsLocalVar(variable:quby.ast.LocalVariable) : bool {
+        containsLocalVar(variable:quby.ast.LocalVariable) : boolean {
             var id = variable.getCallName();
             var scope = this.vars[this.vars.length - 1];
 
             return !!scope[id];
         }
-        containsLocalBlock() : bool {
+        containsLocalBlock() : boolean {
             var localVars = this.vars[this.vars.length - 1];
 
             for (var key in localVars) {
@@ -605,7 +605,7 @@ export module quby.core {
             return errors;
         }
 
-        hasErrors() : bool {
+        hasErrors() : boolean {
             return this.errors.length > 0;
         }
 
@@ -645,7 +645,7 @@ export module quby.core {
         }
 
         // adds a program to be validated by this Validator
-        validate(program:quby.ast.ISyntax, errors:parse.ParserError[]) {
+        validate(program:quby.ast.ISyntax, errors:parse.ParseError[]) {
             // clear this, so errors don't seap across multiple validations
             this.lastErrorName = null;
 
@@ -901,7 +901,7 @@ export module quby.core {
         ensureInFunParameters(syn:quby.ast.ISyntax, errorMsg:string) {
             return this.ensureTest(!this.isInsideFunParameters(), syn, errorMsg);
         }
-        ensureTest(errCondition: bool, syn:quby.ast.ISyntax, errorMsg:string) {
+        ensureTest(errCondition: boolean, syn:quby.ast.ISyntax, errorMsg:string) {
             if (errCondition) {
                 this.parseError(syn.offset, errorMsg);
                 return false;
@@ -1212,7 +1212,7 @@ export module quby.core {
     }
 
     export class ClassValidator {
-        private isPrinted: bool;
+        private isPrinted: boolean;
 
         private validator: Validator;
         private klass:quby.ast.IClassDeclaration;
@@ -1277,7 +1277,7 @@ export module quby.core {
 
             this.funs[index] = fun;
         }
-        hasFunInHierarchy(fun:quby.ast.IFunctionMeta): bool {
+        hasFunInHierarchy(fun:quby.ast.IFunctionMeta): boolean {
             if (this.hasFun(fun)) {
                 return true;
             } else {
@@ -1368,10 +1368,10 @@ export module quby.core {
             }
         }
 
-        hasNew(fun:quby.ast.IFunctionMeta): bool {
+        hasNew(fun:quby.ast.IFunctionMeta): boolean {
             return this.news[fun.getNumParameters()] !== undefined;
         }
-        noNews(): bool {
+        noNews(): boolean {
             return this.news.length === 0;
         }
 
@@ -1596,7 +1596,7 @@ export module quby.core {
             return quby.runtime.TEMP_VARIABLE + (this.tempVarCounter++);
         }
 
-        setCodeMode(isCode: bool) {
+        setCodeMode(isCode: boolean) {
             if (isCode) {
                 this.current = this.currentStmt;
                 this.preOrStmts = this.stmts;

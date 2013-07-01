@@ -1,6 +1,6 @@
-"use strict";
-
 ///<reference path='../quby.ts' />
+
+"use strict";
 
 /**
  * AST
@@ -41,7 +41,7 @@
  * They are 'context unique' because one context prefix does not clash with
  * another contexts prefix.
  */
-export module quby.ast {
+module quby.ast {
     export interface ISyntax {
         offset: parse.Symbol;
 
@@ -54,8 +54,8 @@ export module quby.ast {
          * For exmaple, JS variables, or creating
          * classes in a JS way.
          */
-        isJSLiteral: () => bool;
-        setJSLiteral: (isLit: bool) => void;
+        isJSLiteral: () => boolean;
+        setJSLiteral: (isLit: boolean) => void;
     }
 
     export interface IExpr extends ISyntax {
@@ -68,9 +68,9 @@ export module quby.ast {
     }
 
     export interface IFunctionMeta extends ISyntax {
-        isConstructor(): bool;
-        isFunction(): bool;
-        isMethod(): bool;
+        isConstructor(): boolean;
+        isFunction(): boolean;
+        isMethod(): boolean;
 
         getCallName(): string;
         getName(): string;
@@ -92,7 +92,7 @@ export module quby.ast {
 
         getStatements(): SyntaxList;
 
-        isExtensionClass(): bool;
+        isExtensionClass(): boolean;
     }
 
     export interface IAssignable extends IExpr {
@@ -105,7 +105,7 @@ export module quby.ast {
         rebalance(): IExpr;
         onRebalance(): IExpr;
 
-        testSwap(other: IExpr): bool;
+        testSwap(other: IExpr): boolean;
         swapExpr(other: IExpr): IExpr;
     }
 
@@ -122,7 +122,7 @@ export module quby.ast {
     class EmptyStub implements ISyntax {
         public offset: parse.Symbol;
 
-        private isJSLiteralFlag: bool;
+        private isJSLiteralFlag: boolean;
 
         constructor (offset: parse.Symbol = null) {
             this.offset = offset;
@@ -139,7 +139,7 @@ export module quby.ast {
             return this.isJSLiteralFlag;
         }
 
-        setJSLiteral(isLit: bool) {
+        setJSLiteral(isLit: boolean) {
             this.isJSLiteralFlag = isLit;
         }
     }
@@ -273,11 +273,11 @@ export module quby.ast {
             return this.offset;
         }
 
-        isJSLiteral(): bool {
+        isJSLiteral(): boolean {
             return this.isJSLiteralFlag;
         }
 
-        setJSLiteral(isLit: bool) {
+        setJSLiteral(isLit: boolean) {
             this.isJSLiteralFlag = isLit;
         }
     }
@@ -291,7 +291,7 @@ export module quby.ast {
         public offset: parse.Symbol;
 
         private stmts: ISyntax[];
-        private isJSLiteralFlag: bool;
+        private isJSLiteralFlag: boolean;
 
         constructor (stmts: ISyntax[]) {
             this.stmts = stmts;
@@ -309,11 +309,11 @@ export module quby.ast {
             this.isJSLiteralFlag = false;
         }
 
-        isJSLiteral(): bool {
+        isJSLiteral(): boolean {
             return this.isJSLiteralFlag;
         }
 
-        setJSLiteral(isLit: bool) {
+        setJSLiteral(isLit: boolean) {
             this.isJSLiteralFlag = isLit;
         }
 
@@ -348,12 +348,12 @@ export module quby.ast {
         public offset: parse.Symbol;
 
         private seperator: string;
-        private appendToLast: bool;
+        private appendToLast: boolean;
         private stmts: ISyntax[];
 
-        private isJSLiteralFlag: bool;
+        private isJSLiteralFlag: boolean;
 
-        constructor (strSeperator: string, appendToLast: bool, stmts: ISyntax[] = []) {
+        constructor (strSeperator: string, appendToLast: boolean, stmts: ISyntax[] = []) {
             this.stmts = stmts;
             this.seperator = strSeperator;
             this.appendToLast = appendToLast;
@@ -374,7 +374,7 @@ export module quby.ast {
             return this.isJSLiteralFlag;
         }
 
-        setJSLiteral(isLit: bool) {
+        setJSLiteral(isLit: boolean) {
             this.isJSLiteralFlag = isLit;
         }
 
@@ -681,7 +681,7 @@ export module quby.ast {
             }
         }
 
-        printClause(p: quby.core.Printer, tempVar: string, isFirst: bool) {
+        printClause(p: quby.core.Printer, tempVar: string, isFirst: boolean) {
             if (!isFirst) {
                 p.append(' else');
             }
@@ -1143,7 +1143,7 @@ export module quby.ast {
 
         private stmtBody: Statements;
 
-        private autoReturn: bool;
+        private autoReturn: boolean;
 
         /**
          * These are the variables initialized at the start
@@ -1340,7 +1340,7 @@ export module quby.ast {
     export class Constructor extends FunctionDeclaration {
         private className: string;
         private klass: ClassDeclaration;
-        private isExtensionClass: bool;
+        private isExtensionClass: boolean;
 
         constructor (sym: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
             super(sym, parameters, stmtBody);
@@ -1410,8 +1410,6 @@ export module quby.ast {
     }
 
     export class AdminMethod extends FunctionDeclaration {
-        private callName: string;
-
         constructor (name: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
             super(name, parameters, stmtBody);
 
@@ -1432,9 +1430,9 @@ export module quby.ast {
      * @param isResultBool An optimization flag. Pass in true if the result of this Expression will always be a 'true' or 'false'. Optional, and defaults to false.
      */
     export class Expr extends Syntax implements IExpr {
-        private isResultBool: bool;
+        private isResultBool: boolean;
 
-        constructor (offset: parse.Symbol, isResultBool: bool = false) {
+        constructor (offset: parse.Symbol, isResultBool: boolean = false) {
             super(offset);
 
             this.isResultBool = isResultBool;
@@ -1450,9 +1448,9 @@ export module quby.ast {
     }
 
     export class NamedExpr extends NamedSyntax implements INamedExpr {
-        private isResultBool: bool;
+        private isResultBool: boolean;
 
-        constructor(offset: parse.Symbol, name: string, callName: string, isResultBool: bool = false) {
+        constructor(offset: parse.Symbol, name: string, callName: string, isResultBool: boolean = false) {
             super(offset, name, callName);
 
             this.isResultBool = isResultBool;
@@ -1481,14 +1479,14 @@ export module quby.ast {
     * such as 'get x, y' or 'getset img' for generating accessors (and other things).
     */
     export class FunctionCall extends NamedSyntax implements IFunctionMeta {
-        private isMethodFlag: bool;
+        private isMethodFlag: boolean;
 
         private parameters: Parameters;
         private block: FunctionBlock;
 
         private functionGenerator:ISyntax;
 
-        private isInsideExtensionClass: bool;
+        private isInsideExtensionClass: boolean;
 
         constructor (sym: parse.Symbol, parameters: Parameters, block: FunctionBlock) {
             super(
@@ -1557,11 +1555,11 @@ export module quby.ast {
             this.isMethodFlag = true;
         }
 
-        isMethod() : bool { return this.isMethodFlag }
+        isMethod() : boolean { return this.isMethodFlag }
 
-        isFunction(): bool { return !this.isMethodFlag }
+        isFunction(): boolean { return !this.isMethodFlag }
 
-        isConstructor(): bool { return false }
+        isConstructor(): boolean { return false }
 
         /**
          * This FunctionCall needs to declare it's self to the Validator,
@@ -1783,7 +1781,7 @@ export module quby.ast {
     }
 
     export class NewInstance extends FunctionCall {
-        private isExtensionClass: bool;
+        private isExtensionClass: boolean;
         private className: string;
 
         constructor (name, parameters, block) {
@@ -1908,7 +1906,7 @@ export module quby.ast {
     export class FunctionBlock extends Syntax {
         private parameters: Parameters;
         private statements: Statements;
-        private mismatchedBraceWarning: bool;
+        private mismatchedBraceWarning: boolean;
 
         constructor (parameters: Parameters, statements: Statements) {
             // only pass in the offset if we have it,
@@ -2028,12 +2026,12 @@ export module quby.ast {
      * tree now references the top of the tree.
      */
     export class GenericOp extends Expr implements IPrecedence {
-        private balanceDone: bool;
+        private balanceDone: boolean;
         private precedence: number;
 
         private proxy: ISyntax;
 
-        constructor (offset: parse.Symbol, isResultBool:bool, precedence:number) {
+        constructor (offset: parse.Symbol, isResultBool:boolean, precedence:number) {
             super(offset, isResultBool);
 
             this.balanceDone = false;
@@ -2091,7 +2089,7 @@ export module quby.ast {
             return this.precedence;
         }
 
-        testSwap(other: IExpr): bool {
+        testSwap(other: IExpr): boolean {
             if (other instanceof GenericOp) {
                 var precedence = (<IPrecedence> <any> other).getPrecedence();
 
@@ -2103,7 +2101,7 @@ export module quby.ast {
             return false;
         }
 
-        isBalanced(): bool {
+        isBalanced(): boolean {
             return this.balanceDone;
         }
 
@@ -2132,7 +2130,7 @@ export module quby.ast {
         private expr : IExpr;
         private strOp: string;
 
-        constructor (expr: IExpr, strOp: string, isResultBool: bool) {
+        constructor (expr: IExpr, strOp: string, isResultBool: boolean) {
             super(expr.offset, isResultBool, 1);
 
             this.expr = expr;
@@ -2229,7 +2227,7 @@ export module quby.ast {
         private right: IExpr;
         private strOp: string;
 
-        constructor (left: IExpr, right: IExpr, strOp: string, isResultBool: bool, precedence: number) {
+        constructor (left: IExpr, right: IExpr, strOp: string, isResultBool: boolean, precedence: number) {
             var offset = left ? left.offset : null;
 
             if (precedence === undefined) {
@@ -2342,7 +2340,7 @@ export module quby.ast {
      * @param {number} precedence The precendence for this operator.
      * @param isResultBool Optional, true if the result is a boolean, otherwise it defaults to false.
      */
-    var newShortOp = function (symbol: string, precedence: number, isResultBool: bool)
+    var newShortOp = function (symbol: string, precedence: number, isResultBool: boolean)
             : new (left: IExpr, right: IExpr) => Op
     {
         return <new (left: IExpr, right: IExpr) => Op> <any> function (left: IExpr, right: IExpr) {
@@ -2409,7 +2407,7 @@ export module quby.ast {
     export var BitOr = newShortOp('|', 9, false);
 
     export class BoolOp extends Op {
-        private useSuperPrint:bool;
+        private useSuperPrint:boolean;
 
         constructor(left:IExpr, right:IExpr, syntax:string, precedence:number) {
             super( left, right, syntax, false, precedence );
@@ -2516,7 +2514,7 @@ export module quby.ast {
     }
 
     export class Assignment extends Op {
-        private isCollectionAssignment:bool;
+        private isCollectionAssignment:boolean;
 
         constructor(left:IExpr, right:IExpr) {
             super( left, right, '=', false, 14 );
@@ -2560,7 +2558,7 @@ export module quby.ast {
      * These include globals, fields, locals, and even 'this'!.
      */
     export class Variable extends NamedExpr implements IAssignable {
-        private isAssignmentFlag: bool;
+        private isAssignmentFlag: boolean;
 
         constructor (identifier: parse.Symbol, callName: string) {
             super(identifier, identifier.match, callName);
@@ -2568,7 +2566,7 @@ export module quby.ast {
             this.isAssignmentFlag = false;
         }
 
-        isAssignment(): bool {
+        isAssignment(): boolean {
             return this.isAssignmentFlag;
         }
 
@@ -2586,7 +2584,7 @@ export module quby.ast {
      */
 
     export class LocalVariable extends Variable {
-        private useVar:bool;
+        private useVar:boolean;
 
         constructor(identifier) {
             super( identifier, quby.runtime.formatVar(identifier.match) );
@@ -2679,7 +2677,7 @@ export module quby.ast {
 
     export class FieldVariable extends Variable {
         private klass:IClassDeclaration;
-        private isInsideExtensionClass: bool;
+        private isInsideExtensionClass: boolean;
 
         constructor(identifier:parse.Symbol) {
             super( identifier, identifier.match.substring(1) );
@@ -2762,7 +2760,7 @@ export module quby.ast {
     }
 
     export class ThisVariable extends Syntax {
-        private isInsideExtensionClass: bool;
+        private isInsideExtensionClass: boolean;
 
         constructor(sym:parse.Symbol) {
             super( sym );
@@ -2816,7 +2814,7 @@ export module quby.ast {
         private array:IExpr;
         private index:IExpr;
 
-        private isAssignment:bool;
+        private isAssignment:boolean;
 
         constructor(array:IExpr, index:IExpr) {
             var offset = array !== null ?
@@ -2880,10 +2878,10 @@ export module quby.ast {
      */
     export class ComplexLiteral extends Syntax {
         private parameters:IStatements;
-        private pre:String;
-        private post:String;
+        private pre:string;
+        private post:string;
 
-        constructor(pre:String, parameters:IStatements, post:String) {
+        constructor(pre:string, parameters:IStatements, post:string) {
             var offset;
             if (parameters) {
                 offset = parameters.offset;
@@ -2927,13 +2925,13 @@ export module quby.ast {
         }
     }
 
-    export class HashLiteral extends ArrayLiteral {
+    export class HashLiteral extends ComplexLiteral {
         constructor(parameters?:Mappings) {
             super( '(new QubyHash(', parameters, '))' );
         }
     }
 
-    export class JSArrayLiteral extends ArrayLiteral {
+    export class JSArrayLiteral extends ComplexLiteral {
         constructor(params?:IStatements) {
             super( '([', params, '])' );
         }
@@ -2944,7 +2942,7 @@ export module quby.ast {
         }
     }
 
-    export class JSObjectLiteral extends ArrayLiteral {
+    export class JSObjectLiteral extends ComplexLiteral {
         constructor(parameters?:Mappings) {
             super( '({', parameters, '})' );
         }
@@ -2953,10 +2951,10 @@ export module quby.ast {
     /* Literals */
 
     export class Literal extends Expr {
-        private isTrue:bool;
+        private isTrue:boolean;
         private match:string;
 
-        constructor(sym:parse.Symbol, isTrue:bool, altMatch?:string) {
+        constructor(sym:parse.Symbol, isTrue:boolean, altMatch?:string) {
             this.match = altMatch ?
                     altMatch  :
                     sym.match ;
@@ -3096,14 +3094,14 @@ export module quby.ast {
 
         // flag used for checking if it's a generator,
         // only used inside this FunctionGenerator
-        private isGenerator: bool;
+        private isGenerator: boolean;
 
         // the name of the method this generates
         private name: string;
 
         private numParams: number;
 
-        private isJSLiteralFlag: bool;
+        private isJSLiteralFlag: boolean;
 
         constructor(obj:FunctionCall, methodName: string, numParams: number) {
             this.offset = obj.offset;
@@ -3126,7 +3124,7 @@ export module quby.ast {
             return this.isJSLiteralFlag;
         }
 
-        setJSLiteral(isLit: bool) {
+        setJSLiteral(isLit: boolean) {
             this.isJSLiteralFlag = isLit;
         }
 
@@ -3366,7 +3364,7 @@ export module quby.ast {
      */
 
     export class PreInline extends Syntax {
-        private isPrinted: bool;
+        private isPrinted: boolean;
 
         constructor(sym:parse.Symbol) {
             super(sym);

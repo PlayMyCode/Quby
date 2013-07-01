@@ -1,6 +1,6 @@
-"use static"
-
 ///<reference path='lib/util.ts' />
+
+"use static"
 
 /* 
  * These functions are called so often that they exist outside of the quby.runtime
@@ -164,7 +164,7 @@ function quby_getCollection( collection: { get: ( key:any ) => any; }, key:any )
 * this is due to limitations in using JSON objects for
 * namespaces.
 */
-export module quby.runtime {
+module quby.runtime {
     export var FUNCTION_DEFAULT_TABLE_NAME = '_q_no_funs',
         
         FUNCTION_TABLE_NAME = '_q_funs',
@@ -266,7 +266,7 @@ export module quby.runtime {
             'Hash'
     ]
 
-    export function isCoreClass(name:string) : bool {
+    export function isCoreClass(name:string) : boolean {
         var coreClasses = quby.runtime.CORE_CLASSES;
 
         for (var i = 0; i < coreClasses.length; i++) {

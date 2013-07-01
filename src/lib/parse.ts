@@ -1,6 +1,6 @@
-"use strict";
+///<reference path="util.ts" />
 
-///<reference path='util.ts' />
+"use strict";
 
 /*
  * TODO Optimizations:
@@ -263,7 +263,7 @@
  * but only one 'if' terminal, which is used to find them all.
  */
 
-export module parse {
+module parse {
     export interface TerminalFunction {
         (src: string, i: number, code: number, len: number): number;
     }
@@ -288,7 +288,7 @@ export module parse {
 
     export interface SymbolizeCallback { (terminals: Term[], errors: SymbolError[]): void; };
 
-    export interface FinishCallback { (result: any, errors: ParserError[]): void; };
+    export interface FinishCallback { (result: any, errors: ParseError[]): void; };
 
     interface CompiledTerminals {
         literals: Term[];
@@ -418,13 +418,13 @@ export module parse {
      * @param {number} code
      * @return {boolean}
      */
-    var isHexCode = function (code: number): bool {
+    var isHexCode = function (code: number): boolean {
         return (code >= ZERO && code <= NINE) || // a number
                (code >= LOWER_A && code <= LOWER_F) || // lower a-z
                (code >= UPPER_A && code <= UPPER_F);   // UPPER A-Z
     };
 
-    var isAlphaNumericCode = function (code: number): bool {
+    var isAlphaNumericCode = function (code: number): boolean {
         return (
                 (code >= LOWER_A && code <= LOWER_Z) || // lower case letter
                 (code >= UPPER_A && code <= UPPER_Z) || // upper case letter
@@ -433,7 +433,7 @@ export module parse {
         );
     };
 
-    var isAlphaCode = function (code: number): bool {
+    var isAlphaCode = function (code: number): boolean {
         return (code >= LOWER_A && code <= LOWER_Z) ||
                (code >= UPPER_A && code <= UPPER_Z);
     };
@@ -444,14 +444,14 @@ export module parse {
      * @param {number} code
      * @return {boolean}
      */
-    var isNumericCode = function (code: number): bool {
+    var isNumericCode = function (code: number): boolean {
         return (code >= ZERO && code <= NINE); // a number
     };
 
     /**
      * @return True if f is a function object, and false if not.
      */
-    var isFunction = function (f: any): bool {
+    var isFunction = function (f: any): boolean {
         return (f instanceof Function) || (typeof f == 'function');
     };
 
@@ -813,7 +813,7 @@ export module parse {
      * @param {number} A code for a character.
      * @return {boolean} True if it is a word character, and false if not.
      */
-    var isWordCode = function (code: number): bool {
+    var isWordCode = function (code: number): boolean {
         return (
                 (code >= 97 && code <= 122) || // lower case letter
                 (code >= 48 && code <= 57) || // a number
@@ -838,7 +838,7 @@ export module parse {
      * @param {number} i The index of the character to check in the string.
      * @return {boolean}
      */
-    var isWordCharAt = function (src: string, i: number): bool {
+    var isWordCharAt = function (src: string, i: number): boolean {
         return isWordCode(src.charCodeAt(i));
     }
 
@@ -953,7 +953,7 @@ export module parse {
         * if it should, or shouldn't, override the name
         * automatically.
         */
-        isExplicitelyNamed: bool = false;
+        isExplicitelyNamed: boolean = false;
 
         /**
         * The type of this terminal.
@@ -977,7 +977,7 @@ export module parse {
         * or not match, bits against the source code
         * when parsing symbols.
         */
-        isLiteral: bool = false;
+        isLiteral: boolean = false;
 
         /**
          * The literal value this is matching, if provided.
@@ -1260,9 +1260,9 @@ export module parse {
      *
      *  **  **  **  **  **  **  **  **  **  **  **  **  */
 
-    export class ParserError {
-        isSymbol: bool = false;
-        isTerminal: bool = false;
+    export class ParseError {
+        isSymbol: boolean = false;
+        isTerminal: boolean = false;
 
         offset: number;
         source: SourceLines;
@@ -1286,7 +1286,7 @@ export module parse {
      * That is during the symbolization stage, before the
      * grammar rules are checked.
      */
-    export class SymbolError extends ParserError {
+    export class SymbolError extends ParseError {
         isSymbol = true;
 
         constructor (i, str, sourceLines) {
@@ -1300,13 +1300,13 @@ export module parse {
      * This is a type of error generated whilst the grammar
      * rules are worked on.
      */
-    export class TerminalError extends ParserError {
+    export class TerminalError extends ParseError {
         isTerminal = true;
 
         terminal: Term;
         terminalName: string;
 
-        isLiteral: bool;
+        isLiteral: boolean;
 
         expected: string[];
 
@@ -1800,8 +1800,8 @@ export module parse {
             }
         }
 
-    var bruteScan: { (parserRule: ParserRuleImplementation, seenRules: bool[], idsFound: bool[]): void; } =
-        function (parserRule: ParserRuleImplementation, seenRules: bool[], idsFound: bool[]) {
+    var bruteScan: { (parserRule: ParserRuleImplementation, seenRules: boolean[], idsFound: boolean[]): void; } =
+        function (parserRule: ParserRuleImplementation, seenRules: boolean[], idsFound: boolean[]) {
             if (seenRules[parserRule.compiledId] !== true) {
                 seenRules[parserRule.compiledId] = true;
 
@@ -2021,7 +2021,7 @@ export module parse {
         */
         rules: any[] = [];
 
-        isOptional: bool[] = [];
+        isOptional: boolean[] = [];
 
         /**
         * Choice parser rules can be built from multiple 'or' calls,
@@ -3421,7 +3421,7 @@ export module parse {
 
                 termTests: TerminalFunction[] = new Array(termsLen),
                 termIDs: number[] = new Array(termsLen),
-                multipleIgnores: bool = (ignores.length > 1),
+                multipleIgnores: boolean = (ignores.length > 1),
 
                 /**
                  * An invalid index in the string, used to denote

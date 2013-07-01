@@ -1,6 +1,6 @@
-"use strict";
-
 ///<reference path='lib/util.ts' />
+
+"use strict";
 
 /**
  * Main
@@ -12,7 +12,7 @@
  * Users should simply call the 'parse' entry point
  * function for starting the parser.
  */
-export module quby.main {
+module quby.main {
     export function runScriptTagsDisplay() {
         runScriptTags(function(r:Result) {
             r.runOrDisplayErrors();
@@ -106,7 +106,7 @@ export module quby.main {
     /**
      *
      */
-    export function parse(source:string, adminMode:bool, callback:(result:Result) => void) {
+    export function parse(source:string, adminMode:boolean, callback:(result:Result) => void) {
         var parser = new Parser();
 
         parser.
@@ -124,17 +124,17 @@ export module quby.main {
     }
 
     export class ParserInstance {
-        private isStrictFlag:bool;
-        private isAdminFlag:bool;
+        private isStrictFlag:boolean;
+        private isAdminFlag:boolean;
 
         private whenFinished:() => void;
         private debugCallback:parse.DebugCallback;
 
         private strName:string;
 
-        private isExplicitelyNamed:bool;
+        private isExplicitelyNamed:boolean;
 
-        private hasParsed:bool;
+        private hasParsed:boolean;
 
         private source:string;
 
@@ -158,26 +158,26 @@ export module quby.main {
             }
         }
 
-        adminMode(isAdmin: bool = true) {
+        adminMode(isAdmin: boolean = true) {
             this.ensureCanParse();
 
             return this;
         }
 
-        isAdmin(): bool {
+        isAdmin(): boolean {
             return this.isAdminFlag;
         }
 
         /**
          * Disables strict mode for the current bout of parsing.
          */
-        strictMode(isStrict: bool = true) {
+        strictMode(isStrict: boolean = true) {
             this.ensureCanParse();
 
             return this;
         }
 
-        isStrict(): bool {
+        isStrict(): boolean {
             return this.isStrictFlag;
         }
 
@@ -187,7 +187,7 @@ export module quby.main {
          *
          * The name can be anything you want.
          */
-        name(name: string, isExplicitelyNamed: bool = true) {
+        name(name: string, isExplicitelyNamed: boolean = true) {
             this.ensureCanParse();
 
             this.strName = name;
@@ -275,7 +275,7 @@ export module quby.main {
      */
     export class Parser {
         private validator: quby.core.Validator;
-        private isStrict: bool;
+        private isStrict: boolean;
         private errHandler: (err: Error) => void;
 
         constructor() {
@@ -308,7 +308,7 @@ export module quby.main {
          * Note that you can disable it for indevidual
          * files with 'strictMode'.
          */
-        strictModeAll(isStrict: bool = true): void {
+        strictModeAll(isStrict: boolean = true): void {
             this.isStrict = isStrict;
         }
 
@@ -366,7 +366,7 @@ export module quby.main {
             return this;
         }
 
-        parseArgs(source: string, adminMode: bool, callback:() => void, debugCallback: parse.DebugCallback) : ParserInstance {
+        parseArgs(source: string, adminMode: boolean, callback:() => void, debugCallback: parse.DebugCallback) : ParserInstance {
             return this.
                     parse(source).
                     adminMode(adminMode).
@@ -374,7 +374,7 @@ export module quby.main {
                     onDebug(debugCallback);
         }
 
-        parseSources(sources: string[], adminMode: bool, callback?: (result: Result) => void ) {
+        parseSources(sources: string[], adminMode: boolean, callback?: (result: Result) => void ) {
             util.future.map(sources, (source: string) => {
                 this.parse(source).adminMode(adminMode);
             });
@@ -468,7 +468,7 @@ export module quby.main {
         /**
          * @return True if there were errors within the result, otherwise false if there are no errors.
          */
-        hasErrors() : bool {
+        hasErrors() : boolean {
             return this.errors.length > 0;
         }
 

@@ -8,7 +8,7 @@
     }
 })(window['Date']);
 
-export module util {
+module util {
     var calculateName = function () {
         if (navigator.appName === 'Opera') {
             return 'opera';
@@ -93,7 +93,7 @@ export module util {
         * @param domain Optional, the domain to test for, defaults to the current domain of the document.
         * @return True if the url is of the domain given, otherwise false.
         */
-        export function isDomain(url: string, domain: string): bool {
+        export function isDomain(url: string, domain: string): boolean {
             if (domain === undefined) {
                 domain = document.domain;
             }
@@ -259,7 +259,7 @@ export module util {
                 window.msRequestAnimationFrame ||
                 null;
 
-        var intervalFuns: { isRunning: bool; }[] = [],
+        var intervalFuns: { isRunning: boolean; }[] = [],
             intervalFunID = 1;
 
         /**
@@ -457,7 +457,7 @@ export module util {
             (status: number, text: string, xml: Object): void;
         }
 
-        export function post(url: string, callback: AjaxCallback, data?: any, isBlocking?: bool, timestamp?: bool) {
+        export function post(url: string, callback: AjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
             return ajax.call(
                     'POST',
                     url,
@@ -468,7 +468,7 @@ export module util {
             );
         }
 
-        export function postFuture(url: string, callback: AjaxCallback, data?: any, isBlocking?: bool, timestamp?: bool) {
+        export function postFuture(url: string, callback: AjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
             var tag = util.future.block(function (status, text, xml) {
                 callback(status, text, xml);
             });
@@ -484,7 +484,7 @@ export module util {
             );
         }
 
-        export function get(url: string, callback: AjaxCallback, data?: any, isBlocking?: bool, timestamp?: bool) {
+        export function get(url: string, callback: AjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
             return ajax.call(
                     'GET',
                     url,
@@ -495,7 +495,7 @@ export module util {
             );
         }
 
-        export function getFuture(url: string, callback: AjaxCallback, data?: any, isBlocking?: bool, timestamp?: bool) {
+        export function getFuture(url: string, callback: AjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
             var tag = util.future.block(function (status, text, xml) {
                 callback(status, text, xml);
             });
@@ -511,7 +511,7 @@ export module util {
             );
         }
 
-        export function call(method: string, url: string, callback: AjaxCallback, passData: any = '', async: bool = true, timestamp: bool = false) {
+        export function call(method: string, url: string, callback: AjaxCallback, passData: any = '', async: boolean = true, timestamp: boolean = false) {
             if (passData === undefined || passData === null) {
                 passData = '';
             } else if (!(typeof passData === 'string' || passData instanceof String)) {
