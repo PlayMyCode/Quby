@@ -44,12 +44,15 @@ local.properties
 *.sln.docstates
 
 # Build results
-./[Dd]ebug/
-./[Oo]bj/
+[Dd]ebug/
+[Oo]bj/
 
-./[Rr]elease/
-./[Rr]elease/*
-./[Rr]elease/quby.js
+[Rr]elease/
+[Rr]elease/*
+[Rr]elease/quby.js
+
+src/*.js
+src/lib/*.js
 
 *.csproj
 *.csproj.user
