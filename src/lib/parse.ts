@@ -1485,7 +1485,7 @@ module parse {
 
         getLower() : string {
             if (this.lower === undefined) {
-                return (this.lower = this.match.toLowerCase());
+                return (this.lower = this.getMatch().toLowerCase());
             } else {
                 return this.lower;
             }
