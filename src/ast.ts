@@ -553,8 +553,8 @@ module quby.ast {
     }
 
     export class Mappings extends SyntaxList {
-        constructor (mappings?: ISyntax[]) {
-            super(',', false, mappings);
+        constructor( mappings?: ISyntax[] ) {
+            super( ',', false, mappings );
         }
     }
 
@@ -2226,8 +2226,9 @@ module quby.ast {
         private left: IExpr;
         private right: IExpr;
         private strOp: string;
+        private bracketSurround: boolean;
 
-        constructor (left: IExpr, right: IExpr, strOp: string, isResultBool: boolean, precedence: number) {
+        constructor (left: IExpr, right: IExpr, strOp: string, isResultBool: boolean, precedence: number, bracketSurround:boolean = true) {
             var offset = left ? left.offset : null;
 
             if (precedence === undefined) {
@@ -2240,6 +2241,8 @@ module quby.ast {
             this.right = right;
 
             this.strOp = strOp;
+
+            this.bracketSurround = bracketSurround;
         }
 
         getLeft() {
@@ -2253,12 +2256,18 @@ module quby.ast {
         printOp(p: quby.core.Printer) {
             var bracket = quby.compilation.hints.doubleBracketOps();
 
-            if (bracket) {
-                p.append('((');
-            } else {
-                p.append('(');
+            if ( this.bracketSurround ) {
+                if ( bracket ) {
+                    p.append( '((' );
+                } else {
+                    p.append( '(' );
+                }
+            } else if ( bracket ) {
+                p.append( '(' );
             }
+
             this.left.print(p);
+
             if (bracket) {
                 p.append(')');
             }
@@ -2269,10 +2278,15 @@ module quby.ast {
                 p.append('(');
             }
             this.right.print(p);
-            if (bracket) {
-                p.append('))');
-            } else {
-                p.append(')');
+
+            if ( this.bracketSurround ) {
+                if ( bracket ) {
+                    p.append( '))' );
+                } else {
+                    p.append( ')' );
+                }
+            } else if ( bracket ) {
+                p.append( ')' );
             }
         }
 
@@ -2503,13 +2517,13 @@ module quby.ast {
      */
     export class Mapping extends Op {
         constructor(left:IExpr, right:IExpr) {
-            super( left, right, ':', false, 100 );
+            super( left, right, ',', false, 100, false );
         }
+    }
 
-        printOp(p:quby.core.Printer) {
-            this.getLeft().print(p);
-            p.append(',');
-            this.getRight().print(p);
+    export class JSMapping extends Op {
+        constructor(left:IExpr, right:IExpr) {
+            super( left, right, ':', false, 100, false );
         }
     }
 

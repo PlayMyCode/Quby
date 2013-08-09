@@ -979,10 +979,33 @@ module quby.parser {
             } );
 
     var hashLiteral = parse.
-            name( 'new Hash' ).
-            optional( terminals.ops.hash ).
+            name( 'new hash literal' ).
             then( terminals.symbols.leftBrace ).
             optionalSeperator( hashMapping, terminals.symbols.comma ).
+            optional( terminals.endOfLine ).
+            then( terminals.symbols.rightBrace ).
+            onMatch( function( lBrace, mappings, endOfLine, rBrace ) {
+                if ( mappings !== null ) {
+                    mappings = new quby.ast.Mappings( mappings );
+                }
+
+                return new quby.ast.HashLiteral( mappings );
+            } );
+
+    var jsHashMapping = parse.
+            name( 'js hash mapping' ).
+            a( expr ).
+            either( terminals.ops.colon, terminals.ops.mapArrow ).
+            then( expr ).
+            onMatch( function( left, mapAssign, right ) {
+                return new quby.ast.JSMapping( left, right );
+            } );
+
+    var jsHashLiteral = parse.
+            name( 'new JS hash literal' ).
+            a( terminals.ops.hash ).
+            then( terminals.symbols.leftBrace ).
+            optionalSeperator( jsHashMapping, terminals.symbols.comma ).
             optional( terminals.endOfLine ).
             then( terminals.symbols.rightBrace ).
             onMatch( function( hash, lBrace, mappings, endOfLine, rBrace ) {
@@ -990,11 +1013,7 @@ module quby.parser {
                     mappings = new quby.ast.Mappings( mappings );
                 }
 
-                if ( hash !== null ) {
-                    return new quby.ast.JSObjectLiteral( mappings );
-                } else {
-                    return new quby.ast.HashLiteral( mappings );
-                }
+                return new quby.ast.JSObjectLiteral( mappings );
             } );
 
     var yieldExpr = parse.
@@ -1368,8 +1387,12 @@ module quby.parser {
             name( 'expression' ).
             either(
                     singleOpExpr,
+
                     arrayLiteral,
+
                     hashLiteral,
+                    jsHashLiteral,
+
                     yieldExpr,
                     exprInParenthesis,
                     newInstance,
