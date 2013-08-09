@@ -1291,7 +1291,7 @@ var parse;
                 }
 
                 i++;
-            } while(i < rules.length && isOptional[i]);
+            } while(i < rules.length && isOptional[i - 1]);
         } else {
             return;
         }
@@ -1542,6 +1542,7 @@ var parse;
         };
 
         ParserRuleImplementation.prototype.errorIfEnded = function (ignoreSpecial) {
+            if (typeof ignoreSpecial === "undefined") { ignoreSpecial = false; }
             if (this.compiled !== null) {
                 throw new Error("New rule added, but 'finally' has already been called");
             }
@@ -1558,7 +1559,7 @@ var parse;
                 throw new Error("Item being marked as optional, when there are no rules.");
             }
 
-            this.isOptional[rulesLen - 1] = !!isOptional;
+            this.isOptional[rulesLen - 1] = isOptional;
 
             return this;
         };
@@ -4617,7 +4618,8 @@ var quby;
 
         var Op = (function (_super) {
             __extends(Op, _super);
-            function Op(left, right, strOp, isResultBool, precedence) {
+            function Op(left, right, strOp, isResultBool, precedence, bracketSurround) {
+                if (typeof bracketSurround === "undefined") { bracketSurround = true; }
                 var offset = left ? left.offset : null;
 
                 if (precedence === undefined) {
@@ -4630,6 +4632,8 @@ var quby;
                 this.right = right;
 
                 this.strOp = strOp;
+
+                this.bracketSurround = bracketSurround;
             }
             Op.prototype.getLeft = function () {
                 return this.left;
@@ -4642,12 +4646,18 @@ var quby;
             Op.prototype.printOp = function (p) {
                 var bracket = quby.compilation.hints.doubleBracketOps();
 
-                if (bracket) {
-                    p.append('((');
-                } else {
+                if (this.bracketSurround) {
+                    if (bracket) {
+                        p.append('((');
+                    } else {
+                        p.append('(');
+                    }
+                } else if (bracket) {
                     p.append('(');
                 }
+
                 this.left.print(p);
+
                 if (bracket) {
                     p.append(')');
                 }
@@ -4658,9 +4668,14 @@ var quby;
                     p.append('(');
                 }
                 this.right.print(p);
-                if (bracket) {
-                    p.append('))');
-                } else {
+
+                if (this.bracketSurround) {
+                    if (bracket) {
+                        p.append('))');
+                    } else {
+                        p.append(')');
+                    }
+                } else if (bracket) {
                     p.append(')');
                 }
             };
@@ -4854,16 +4869,20 @@ var quby;
         var Mapping = (function (_super) {
             __extends(Mapping, _super);
             function Mapping(left, right) {
-                _super.call(this, left, right, ':', false, 100);
+                _super.call(this, left, right, ',', false, 100, false);
             }
-            Mapping.prototype.printOp = function (p) {
-                this.getLeft().print(p);
-                p.append(',');
-                this.getRight().print(p);
-            };
             return Mapping;
         })(Op);
         ast.Mapping = Mapping;
+
+        var JSMapping = (function (_super) {
+            __extends(JSMapping, _super);
+            function JSMapping(left, right) {
+                _super.call(this, left, right, ':', false, 100, false);
+            }
+            return JSMapping;
+        })(Op);
+        ast.JSMapping = JSMapping;
 
         var Assignment = (function (_super) {
             __extends(Assignment, _super);
@@ -5183,13 +5202,13 @@ var quby;
             };
 
             ComplexLiteral.prototype.print = function (p) {
-                p.append('(new QubyArray([');
+                p.append(this.pre);
 
                 if (this.parameters !== null) {
                     this.parameters.print(p);
                 }
 
-                p.append(']))');
+                p.append(this.post);
             };
 
             ComplexLiteral.prototype.validate = function (v) {
@@ -8007,16 +8026,24 @@ var quby;
             return new quby.ast.Mapping(left, right);
         });
 
-        var hashLiteral = parse.name('new Hash').optional(terminals.ops.hash).then(terminals.symbols.leftBrace).optionalSeperator(hashMapping, terminals.symbols.comma).optional(terminals.endOfLine).then(terminals.symbols.rightBrace).onMatch(function (hash, lBrace, mappings, endOfLine, rBrace) {
+        var hashLiteral = parse.name('new hash literal').then(terminals.symbols.leftBrace).optionalSeperator(hashMapping, terminals.symbols.comma).optional(terminals.endOfLine).then(terminals.symbols.rightBrace).onMatch(function (lBrace, mappings, endOfLine, rBrace) {
             if (mappings !== null) {
                 mappings = new quby.ast.Mappings(mappings);
             }
 
-            if (hash !== null) {
-                return new quby.ast.JSObjectLiteral(mappings);
-            } else {
-                return new quby.ast.HashLiteral(mappings);
+            return new quby.ast.HashLiteral(mappings);
+        });
+
+        var jsHashMapping = parse.name('js hash mapping').a(expr).either(terminals.ops.colon, terminals.ops.mapArrow).then(expr).onMatch(function (left, mapAssign, right) {
+            return new quby.ast.JSMapping(left, right);
+        });
+
+        var jsHashLiteral = parse.name('new JS hash literal').a(terminals.ops.hash).then(terminals.symbols.leftBrace).optionalSeperator(jsHashMapping, terminals.symbols.comma).optional(terminals.endOfLine).then(terminals.symbols.rightBrace).onMatch(function (hash, lBrace, mappings, endOfLine, rBrace) {
+            if (mappings !== null) {
+                mappings = new quby.ast.Mappings(mappings);
             }
+
+            return new quby.ast.JSObjectLiteral(mappings);
         });
 
         var yieldExpr = parse.name('yield').a(terminals.keywords.YIELD).optional(exprs).onMatch(function (yld, exprs) {
@@ -8181,7 +8208,7 @@ var quby;
             }
         }));
 
-        expr.name('expression').either(singleOpExpr, arrayLiteral, hashLiteral, yieldExpr, exprInParenthesis, newInstance, functionCall, variables, lambda, terminals.literals, terminals.admin.inline, terminals.admin.preInline).optional(exprExtension).onMatch(function (expr, rest) {
+        expr.name('expression').either(singleOpExpr, arrayLiteral, hashLiteral, jsHashLiteral, yieldExpr, exprInParenthesis, newInstance, functionCall, variables, lambda, terminals.literals, terminals.admin.inline, terminals.admin.preInline).optional(exprExtension).onMatch(function (expr, rest) {
             if (rest !== null) {
                 rest.appendLeft(expr);
 
