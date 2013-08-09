@@ -1840,7 +1840,7 @@ module parse {
                     }
 
                     i++;
-                } while (i < rules.length && isOptional[i]);
+                } while (i < rules.length && isOptional[i-1]);
             } else {
                 return;
             }
@@ -2418,7 +2418,7 @@ module parse {
         /**
          * @param ignoreSpecial Pass in true to skip the cyclic check.
          */
-        private errorIfEnded(ignoreSpecial? ) {
+        private errorIfEnded(ignoreSpecial:boolean = false) {
             if (this.compiled !== null) {
                 throw new Error("New rule added, but 'finally' has already been called");
             }
@@ -2433,14 +2433,14 @@ module parse {
          *
          * Optional rules can be skipped.
          */
-        private markOptional(isOptional) {
+        private markOptional(isOptional:boolean) {
             var rulesLen = this.rules.length;
 
             if (rulesLen === 0) {
                 throw new Error("Item being marked as optional, when there are no rules.");
             }
 
-            this.isOptional[rulesLen - 1] = !!isOptional;
+            this.isOptional[rulesLen - 1] = isOptional;
 
             return this;
         }
@@ -2625,9 +2625,10 @@ module parse {
                                 }
                             }
                         }
-                        // an 'then' rule
+                    // an 'then' rule
                     } else if (rule instanceof Term) {
                         addRuleToLookup(rule.id, ruleLookup, rule);
+                    // nested parser rule (I think)
                     } else {
                         var ids = [],
                             seen = [];
