@@ -1261,17 +1261,22 @@ module parse {
      *  **  **  **  **  **  **  **  **  **  **  **  **  */
 
     export class ParseError {
-        isSymbol: boolean = false;
-        isTerminal: boolean = false;
+        public isSymbol: boolean = false;
+        public isTerminal: boolean = false;
 
-        offset: number;
-        source: SourceLines;
-        match: string;
+        public source: SourceLines;
 
-        constructor (offset, source, match) {
-            this.offset = offset;
+        public offset: number;
+        public endOffset: number;
+
+        constructor (source, offset, endI) {
             this.source = source;
-            this.match = match;
+            this.offset = offset;
+            this.endOffset = endI;
+        }
+
+        getMatch() {
+            return this.source.substring( this.offset, this.endOffset );
         }
 
         getLine() {
@@ -1287,10 +1292,10 @@ module parse {
      * grammar rules are checked.
      */
     export class SymbolError extends ParseError {
-        isSymbol = true;
+        public isSymbol = true;
 
-        constructor (i, str, sourceLines) {
-            super(i, sourceLines, str);
+        constructor (sourceLines, i, endI) {
+            super( sourceLines, i, endI );
 
             this.isSymbol = true;
         }
@@ -1301,17 +1306,17 @@ module parse {
      * rules are worked on.
      */
     export class TerminalError extends ParseError {
-        isTerminal = true;
+        public isTerminal = true;
 
-        terminal: Term;
-        terminalName: string;
+        public terminal: Term;
+        public terminalName: string;
 
-        isLiteral: boolean;
+        public isLiteral: boolean;
 
-        expected: string[];
+        public expected: string[];
 
         constructor (symbol: Symbol, expected: string[]) {
-            super(symbol.offset, symbol.source, symbol.match);
+            super( symbol.source, symbol.offset, symbol.endOffset );
 
             var term = symbol.terminal;
 
@@ -1393,6 +1398,14 @@ module parse {
             }
         }
 
+        substr( i: number, len: number ): string {
+            return this.source.substr( i, len );
+        }
+
+        substring( i: number, end: number ): string {
+            return this.source.substring( i, end );
+        }
+
         getSourceName() {
             return this.name;
         }
@@ -1425,24 +1438,53 @@ module parse {
     export class Symbol {
         public terminal: Term;
         public offset: number;
+        public endOffset: number;
         public source: SourceLines;
-        public match: string;
 
-        public lower: string = null;
+        private match: string;
+        private lower: string;
 
-        constructor (terminal, offset, sourceLines, match) {
-            this['terminal'] = terminal;
-            this['offset'] = offset;
-            this['source'] = sourceLines;
-            this['match'] = match;
+        constructor (terminal:Term, sourceLines:SourceLines, offset:number, endOffset:number) {
+            this.terminal = terminal;
+            this.offset = offset;
+            this.endOffset = endOffset;
+            this.source = sourceLines;
+
+            this.match = undefined;
+            this.lower = undefined;
         }
 
         clone(newMatch: string) {
-            return new Symbol(this.terminal, this.offset, this.source, newMatch);
+            var sym = new Symbol(this.terminal, this.source, this.offset, this.endOffset);
+
+            sym.match = this.match;
+            sym.lower = this.lower;
+
+            return sym;
         }
 
-        getLower() {
-            if (this.lower === null) {
+        chompLeft( offset: number ): string {
+            return this.source.substring( this.offset + offset, this.endOffset );
+        }
+
+        chompRight( offset: number ): string {
+            return this.source.substring( this.offset, this.endOffset - offset );
+        }
+
+        chomp( left: number, right: number ): string {
+            return this.source.substring( this.offset + left, this.endOffset - right );
+        }
+
+        getMatch() : string {
+            if ( this.match === undefined ) {
+                this.match = this.source.substring( this.offset, this.endOffset );
+            }
+
+            return this.match;
+        }
+
+        getLower() : string {
+            if (this.lower === undefined) {
                 return (this.lower = this.match.toLowerCase());
             } else {
                 return this.lower;
@@ -3563,9 +3605,9 @@ module parse {
                                 continue scan_literals;
                             }
 
-                            /*
-                             * Non-alphanumeric codes, such as '+'.
-                             */
+                        /*
+                         * Non-alphanumeric codes, such as '+'.
+                         */
                         } else if (type === TYPE_CODE) {
                             if (code === match) {
                                 r = i + 1;
@@ -3574,11 +3616,11 @@ module parse {
                                 continue scan_literals;
                             }
 
-                            /*
-                             * Single alpha-numeric codes, such as 'a' or 'b'.
-                             *
-                             * I expect it is unpopular, which is why it is last.
-                             */
+                        /*
+                         * Single alpha-numeric codes, such as 'a' or 'b'.
+                         *
+                         * I expect it is unpopular, which is why it is last.
+                         */
                         } else if (type === TYPE_WORD_CODE) {
                             if (code === match && !isWordCode(src.charCodeAt(i + 1))) {
                                 r = i + 1;
@@ -3590,12 +3632,6 @@ module parse {
 
                         if (r > i) {
                             symbolIDs[symbolI] = termIDs[j];
-                            symbols[symbolI++] = new Symbol(
-                                    allTerms[j],
-                                    i,
-                                    sourceLines,
-                                    literalsMatches[j]
-                            );
 
                             // If we were in error mode,
                             // report the error section.
@@ -3604,9 +3640,9 @@ module parse {
                             // to this one, but ignores whitespace.
                             if (errorStart !== NO_ERROR) {
                                 errors.push(new SymbolError(
+                                        sourceLines,
                                         errorStart,
-                                        inputSrc.substring(errorStart, i),
-                                        sourceLines
+                                        i
                                 ));
 
                                 errorStart = NO_ERROR;
@@ -3619,13 +3655,18 @@ module parse {
                                 var r2 = postMatchEvent(src, r, code, len);
 
                                 if (r2 !== undefined && r2 > r) {
-                                    i = r2;
-                                } else {
-                                    i = r;
+                                    r = r2;
                                 }
-                            } else {
-                                i = r;
                             }
+
+                            symbols[symbolI++] = new Symbol(
+                                    allTerms[j],
+                                    sourceLines,
+                                    i,
+                                    r
+                            );
+
+                            i = r;
 
                             continue scan;
                         }
@@ -3643,13 +3684,6 @@ module parse {
                         if (r !== undefined && r !== false && r > i) {
                             symbolIDs[symbolI] = termIDs[j];
 
-                            symbols[symbolI++] = new Symbol(
-                                    allTerms[j],
-                                    i,
-                                    sourceLines,
-                                    inputSrc.substring(i, r)
-                            );
-
                             // If we were in error mode,
                             // report the error section.
                             //
@@ -3657,9 +3691,9 @@ module parse {
                             // to this one, but ignores whitespace.
                             if (errorStart !== NO_ERROR) {
                                 errors.push(new SymbolError(
+                                        sourceLines,
                                         errorStart,
-                                        inputSrc.substring(errorStart, i),
-                                        sourceLines
+                                        i
                                 ));
 
                                 errorStart = NO_ERROR;
@@ -3672,13 +3706,18 @@ module parse {
                                 var r2 = postMatchEvent(src, r, code, len);
 
                                 if (r2 !== undefined && r2 > r) {
-                                    i = r2;
-                                } else {
-                                    i = r;
+                                    r = r2;
                                 }
-                            } else {
-                                i = r;
                             }
+
+                            symbols[symbolI++] = new Symbol(
+                                    allTerms[j],
+                                    sourceLines,
+                                    i,
+                                    r
+                            );
+
+                            i = r;
 
                             continue scan;
                         }
@@ -3696,9 +3735,9 @@ module parse {
 
                 if (errorStart !== NO_ERROR && errorStart < len) {
                     errors.push(new SymbolError(
+                            sourceLines,
                             errorStart,
-                            inputSrc.substring(errorStart, i),
-                            sourceLines
+                            i
                     ));
                 }
 

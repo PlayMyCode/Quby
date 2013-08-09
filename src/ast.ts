@@ -849,13 +849,13 @@ module quby.ast {
                 this.extendsCallName = quby.runtime.ROOT_CLASS_CALL_NAME;
                 this.extendsName = quby.runtime.ROOT_CLASS_NAME;
             } else {
-                this.extendsCallName = quby.runtime.formatClass(extendsId.match);
-                this.extendsName = extendsId.match;
+                this.extendsCallName = quby.runtime.formatClass(extendsId.getMatch());
+                this.extendsName = extendsId.getMatch();
             }
 
             this.classId = identifier;
             this.extendId = extendsId;
-            this.match = identifier.match;
+            this.match = identifier.getMatch();
         }
 
         getName() {
@@ -881,7 +881,7 @@ module quby.ast {
 
             if (this.hasSuper()) {
                 var extendName = this.extendId.getLower();
-                var extendStr = this.extendId.match;
+                var extendStr = this.extendId.getMatch();
 
                 if (name == extendName) {
                     v.parseError(this.offset, "Class '" + this.match + "' is extending itself.");
@@ -1152,7 +1152,7 @@ module quby.ast {
         private preVariables: Variable[];
 
         constructor(symName: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
-            super(symName, symName.match, '');
+            super(symName, symName.getMatch(), '');
 
             this.type = FunctionDeclaration.FUNCTION;
 
@@ -1160,10 +1160,10 @@ module quby.ast {
 
             if (parameters !== null) {
                 this.blockParam = parameters.getBlockParam();
-                this.setCallName( quby.runtime.formatFun(symName.match, parameters.length) );
+                this.setCallName( quby.runtime.formatFun(symName.getMatch(), parameters.length) );
             } else {
                 this.blockParam = null;
-                this.setCallName( quby.runtime.formatFun(symName.match, 0) );
+                this.setCallName( quby.runtime.formatFun(symName.getMatch(), 0) );
             }
 
             this.stmtBody = stmtBody;
@@ -1413,7 +1413,7 @@ module quby.ast {
         constructor (name: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
             super(name, parameters, stmtBody);
 
-            this.setCallName(name.match);
+            this.setCallName(name.getMatch());
         }
 
         validate(v: quby.core.Validator) {
@@ -1491,9 +1491,9 @@ module quby.ast {
         constructor (sym: parse.Symbol, parameters: Parameters, block: FunctionBlock) {
             super(
                     sym,
-                    sym.match,
+                    sym.getMatch(),
                     quby.runtime.formatFun(
-                            sym.match,
+                            sym.getMatch(),
                             (parameters !== null) ?
                                     parameters.length :
                                     0
@@ -1784,14 +1784,16 @@ module quby.ast {
         private isExtensionClass: boolean;
         private className: string;
 
-        constructor (name, parameters, block) {
+        constructor (name:parse.Symbol, parameters:Parameters, block:FunctionBlock) {
             super(name, parameters, block);
 
+            var match = name.getMatch();
+
             this.isExtensionClass = false;
-            this.className = quby.runtime.formatClass(name.match);
+            this.className = quby.runtime.formatClass(match);
 
             this.setCallName(
-                    quby.runtime.formatNew(name.match, this.getNumParameters())
+                    quby.runtime.formatNew(match, this.getNumParameters())
             );
         }
 
@@ -1873,7 +1875,7 @@ module quby.ast {
     export class YieldStmt extends Syntax {
         private parameters: Parameters;
 
-        constructor (offsetObj, args: Parameters = null) {
+        constructor (offsetObj:parse.Symbol, args: Parameters = null) {
             super(offsetObj);
 
             this.parameters = args;
@@ -2185,7 +2187,7 @@ module quby.ast {
     }
 
     export class Not extends SingleOp {
-        constructor (expr) {
+        constructor (expr:IExpr) {
             super(expr, "!", true);
         }
 
@@ -2385,7 +2387,7 @@ module quby.ast {
      *  if ( a #instanceof #Foo ) {
      */
     export class JSInstanceOf extends Op {
-        constructor(left, right) {
+        constructor(left:IExpr, right:IExpr) {
             super( left, right, 'instanceof', true, 7);
 
             this.setJSLiteral(true);
@@ -2575,7 +2577,7 @@ module quby.ast {
         private isAssignmentFlag: boolean;
 
         constructor (identifier: parse.Symbol, callName: string) {
-            super(identifier, identifier.match, callName);
+            super(identifier, identifier.getMatch(), callName);
 
             this.isAssignmentFlag = false;
         }
@@ -2600,8 +2602,8 @@ module quby.ast {
     export class LocalVariable extends Variable {
         private useVar:boolean;
 
-        constructor(identifier) {
-            super( identifier, quby.runtime.formatVar(identifier.match) );
+        constructor(identifier:parse.Symbol) {
+            super( identifier, quby.runtime.formatVar(identifier.getMatch()) );
 
             this.useVar = false;
         }
@@ -2644,8 +2646,8 @@ module quby.ast {
     }
 
     export class GlobalVariable extends Variable {
-        constructor(identifier) {
-            super( identifier, quby.runtime.formatGlobal(identifier.match) );
+        constructor(identifier:parse.Symbol) {
+            super( identifier, quby.runtime.formatGlobal(identifier.getMatch()) );
         }
 
         print(p:quby.core.Printer) {
@@ -2694,7 +2696,7 @@ module quby.ast {
         private isInsideExtensionClass: boolean;
 
         constructor(identifier:parse.Symbol) {
-            super( identifier, identifier.match.substring(1) );
+            super( identifier, identifier.chompLeft( 1 ) );
 
             this.klass = null;
             this.isInsideExtensionClass = false;
@@ -2806,7 +2808,7 @@ module quby.ast {
         constructor(identifier:parse.Symbol) {
             super( identifier );
 
-            this.setCallName(identifier.match);
+            this.setCallName(identifier.getMatch());
             this.setJSLiteral(true);
         }
 
@@ -2971,7 +2973,7 @@ module quby.ast {
         constructor(sym:parse.Symbol, isTrue:boolean, altMatch?:string) {
             this.match = altMatch ?
                     altMatch  :
-                    sym.match ;
+                    sym.getMatch() ;
 
             super(sym);
 
@@ -2987,8 +2989,8 @@ module quby.ast {
             // do nothing
         }
 
-        print(p:quby.core.Printer) {
-            p.append(this.match);
+        print( p: quby.core.Printer ) {
+            p.append( this.match );
         }
 
         /**
@@ -3010,7 +3012,7 @@ module quby.ast {
         constructor(sym:parse.Symbol) {
             super( sym, true );
 
-            this.callName = quby.runtime.formatSymbol( sym.match );
+            this.callName = quby.runtime.formatSymbol( sym.getMatch() );
         }
 
         getName() {
@@ -3030,9 +3032,9 @@ module quby.ast {
         constructor(sym:parse.Symbol) {
             var matchStr:string;
 
-            var origNum = sym.match,
-                num = origNum.replace(/_+/g, ''),
-                decimalCount = 0;
+            var origNum:string = sym.getMatch();
+            var num:string = origNum.replace( /_+/g, '' );
+            var decimalCount:number = 0;
 
             // TODO validate num
 
@@ -3047,13 +3049,13 @@ module quby.ast {
     export class String extends Literal {
         constructor( sym:parse.Symbol ) {
             // escape the \n's
-            super( sym, true, sym.match.replace(/\n/g, "\\n") );
+            super( sym, true, sym.getMatch().replace(/\n/g, "\\n") );
         }
     }
 
     export class Bool extends Literal {
         constructor( sym:parse.Symbol ) {
-            super(sym, (sym.match === 'true'));
+            super(sym, (sym.terminal.literal === 'true'));
         }
     }
 
@@ -3388,8 +3390,7 @@ module quby.ast {
 
         print(p:quby.core.Printer) {
             if (!this.isPrinted) {
-                var match = this.offset.match;
-                p.append(match.substring(6, match.length - 3));
+                p.append( this.offset.chomp( 6, 3 ) );
 
                 this.isPrinted = true;
             }
@@ -3407,9 +3408,7 @@ module quby.ast {
         }
 
         print(p:quby.core.Printer) {
-            var match = this.offset.match;
-
-            p.append(match.substring(3, match.length - 3));
+            p.append( this.offset.chomp( 3, 3 ) );
         }
         printAsCondition(p:quby.core.Printer) {
             this.print(p);

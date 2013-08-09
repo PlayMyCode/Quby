@@ -96,14 +96,14 @@ module quby.core {
             strErr;
 
         if (error.isSymbol) {
-            strErr = "error parsing '" + error.match + "'";
+            strErr = "error parsing '" + error.getMatch() + "'";
         } else if (error.isTerminal) {
             var termError = <parse.TerminalError> error;
 
-            if (termError.isLiteral || util.str.trim(termError.match) === '') {
+            if (termError.isLiteral || util.str.trim(termError.getMatch()) === '') {
                 strErr = "syntax error near '" + termError.terminalName + "'";
             } else {
-                strErr = "syntax error near " + termError.terminalName + " '" + error.match + "'";
+                strErr = "syntax error near " + termError.terminalName + " '" + error.getMatch() + "'";
             }
 
             var expected = termError.expected;

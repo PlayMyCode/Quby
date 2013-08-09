@@ -904,13 +904,17 @@ var parse;
     parse.Term = Term;
 
     var ParseError = (function () {
-        function ParseError(offset, source, match) {
+        function ParseError(source, offset, endI) {
             this.isSymbol = false;
             this.isTerminal = false;
-            this.offset = offset;
             this.source = source;
-            this.match = match;
+            this.offset = offset;
+            this.endOffset = endI;
         }
+        ParseError.prototype.getMatch = function () {
+            return this.source.substring(this.offset, this.endOffset);
+        };
+
         ParseError.prototype.getLine = function () {
             return this.source.getLine(this.offset);
         };
@@ -920,8 +924,8 @@ var parse;
 
     var SymbolError = (function (_super) {
         __extends(SymbolError, _super);
-        function SymbolError(i, str, sourceLines) {
-            _super.call(this, i, sourceLines, str);
+        function SymbolError(sourceLines, i, endI) {
+            _super.call(this, sourceLines, i, endI);
             this.isSymbol = true;
 
             this.isSymbol = true;
@@ -933,7 +937,7 @@ var parse;
     var TerminalError = (function (_super) {
         __extends(TerminalError, _super);
         function TerminalError(symbol, expected) {
-            _super.call(this, symbol.offset, symbol.source, symbol.match);
+            _super.call(this, symbol.source, symbol.offset, symbol.endOffset);
             this.isTerminal = true;
 
             var term = symbol.terminal;
@@ -985,6 +989,14 @@ var parse;
             }
         };
 
+        SourceLines.prototype.substr = function (i, len) {
+            return this.source.substr(i, len);
+        };
+
+        SourceLines.prototype.substring = function (i, end) {
+            return this.source.substring(i, end);
+        };
+
         SourceLines.prototype.getSourceName = function () {
             return this.name;
         };
@@ -1010,19 +1022,46 @@ var parse;
     ;
 
     var Symbol = (function () {
-        function Symbol(terminal, offset, sourceLines, match) {
-            this.lower = null;
-            this['terminal'] = terminal;
-            this['offset'] = offset;
-            this['source'] = sourceLines;
-            this['match'] = match;
+        function Symbol(terminal, sourceLines, offset, endOffset) {
+            this.terminal = terminal;
+            this.offset = offset;
+            this.endOffset = endOffset;
+            this.source = sourceLines;
+
+            this.match = undefined;
+            this.lower = undefined;
         }
         Symbol.prototype.clone = function (newMatch) {
-            return new Symbol(this.terminal, this.offset, this.source, newMatch);
+            var sym = new Symbol(this.terminal, this.source, this.offset, this.endOffset);
+
+            sym.match = this.match;
+            sym.lower = this.lower;
+
+            return sym;
+        };
+
+        Symbol.prototype.chompLeft = function (offset) {
+            return this.source.substring(this.offset + offset, this.endOffset);
+        };
+
+        Symbol.prototype.chompRight = function (offset) {
+            return this.source.substring(this.offset, this.endOffset - offset);
+        };
+
+        Symbol.prototype.chomp = function (left, right) {
+            return this.source.substring(this.offset + left, this.endOffset - right);
+        };
+
+        Symbol.prototype.getMatch = function () {
+            if (this.match === undefined) {
+                this.match = this.source.substring(this.offset, this.endOffset);
+            }
+
+            return this.match;
         };
 
         Symbol.prototype.getLower = function () {
-            if (this.lower === null) {
+            if (this.lower === undefined) {
                 return (this.lower = this.match.toLowerCase());
             } else {
                 return this.lower;
@@ -2420,10 +2459,9 @@ var parse;
 
                         if (r > i) {
                             symbolIDs[symbolI] = termIDs[j];
-                            symbols[symbolI++] = new Symbol(allTerms[j], i, sourceLines, literalsMatches[j]);
 
                             if (errorStart !== NO_ERROR) {
-                                errors.push(new SymbolError(errorStart, inputSrc.substring(errorStart, i), sourceLines));
+                                errors.push(new SymbolError(sourceLines, errorStart, i));
 
                                 errorStart = NO_ERROR;
                             }
@@ -2435,13 +2473,13 @@ var parse;
                                 var r2 = postMatchEvent(src, r, code, len);
 
                                 if (r2 !== undefined && r2 > r) {
-                                    i = r2;
-                                } else {
-                                    i = r;
+                                    r = r2;
                                 }
-                            } else {
-                                i = r;
                             }
+
+                            symbols[symbolI++] = new Symbol(allTerms[j], sourceLines, i, r);
+
+                            i = r;
 
                             continue scan;
                         }
@@ -2455,10 +2493,8 @@ var parse;
                         if (r !== undefined && r !== false && r > i) {
                             symbolIDs[symbolI] = termIDs[j];
 
-                            symbols[symbolI++] = new Symbol(allTerms[j], i, sourceLines, inputSrc.substring(i, r));
-
                             if (errorStart !== NO_ERROR) {
-                                errors.push(new SymbolError(errorStart, inputSrc.substring(errorStart, i), sourceLines));
+                                errors.push(new SymbolError(sourceLines, errorStart, i));
 
                                 errorStart = NO_ERROR;
                             }
@@ -2470,13 +2506,13 @@ var parse;
                                 var r2 = postMatchEvent(src, r, code, len);
 
                                 if (r2 !== undefined && r2 > r) {
-                                    i = r2;
-                                } else {
-                                    i = r;
+                                    r = r2;
                                 }
-                            } else {
-                                i = r;
                             }
+
+                            symbols[symbolI++] = new Symbol(allTerms[j], sourceLines, i, r);
+
+                            i = r;
 
                             continue scan;
                         }
@@ -2489,7 +2525,7 @@ var parse;
                 }
 
                 if (errorStart !== NO_ERROR && errorStart < len) {
-                    errors.push(new SymbolError(errorStart, inputSrc.substring(errorStart, i), sourceLines));
+                    errors.push(new SymbolError(sourceLines, errorStart, i));
                 }
 
                 return new SymbolResult(errors, symbols, symbolIDs, symbolI, symbolIDToTerms);
@@ -3425,13 +3461,13 @@ var quby;
                     this.extendsCallName = quby.runtime.ROOT_CLASS_CALL_NAME;
                     this.extendsName = quby.runtime.ROOT_CLASS_NAME;
                 } else {
-                    this.extendsCallName = quby.runtime.formatClass(extendsId.match);
-                    this.extendsName = extendsId.match;
+                    this.extendsCallName = quby.runtime.formatClass(extendsId.getMatch());
+                    this.extendsName = extendsId.getMatch();
                 }
 
                 this.classId = identifier;
                 this.extendId = extendsId;
-                this.match = identifier.match;
+                this.match = identifier.getMatch();
             }
             ClassHeader.prototype.getName = function () {
                 return this.match;
@@ -3450,7 +3486,7 @@ var quby;
 
                 if (this.hasSuper()) {
                     var extendName = this.extendId.getLower();
-                    var extendStr = this.extendId.match;
+                    var extendStr = this.extendId.getMatch();
 
                     if (name == extendName) {
                         v.parseError(this.offset, "Class '" + this.match + "' is extending itself.");
@@ -3646,7 +3682,7 @@ var quby;
         var FunctionDeclaration = (function (_super) {
             __extends(FunctionDeclaration, _super);
             function FunctionDeclaration(symName, parameters, stmtBody) {
-                _super.call(this, symName, symName.match, '');
+                _super.call(this, symName, symName.getMatch(), '');
 
                 this.type = FunctionDeclaration.FUNCTION;
 
@@ -3654,10 +3690,10 @@ var quby;
 
                 if (parameters !== null) {
                     this.blockParam = parameters.getBlockParam();
-                    this.setCallName(quby.runtime.formatFun(symName.match, parameters.length));
+                    this.setCallName(quby.runtime.formatFun(symName.getMatch(), parameters.length));
                 } else {
                     this.blockParam = null;
-                    this.setCallName(quby.runtime.formatFun(symName.match, 0));
+                    this.setCallName(quby.runtime.formatFun(symName.getMatch(), 0));
                 }
 
                 this.stmtBody = stmtBody;
@@ -3896,7 +3932,7 @@ var quby;
             function AdminMethod(name, parameters, stmtBody) {
                 _super.call(this, name, parameters, stmtBody);
 
-                this.setCallName(name.match);
+                this.setCallName(name.getMatch());
             }
             AdminMethod.prototype.validate = function (v) {
                 v.ensureAdminMode(this, "Admin (or hash) methods cannot be defined without admin rights.");
@@ -3950,7 +3986,7 @@ var quby;
         var FunctionCall = (function (_super) {
             __extends(FunctionCall, _super);
             function FunctionCall(sym, parameters, block) {
-                _super.call(this, sym, sym.match, quby.runtime.formatFun(sym.match, (parameters !== null) ? parameters.length : 0));
+                _super.call(this, sym, sym.getMatch(), quby.runtime.formatFun(sym.getMatch(), (parameters !== null) ? parameters.length : 0));
 
                 this.parameters = parameters;
 
@@ -4238,10 +4274,12 @@ var quby;
             function NewInstance(name, parameters, block) {
                 _super.call(this, name, parameters, block);
 
-                this.isExtensionClass = false;
-                this.className = quby.runtime.formatClass(name.match);
+                var match = name.getMatch();
 
-                this.setCallName(quby.runtime.formatNew(name.match, this.getNumParameters()));
+                this.isExtensionClass = false;
+                this.className = quby.runtime.formatClass(match);
+
+                this.setCallName(quby.runtime.formatNew(match, this.getNumParameters()));
             }
             NewInstance.prototype.print = function (p) {
                 p.append(this.getCallName(), '(');
@@ -4927,7 +4965,7 @@ var quby;
         var Variable = (function (_super) {
             __extends(Variable, _super);
             function Variable(identifier, callName) {
-                _super.call(this, identifier, identifier.match, callName);
+                _super.call(this, identifier, identifier.getMatch(), callName);
 
                 this.isAssignmentFlag = false;
             }
@@ -4949,7 +4987,7 @@ var quby;
         var LocalVariable = (function (_super) {
             __extends(LocalVariable, _super);
             function LocalVariable(identifier) {
-                _super.call(this, identifier, quby.runtime.formatVar(identifier.match));
+                _super.call(this, identifier, quby.runtime.formatVar(identifier.getMatch()));
 
                 this.useVar = false;
             }
@@ -4983,7 +5021,7 @@ var quby;
         var GlobalVariable = (function (_super) {
             __extends(GlobalVariable, _super);
             function GlobalVariable(identifier) {
-                _super.call(this, identifier, quby.runtime.formatGlobal(identifier.match));
+                _super.call(this, identifier, quby.runtime.formatGlobal(identifier.getMatch()));
             }
             GlobalVariable.prototype.print = function (p) {
                 if (this.isAssignment) {
@@ -5029,7 +5067,7 @@ var quby;
         var FieldVariable = (function (_super) {
             __extends(FieldVariable, _super);
             function FieldVariable(identifier) {
-                _super.call(this, identifier, identifier.match.substring(1));
+                _super.call(this, identifier, identifier.chompLeft(1));
 
                 this.klass = null;
                 this.isInsideExtensionClass = false;
@@ -5114,7 +5152,7 @@ var quby;
             function JSVariable(identifier) {
                 _super.call(this, identifier);
 
-                this.setCallName(identifier.match);
+                this.setCallName(identifier.getMatch());
                 this.setJSLiteral(true);
             }
             JSVariable.prototype.validate = function (v) {
@@ -5263,7 +5301,7 @@ var quby;
         var Literal = (function (_super) {
             __extends(Literal, _super);
             function Literal(sym, isTrue, altMatch) {
-                this.match = altMatch ? altMatch : sym.match;
+                this.match = altMatch ? altMatch : sym.getMatch();
 
                 _super.call(this, sym);
 
@@ -5296,7 +5334,7 @@ var quby;
             function Symbol(sym) {
                 _super.call(this, sym, true);
 
-                this.callName = quby.runtime.formatSymbol(sym.match);
+                this.callName = quby.runtime.formatSymbol(sym.getMatch());
             }
             Symbol.prototype.getName = function () {
                 return this.getMatch();
@@ -5318,7 +5356,9 @@ var quby;
             function Number(sym) {
                 var matchStr;
 
-                var origNum = sym.match, num = origNum.replace(/_+/g, ''), decimalCount = 0;
+                var origNum = sym.getMatch();
+                var num = origNum.replace(/_+/g, '');
+                var decimalCount = 0;
 
                 var matchStr = (num.indexOf('.') === -1) ? "" + ((num) | 0) : "" + (parseFloat(num));
 
@@ -5331,7 +5371,7 @@ var quby;
         var String = (function (_super) {
             __extends(String, _super);
             function String(sym) {
-                _super.call(this, sym, true, sym.match.replace(/\n/g, "\\n"));
+                _super.call(this, sym, true, sym.getMatch().replace(/\n/g, "\\n"));
             }
             return String;
         })(Literal);
@@ -5340,7 +5380,7 @@ var quby;
         var Bool = (function (_super) {
             __extends(Bool, _super);
             function Bool(sym) {
-                _super.call(this, sym, (sym.match === 'true'));
+                _super.call(this, sym, (sym.terminal.literal === 'true'));
             }
             return Bool;
         })(Literal);
@@ -5632,8 +5672,7 @@ var quby;
             }
             PreInline.prototype.print = function (p) {
                 if (!this.isPrinted) {
-                    var match = this.offset.match;
-                    p.append(match.substring(6, match.length - 3));
+                    p.append(this.offset.chomp(6, 3));
 
                     this.isPrinted = true;
                 }
@@ -5653,9 +5692,7 @@ var quby;
                 _super.call(this, sym);
             }
             Inline.prototype.print = function (p) {
-                var match = this.offset.match;
-
-                p.append(match.substring(3, match.length - 3));
+                p.append(this.offset.chomp(3, 3));
             };
             Inline.prototype.printAsCondition = function (p) {
                 this.print(p);
@@ -5755,14 +5792,14 @@ var quby;
             var errLine = error.getLine(), strErr;
 
             if (error.isSymbol) {
-                strErr = "error parsing '" + error.match + "'";
+                strErr = "error parsing '" + error.getMatch() + "'";
             } else if (error.isTerminal) {
                 var termError = error;
 
-                if (termError.isLiteral || util.str.trim(termError.match) === '') {
+                if (termError.isLiteral || util.str.trim(termError.getMatch()) === '') {
                     strErr = "syntax error near '" + termError.terminalName + "'";
                 } else {
-                    strErr = "syntax error near " + termError.terminalName + " '" + error.match + "'";
+                    strErr = "syntax error near " + termError.terminalName + " '" + error.getMatch() + "'";
                 }
 
                 var expected = termError.expected;
@@ -7824,52 +7861,8 @@ var quby;
                 hashDef: '#def',
                 jsInstanceOf: '#instanceof',
                 jsTypeOf: '#typeof',
-                inline: function (src, i, code, len) {
-                    if (code === HASH && src.charCodeAt(i + 1) === LESS_THAN && src.charCodeAt(i + 2) === HASH) {
-                        i += 2;
-
-                        do {
-                            i += 3;
-
-                            code = src.charCodeAt(i);
-
-                            if (code === HASH) {
-                                if (src.charCodeAt(i - 1) === GREATER_THAN && src.charCodeAt(i - 2) === HASH) {
-                                    return i + 1;
-                                } else if (src.charCodeAt(i + 1) === GREATER_THAN && src.charCodeAt(i + 2) === HASH) {
-                                    return i + 3;
-                                }
-                            } else if (code === GREATER_THAN && src.charCodeAt(i - 1) === HASH && src.charCodeAt(i + 1) === HASH) {
-                                return i + 2;
-                            }
-                        } while(i < len);
-
-                        return len;
-                    }
-                },
-                preInline: function (src, i, code, len) {
-                    if (code === HASH && src.charCodeAt(i + 1) === LESS_THAN && src.charCodeAt(i + 2) === LOWER_P && src.charCodeAt(i + 3) === LOWER_R && src.charCodeAt(i + 4) === LOWER_E && src.charCodeAt(i + 5) === HASH) {
-                        i += 5;
-
-                        do {
-                            i += 3;
-
-                            code = src.charCodeAt(i);
-
-                            if (code === HASH) {
-                                if (src.charCodeAt(i - 1) === GREATER_THAN && src.charCodeAt(i - 2) === HASH) {
-                                    return i + 1;
-                                } else if (src.charCodeAt(i + 1) === GREATER_THAN && src.charCodeAt(i + 2) === HASH) {
-                                    return i + 3;
-                                }
-                            } else if (code === GREATER_THAN && src.charCodeAt(i - 1) === HASH && src.charCodeAt(i + 1) === HASH) {
-                                return i + 2;
-                            }
-                        } while(i < len);
-
-                        return len;
-                    }
-                }
+                inline: '#<#',
+                preInline: '#<pre#'
             }
         });
 
@@ -7907,6 +7900,29 @@ var quby;
 
             return i;
         });
+
+        var inlinePostMatch = function (src, i, code, len) {
+            do {
+                i += 3;
+
+                code = src.charCodeAt(i);
+
+                if (code === HASH) {
+                    if (src.charCodeAt(i - 1) === GREATER_THAN && src.charCodeAt(i - 2) === HASH) {
+                        return i + 1;
+                    } else if (src.charCodeAt(i + 1) === GREATER_THAN && src.charCodeAt(i + 2) === HASH) {
+                        return i + 3;
+                    }
+                } else if (code === GREATER_THAN && src.charCodeAt(i - 1) === HASH && src.charCodeAt(i + 1) === HASH) {
+                    return i + 2;
+                }
+            } while(i < len);
+
+            return len;
+        };
+
+        terminals.admin.inline.symbolMatch(inlinePostMatch);
+        terminals.admin.preInline.symbolMatch(inlinePostMatch);
 
         terminals.endOfStatement.onMatch(function () {
             return null;

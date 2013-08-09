@@ -638,105 +638,13 @@ module quby.parser {
         },
 
         admin: {
-            hashDef: '#def',
+            hashDef     : '#def',
 
             jsInstanceOf: '#instanceof',
             jsTypeOf    : '#typeof',
 
-            inline: function( src, i, code, len ) {
-                // #<# random( javascript.code ) #>#
-                if (
-                                       code === HASH &&
-                        src.charCodeAt( i + 1 ) === LESS_THAN &&
-                        src.charCodeAt( i + 2 ) === HASH
-                ) {
-                    i += 2;
-
-                    /*
-                     * Jump in segments of 3, and then check if we hit the
-                     * closing #># at the beginning, middle or end.
-                     */
-                    do {
-                        i += 3;
-
-                        code = src.charCodeAt( i );
-
-                        if ( code === HASH ) {
-                            // land at the end of the closing section
-                            if (
-                                    src.charCodeAt( i - 1 ) === GREATER_THAN &&
-                                    src.charCodeAt( i - 2 ) === HASH
-                            ) {
-                                return i + 1;
-                                // land at the beginning
-                            } else if (
-                                    src.charCodeAt( i + 1 ) === GREATER_THAN &&
-                                    src.charCodeAt( i + 2 ) === HASH
-                            ) {
-                                return i + 3;
-                            }
-                            // land in the middle
-                        } else if (
-                                               code === GREATER_THAN &&
-                                src.charCodeAt( i - 1 ) === HASH &&
-                                src.charCodeAt( i + 1 ) === HASH
-                        ) {
-                            return i + 2;
-                        }
-                    } while ( i < len );
-
-                    return len;
-                }
-            },
-
-            preInline: function( src, i, code, len ) {
-                // if #<pre# javascript.code.here #>#
-                if (
-                                       code === HASH &&
-                        src.charCodeAt( i + 1 ) === LESS_THAN &&
-                        src.charCodeAt( i + 2 ) === LOWER_P &&
-                        src.charCodeAt( i + 3 ) === LOWER_R &&
-                        src.charCodeAt( i + 4 ) === LOWER_E &&
-                        src.charCodeAt( i + 5 ) === HASH
-                ) {
-                    i += 5;
-
-                    /*
-                     * Jump in segments of 3, and then check if we hit the
-                     * closing #># at the beginning, middle or end.
-                     */
-                    do {
-                        i += 3;
-
-                        code = src.charCodeAt( i );
-
-                        if ( code === HASH ) {
-                            // land at the end of the closing section
-                            if (
-                                    src.charCodeAt( i - 1 ) === GREATER_THAN &&
-                                    src.charCodeAt( i - 2 ) === HASH
-                            ) {
-                                return i + 1;
-                                // land at the beginning
-                            } else if (
-                                    src.charCodeAt( i + 1 ) === GREATER_THAN &&
-                                    src.charCodeAt( i + 2 ) === HASH
-                            ) {
-                                return i + 3;
-                            }
-                            // land in the middle
-                        } else if (
-                                               code === GREATER_THAN &&
-                                src.charCodeAt( i - 1 ) === HASH &&
-                                src.charCodeAt( i + 1 ) === HASH
-                        ) {
-                            return i + 2;
-                        }
-                    } while ( i < len );
-
-                    return len;
-                }
-            }
+            inline      : '#<#',
+            preInline   : '#<pre#'
         }
     } );
 
@@ -791,6 +699,47 @@ module quby.parser {
                 return i;
             }
     );
+
+
+    var inlinePostMatch = function ( src, i, code, len ) {
+        /*
+         * Jump in segments of 3, and then check if we hit the
+         * closing #># at the beginning, middle or end.
+         */
+        do {
+            i += 3;
+
+            code = src.charCodeAt( i );
+
+            if ( code === HASH ) {
+                // land at the end of the closing section
+                if (
+                    src.charCodeAt( i - 1 ) === GREATER_THAN &&
+                    src.charCodeAt( i - 2 ) === HASH
+                    ) {
+                    return i + 1;
+                    // land at the beginning
+                } else if (
+                    src.charCodeAt( i + 1 ) === GREATER_THAN &&
+                    src.charCodeAt( i + 2 ) === HASH
+                    ) {
+                    return i + 3;
+                }
+                // land in the middle
+            } else if (
+                code === GREATER_THAN &&
+                src.charCodeAt( i - 1 ) === HASH &&
+                src.charCodeAt( i + 1 ) === HASH
+            ) {
+                return i + 2;
+            }
+        } while ( i < len );
+
+        return len;
+    };
+
+    terminals.admin.inline.symbolMatch( inlinePostMatch );
+    terminals.admin.preInline.symbolMatch( inlinePostMatch );
 
     /*
      * The values returned after it has been matched, when the symbol is
@@ -1616,13 +1565,13 @@ module quby.parser {
      * @param onDebug An optional callback, for sending debug information into.
      */
     export function parseSource(
-            src: string,
-            name: string,
-            onFinish: ( program: quby.ast.ISyntax, errors:parse.ParseError[] ) => void ,
-            onDebug: parse.DebugCallback
-    ) {
-        if (onDebug !== null) {
-            console.log(src);
+        src: string,
+        name: string,
+        onFinish: ( program: quby.ast.ISyntax, errors: parse.ParseError[] ) => void ,
+        onDebug: parse.DebugCallback
+        ) {
+        if ( onDebug !== null ) {
+            console.log( src );
         }
 
         statements.parse( {
@@ -1632,6 +1581,6 @@ module quby.parser {
 
             onFinish: onFinish,
             onDebug: onDebug || null
-        } );
+        });
     }
 }
