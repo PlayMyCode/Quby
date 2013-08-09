@@ -2877,13 +2877,13 @@ module quby.ast {
      * expressions, when defined.
      */
     export class ComplexLiteral extends Syntax {
-        private parameters:IStatements;
-        private pre:string;
-        private post:string;
+        private parameters: IStatements;
+        private pre: string;
+        private post: string;
 
-        constructor(pre:string, parameters:IStatements, post:string) {
+        constructor( pre: string, parameters: IStatements, post: string ) {
             var offset;
-            if (parameters) {
+            if ( parameters ) {
                 offset = parameters.offset;
             } else {
                 parameters = null;
@@ -2894,7 +2894,7 @@ module quby.ast {
 
             this.parameters = parameters;
 
-            this.pre  = pre;
+            this.pre = pre;
             this.post = post;
         }
 
@@ -2902,19 +2902,19 @@ module quby.ast {
             return this.parameters;
         }
 
-        print(p:quby.core.Printer) {
-            p.append('(new QubyArray([');
+        print( p: quby.core.Printer ) {
+            p.append( this.pre );
 
-            if (this.parameters !== null) {
-                this.parameters.print(p);
+            if ( this.parameters !== null ) {
+                this.parameters.print( p );
             }
 
-            p.append(']))');
+            p.append( this.post );
         }
 
-        validate(v:quby.core.Validator) {
-            if (this.parameters !== null) {
-                this.parameters.validate(v);
+        validate( v: quby.core.Validator ) {
+            if ( this.parameters !== null ) {
+                this.parameters.validate( v );
             }
         }
     }
