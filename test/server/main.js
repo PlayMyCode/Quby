@@ -3,6 +3,7 @@
 var PUBLIC_FOLDER = __dirname + '/./..';
 
 var rockwall = require( './rockwall/rockwall.js' );
+var fs = require('fs');
 
 var rockServer = new rockwall.Server();
 
@@ -22,37 +23,87 @@ rockServer.mime({
 rockServer.pageNotFound( function(url, req, res) {
     res.end( '<h1>page not found</h1>' );
 } );
+
+var endsWith = function( str, search ) {
+    return str.lastIndexOf(search) === (str.length-search.length);
+}
+
+var getNewestFileTime = function( folder, extension ) {
+    extension = extension.toLowerCase();
+    if ( extension !== '' && extension.charAt(0) !== '.' ) {
+        extension = '.' + extension;
+    }
+
+    var newestTime = 0;
+    var files = fs.readdirSync( folder );
+
+    for ( var k in files ) {
+        var file = files[k];
+        var path = folder + '/' + file;
+        var fileInfo = fs.statSync( path );
+
+        if ( fileInfo.isDirectory() ) {
+            newestTime = Math.max( newestTime, getNewestFileTime(path, extension) );
+        } else if ( fileInfo.isFile() ) {
+            if ( endsWith( file.toLowerCase(), extension ) ) {
+                newestTime = Math.max( newestTime, fileInfo.mtime.valueOf() );
+            }
+        }
+    }
+
+    return newestTime;
+}
+
 rockServer.route({
         '': function(url, req, res) {
             rockServer.serveFile( 'index.html', req, res );
         },
         'compile': function( url, req, res ) {
-            var compile = spawn( 'cmd',
-                    [
-                            '/c',
-                            __dirname.replace(/\\/g, '/') + '/./../../build/build.bat'
-                    ]
-            );
+            var dir = __dirname.replace(/\\/g, '/') + '/';
 
-            var err = '';
-            compile.stderr.on( 'data', function(data) {
-                err += data;
-            } );
+            var qubytime;
+            try {
+                qubytime = fs.statSync( dir + '../../release/quby.js' ).mtime.valueOf();
+            } catch ( ex ) {
+                console.log( '############################' );
+                console.log( ex );
+                console.log( '############################' );
 
-            compile.on( 'exit', function(code) {
-                if ( code === 0 ) {
-                    console.log( 'compile exit... serve!' );
+                qubytime = 0;
+            }
 
-                    res.status( 200, 'application/javascript' );
-                    rockServer.serveFile( './../release/quby.js', req, res );
-                } else {
-                    console.log( 'compile exit... fail :(' );
+            var tsTime = getNewestFileTime('../../src', '.ts');
 
-                    res.status( 500, 'text/text' );
-                    res.write( err );
-                    res.end();
-                }
-            } );
+            if ( qubytime === 0 || qubytime < tsTime ) {
+                var compile = spawn( 'cmd',
+                        [
+                                '/c',
+                                dir + '../../build/build.bat'
+                        ]
+                );
+
+                var err = '';
+                compile.stderr.on( 'data', function(data) {
+                    err += data;
+                } );
+
+                compile.on( 'exit', function(code) {
+                    if ( code === 0 ) {
+                        console.log( 'compile exit... serve!' );
+
+                        res.status( 200, 'application/javascript' );
+                        rockServer.serveFile( './../release/quby.js', req, res );
+                    } else {
+                        console.log( 'compile exit... fail :(' );
+
+                        res.status( 500, 'text/text' );
+                        res.write( err );
+                        res.end();
+                    }
+                } );
+            } else {
+                rockServer.serveFile( './../release/quby.js', req, res );
+            }
         }
 });
 
