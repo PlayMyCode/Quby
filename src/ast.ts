@@ -2031,7 +2031,16 @@ module quby.ast {
         private balanceDone: boolean;
         private precedence: number;
 
-        private proxy: ISyntax;
+        /**
+         * When this operator is rebalanced, 'proxy' will reference
+         * the new parent operator, which should be above this one.
+         * 
+         * This however causes a cyclic chain, as this references the
+         * parent, and the parent references this. So we must break this
+         * chain whilst we call into the 'proxy' operator (and then 
+         * re-build it after).
+         */ 
+        private proxy: IExpr;
 
         constructor (offset: parse.Symbol, isResultBool:boolean, precedence:number) {
             super(offset, isResultBool);
@@ -2041,7 +2050,7 @@ module quby.ast {
             this.proxy = null;
         }
 
-        setProxy(other: ISyntax) {
+        setProxy(other: IExpr) {
             this.proxy = other;
         }
 
@@ -2058,17 +2067,33 @@ module quby.ast {
         }
 
         validate(v: quby.core.Validator) {
-            if (this.proxy !== null) {
-                this.proxy.validate(v);
+            /*
+             * As validation should only occur once,
+             * this condition should never be reached.
+             *
+             * It's here to allow a repeated call, by disabling the proxy,
+             * to remove a 'cyclic loop' in the tree.
+             */
+            if ( this.proxy !== null ) {
+                var proxy = this.proxy;
+                this.proxy = null;
+
+                proxy.validate( v );
+
+                this.proxy = proxy;
             } else if (this.balanceDone) {
                 this.validateOp(v);
             } else {
                 var self = this.rebalance();
 
+                /*
+                 * the proxy causes a cyclic loop, so we validate the
+                 * new item above us, so it will in turn validate this Op.
+                 */
                 if (self !== this) {
-                    this.proxy = self;
-
                     self.validate(v);
+
+                    this.proxy = self;
                 } else {
                     this.validateOp(v);
                 }
@@ -2076,10 +2101,15 @@ module quby.ast {
         }
 
         print(p: quby.core.Printer) {
-            if (this.proxy === null) {
-                this.printOp(p);
+            if (this.proxy !== null) {
+                var proxy = this.proxy;
+                this.proxy = null;
+
+                proxy.print( p );
+
+                this.proxy = proxy;
             } else {
-                this.proxy.print(p);
+                this.printOp(p);
             }
         }
 
@@ -2316,11 +2346,12 @@ module quby.ast {
                      */
                     if (this.testSwap(right)) {
                         this.right = (<GenericOp> <any> right).swapExpr(this);
+
                         return right;
 
-                        /*
-                         * Or no swapping should take place.
-                         */
+                    /*
+                     * Or no swapping should take place.
+                     */
                     } else {
                         this.right = right;
                     }
