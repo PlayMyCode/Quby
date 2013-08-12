@@ -92,8 +92,8 @@ module quby.core {
      * @return Info on the error, for display purposes.
      */
     var formatError = function(error:parse.ParseError): { line: number; msg: string; } {
-        var errLine = error.getLine(),
-            strErr;
+        var errLine:number = error.getLine(),
+            strErr:string;
 
         if (error.isSymbol) {
             strErr = "error parsing '" + error.getMatch() + "'";
@@ -109,6 +109,7 @@ module quby.core {
             var expected = termError.expected;
             if (expected.length > 0) {
                 strErr += ', expected ';
+
                 if (expected.length > 1) {
                     strErr += expected.slice(0, expected.length - 1).join(', ') + ' or ' + expected[expected.length - 1];
                 } else {
@@ -634,7 +635,7 @@ module quby.core {
          * or at best, you will receive an incomplete program with random
          * bits missing (which shouldn't be used).
          */
-        finaliseProgram() {
+        finaliseProgram():string {
             this.endValidate();
 
             if (this.hasErrors()) {
@@ -903,7 +904,7 @@ module quby.core {
         ensureInFunParameters(syn:quby.ast.ISyntax, errorMsg:string) {
             return this.ensureTest(!this.isInsideFunParameters(), syn, errorMsg);
         }
-        ensureTest(errCondition: boolean, syn:quby.ast.ISyntax, errorMsg:string) {
+        ensureTest(errCondition: boolean, syn:quby.ast.ISyntax, errorMsg:string):boolean {
             if (errCondition) {
                 this.parseError(syn.offset, errorMsg);
                 return false;
@@ -1724,8 +1725,6 @@ module quby.core {
 
             return this;
         };
-    } else {
-        
     }
 
     class PrinterStatement {

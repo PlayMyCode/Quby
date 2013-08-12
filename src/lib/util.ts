@@ -2,8 +2,8 @@
 
 (function(Date) {
     if ( Date.now === undefined ) {
-        Date.now = function() {
-            return (new Date()).getTime();
+        Date.now = function():number {
+            return new Date().getTime();
         }
     }
 })(window['Date']);
@@ -144,7 +144,8 @@ module util {
         * much faster!
         */
         export function argumentsToArray(args: IArguments, i: number = 0): any[] {
-            var len, arr;
+            var len: number,
+                arr: any[];
 
             // iterating from the start to the end
             if (i === 0) {
@@ -245,13 +246,13 @@ module util {
 
         var isFutureRunning = false;
 
-        var futureFuns: { (): void; }[] = [],
+        var futureFuns: { (..._:any[]): void; }[] = [],
         futureBlocking: number[] = [];
 
         var futureBlockingOffset = 0,
             blockingCount = 1;
 
-        var requestAnimFrame =
+        var requestAnimFrame:( callback:FrameRequestCallback ) => number =
                 window.requestAnimationFrame ||
                 window['webkitRequestAnimationFrame'] ||
                 window['mozRequestAnimationFrame'] ||
@@ -274,7 +275,7 @@ module util {
             }
         }
 
-        function addFuns(fs: { (): any; }[]) {
+        function addFuns(fs: { (..._:any[]): any; }[]) {
             for (var i = 0; i < fs.length; i++) {
                 util.future.runFun(fs[i]);
             }
@@ -288,7 +289,7 @@ module util {
         * @private
         * @const
         */
-        function runNextFuture(args? ): void {
+        function runNextFuture(args?:any[] ): void {
             if (futureFuns.length > 0) {
                 util.future.once(function () {
                     if (isFutureRunning === false && futureBlocking[0] === 0) {
@@ -311,11 +312,11 @@ module util {
             }
         }
 
-        export function getRequestAnimationFrame(): (callback: () =>void , element?: HTMLElement) => void {
+        export function getRequestAnimationFrame() {
             return requestAnimFrame;
         }
 
-        export function block(f) {
+        export function block(f:(..._:any[])=>void):number {
             ensureFun(f);
 
             var index = 0;
@@ -339,7 +340,7 @@ module util {
             return index;
         }
 
-        export function unblock(tag, ...args: any[]) {
+        export function unblock(tag:number, ...args: any[]) {
             var index = tag & 0xffff;
             var check = (tag >> 16) & 0xfff;
 
@@ -366,11 +367,11 @@ module util {
             runNextFuture();
         }
 
-        export function hasWork() {
+        export function hasWork():boolean {
             return futureFuns.length > 0;
         }
 
-        export function run(... fs: { (): any; }[]) {
+        export function run(... fs: { (..._:any[]): any; }[]) {
             addFuns(fs);
 
             if (!isFutureRunning) {
@@ -378,7 +379,7 @@ module util {
             }
         }
 
-        export function runFun(f: () =>any): void {
+        export function runFun(f: (..._:any[]) => any): void {
             ensureFun(f);
 
             if (isFutureRunning) {
@@ -391,7 +392,7 @@ module util {
             }
         }
 
-        export function map(values: any[], f: (any) =>any): void {
+        export function map(values: any[], f: (any) => any): void {
             ensureFun(f);
 
             // this is to ensure all values are in their own unique scope
@@ -406,18 +407,18 @@ module util {
             util.future.run();
         }
 
-        export function interval(callback: { (): void; }, element: HTMLElement): number {
+        export function interval(callback: () => void ): number {
             if (requestAnimFrame !== null) {
                 var isRunningHolder = { isRunning: true };
 
-                var recursiveCallback: { (): void; } = function () {
+                var recursiveCallback: () => void = function () {
                     if (isRunningHolder.isRunning) {
                         callback();
-                        requestAnimFrame(recursiveCallback, element);
+                        requestAnimFrame(recursiveCallback);
                     }
                 }
 
-                requestAnimFrame(recursiveCallback, element);
+                requestAnimFrame(recursiveCallback);
 
                 var id = intervalFunID++;
                 intervalFuns[id] = isRunningHolder;

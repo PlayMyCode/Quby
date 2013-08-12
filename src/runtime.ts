@@ -177,7 +177,7 @@ module quby.runtime {
 
         // These are for translating from one class name to another.
         // This is so externally it can have one name but internally it has another.
-        TRANSLATE_CLASSES = {
+        TRANSLATE_CLASSES: { [key: string]: string; } = {
                 'array'  : 'QubyArray' ,
                 'hash'   : 'QubyHash'  ,
                 'object' : 'QubyObject'

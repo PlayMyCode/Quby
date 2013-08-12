@@ -219,7 +219,7 @@ module quby.main {
             return this;
         }
 
-        getFinishedFun() {
+        getFinishedFun():() => void {
             return this.whenFinished;
         }
 
