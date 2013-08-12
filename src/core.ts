@@ -802,7 +802,7 @@ module quby.core {
                     callNames:string[] = [],
                     extensionStr:string[] = [];
 
-                p.append(quby.runtime.FUNCTION_DEFAULT_TABLE_NAME, "={");
+                p.append('var ', quby.runtime.FUNCTION_DEFAULT_TABLE_NAME, "={");
 
                 var errFun = ":function(){quby_errFunStub(this,arguments);}";
                 var printComma = false;
@@ -1122,7 +1122,7 @@ module quby.core {
         print(p: Printer) {
             var fs = this.funs;
 
-            p.append(quby.runtime.FUNCTION_TABLE_NAME, '={');
+            p.append('var ', quby.runtime.FUNCTION_TABLE_NAME, '={');
 
             // We print a comma between each entry
             // and we achieve this by always printing it before the next item,
