@@ -180,7 +180,7 @@ module quby.core {
          * These all bind in the form:
          *  { callname -> Function }
          */
-        private funs: MapObj<quby.ast.IFunctionMeta>;
+        private funs: MapObj<quby.ast.IFunctionDeclarationMeta>;
         private calledMethods: MapObj<quby.ast.IFunctionMeta>;
         private methodNames: FunctionTable;
 
@@ -499,7 +499,7 @@ module quby.core {
          *
          * @param func
          */
-        defineFun(fun:quby.ast.IFunctionMeta) {
+        defineFun(fun:quby.ast.IFunctionDeclarationMeta) {
             var klass = this.currentClass;
 
             // Methods / Constructors
@@ -730,15 +730,17 @@ module quby.core {
                     }
 
                     if (!methodFound) {
-                        var found:quby.ast.IFunctionMeta = this.searchForMethodLike(method),
+                        var found:quby.ast.IFunctionDeclarationMeta = this.searchForMethodLike(method),
                             name = method.getName().toLowerCase(),
                             errMsg:string = null;
 
                         if (found !== null) {
-                            if (name === found.getName().toLowerCase()) {
-                                errMsg = "Method '" + method.getName() + "' called with incorrect number of parameters, " + method.getNumParameters() + " instead of " + found.getNumParameters();
-                            } else {
-                                errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.getName() + "'?";
+                            if ( !found.hasDeclarationError() ) {
+                                if ( name === found.getName().toLowerCase() ) {
+                                    errMsg = "Method '" + method.getName() + "' called with incorrect number of parameters, " + method.getNumParameters() + " instead of " + found.getNumParameters();
+                                } else {
+                                    errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.getName() + "'?";
+                                }
                             }
                         } else {
                             // no alternative method found
@@ -917,12 +919,12 @@ module quby.core {
          * @param method The method to search for one similar too.
          * @param klassVal An optional ClassValidator to restrict the search, otherwise searches through all classes.
          */
-        searchForMethodLike(method:quby.ast.IFunctionMeta, klassVal?:ClassValidator):quby.ast.IFunctionMeta {
+        searchForMethodLike(method:quby.ast.IFunctionMeta, klassVal?:ClassValidator):quby.ast.IFunctionDeclarationMeta {
             if (klassVal) {
                 return this.searchMissingFun(method, klassVal.getFunctions());
             } else {
                 var searchKlassVals = this.classes,
-                    altMethod:quby.ast.IFunctionMeta = null,
+                    altMethod:quby.ast.IFunctionDeclarationMeta = null,
                     methodName = method.getName().toLowerCase();
                 // check for same method, but different number of parameters
 
@@ -951,9 +953,9 @@ module quby.core {
          * 'alternative name' is returned, only if 'incorrect parameters' does not come first.
          * Otherwise null is returned.
          */
-        searchMissingFunWithName(name:string, searchFuns:MapObj<quby.ast.IFunctionMeta>):quby.ast.IFunctionMeta {
+        searchMissingFunWithName(name:string, searchFuns:MapObj<quby.ast.IFunctionDeclarationMeta>):quby.ast.IFunctionDeclarationMeta {
             var altNames:string[] = [],
-                altFun:quby.ast.IFunctionMeta = null;
+                altFun:quby.ast.IFunctionDeclarationMeta = null;
             var nameLen = name.length;
 
             if (
@@ -988,14 +990,14 @@ module quby.core {
             return altFun;
         }
 
-        searchMissingFun(fun:quby.ast.IFunctionMeta, searchFuns:MapObj<quby.ast.IFunctionMeta>) {
+        searchMissingFun(fun:quby.ast.IFunctionMeta, searchFuns:MapObj<quby.ast.IFunctionDeclarationMeta>) : quby.ast.IFunctionDeclarationMeta {
             return this.searchMissingFunWithName(fun.getName().toLowerCase(), searchFuns);
         }
 
         /**
          *
          */
-        searchMissingFunAndError(fun:quby.ast.IFunctionMeta, searchFuns:MapObj<quby.ast.IFunctionMeta>, strFunctionType:string) {
+        searchMissingFunAndError(fun:quby.ast.IFunctionMeta, searchFuns:MapObj<quby.ast.IFunctionDeclarationMeta>, strFunctionType:string) {
             var name = fun.getName(),
                 lower = name.toLowerCase(),
                 found = this.searchMissingFunWithName(name, searchFuns),
@@ -1217,7 +1219,7 @@ module quby.core {
         private validator: Validator;
         private klass:quby.ast.IClassDeclaration;
 
-        private funs: MapObj<quby.ast.IFunctionMeta>;
+        private funs: MapObj<quby.ast.IFunctionDeclarationMeta>;
         private usedFuns: MapObj<quby.ast.IFunctionMeta>;
         private news : quby.ast.IFunctionMeta[];
 
@@ -1268,7 +1270,7 @@ module quby.core {
             return this.assignedFields[callName] !== undefined;
         }
 
-        addFun(fun:quby.ast.IFunctionMeta) {
+        addFun(fun:quby.ast.IFunctionDeclarationMeta) {
             var index = fun.getCallName();
 
             if (this.funs.hasOwnProperty(index)) {

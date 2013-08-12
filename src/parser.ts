@@ -18,7 +18,7 @@ module quby.parser {
      *
      * All of this is provided through one function: quby.parse.parse
      */
-    var log: ( ...args: any[] ) =>void = function() {
+    var log: ( ...args: any[] ) => void = function () {
         if ( window['console'] && window['console']['log'] ) {
             window['console']['log'].apply( window['console'], arguments );
         }
@@ -118,15 +118,15 @@ module quby.parser {
      * @param {number} code
      * @return {boolean}
      */
-    var isAlphaNumericCode = function( code: number ): boolean {
+    var isAlphaNumericCode = function ( code: number ): boolean {
         return (
-                ( code >= LOWER_A && code <= LOWER_Z ) || // lower case letter
-                ( code === UNDERSCORE ) ||
-                ( code >= ZERO && code <= NINE )     // a number
-        );
+            ( code >= LOWER_A && code <= LOWER_Z ) || // lower case letter
+            ( code === UNDERSCORE ) ||
+            ( code >= ZERO && code <= NINE )     // a number
+            );
     };
 
-    var isAlphaCode = function( code: number ): boolean {
+    var isAlphaCode = function ( code: number ): boolean {
         return ( code >= LOWER_A && code <= LOWER_Z );
     }
 
@@ -140,7 +140,7 @@ module quby.parser {
      * @param {number} i
      * @return {boolean}
      */
-    var isAlphaNumeric = function( src: string, i: number ): boolean {
+    var isAlphaNumeric = function ( src: string, i: number ): boolean {
         var code = src.charCodeAt( i + src.length );
 
         return isAlphaNumericCode( code );
@@ -160,8 +160,8 @@ module quby.parser {
      *
      * @param source The source code to prep.
      */
-    var preParse = ( function() {
-        var pushWhitespace = function( newSrc: string[], size: number ) {
+    var preParse = ( function () {
+        var pushWhitespace = function ( newSrc: string[], size: number ) {
             var diff5 = ( size / 5 ) | 0;
 
             // push the whitespace on in clumps of 5 characters
@@ -182,7 +182,7 @@ module quby.parser {
             }
         };
 
-        var getLeft = function( src: string, i: number ): number {
+        var getLeft = function ( src: string, i: number ): number {
             if ( i > 0 ) {
                 return src.charCodeAt( i - 1 );
             } else {
@@ -190,11 +190,11 @@ module quby.parser {
             }
         };
 
-        var getRight = function( src: string, i: number ): number {
+        var getRight = function ( src: string, i: number ): number {
             return getR( src, i + 1 );
         };
 
-        var getR = function( src: string, i: number ) {
+        var getR = function ( src: string, i: number ) {
             if ( i < src.length ) {
                 return src.charCodeAt( i );
             } else {
@@ -208,7 +208,7 @@ module quby.parser {
          *      // single line comments
          *      / * * / multi-line comments
          */
-        var stripComments = function( src: string ): string {
+        var stripComments = function ( src: string ): string {
             var inAdmin = false;
             var inPreAdmin = false;
             var inSingleComment = false;
@@ -222,48 +222,48 @@ module quby.parser {
              * are in a comment.
              */
             var multiCommentCount = 0,
-            newSrc: string[] = [],
+                newSrc: string[] = [],
                 startI = 0;
 
             // note that i is incremented within the code as well as within the for.
             for (
-                    var i = 0, len = src.length;
-                    i < len;
-                    i++
-            ) {
+                var i = 0, len = src.length;
+                i < len;
+                i++
+                ) {
                 var c = src.charCodeAt( i );
 
                 // these are in order of precedence
                 if ( inAdmin ) {
                     if (
-                                        c === HASH &&
-                            getR( src, i + 1 ) === GREATER_THAN &&
-                            getR( src, i + 2 ) === HASH
-                    ) {
+                        c === HASH &&
+                        getR( src, i + 1 ) === GREATER_THAN &&
+                        getR( src, i + 2 ) === HASH
+                        ) {
                         inAdmin = false;
                         i += 2;
                     }
                 } else if ( inPreAdmin ) {
                     if (
-                                        c === HASH &&
-                            getR( src, i + 1 ) === GREATER_THAN &&
-                            getR( src, i + 2 ) === HASH
-                    ) {
+                        c === HASH &&
+                        getR( src, i + 1 ) === GREATER_THAN &&
+                        getR( src, i + 2 ) === HASH
+                        ) {
                         inPreAdmin = false;
                         i += 2;
                     }
                 } else if ( inDoubleString ) {
                     if (
-                                          c === DOUBLE_QUOTE &&
-                            getLeft( src, i ) !== BACKSLASH
-                    ) {
+                        c === DOUBLE_QUOTE &&
+                        getLeft( src, i ) !== BACKSLASH
+                        ) {
                         inDoubleString = false;
                     }
                 } else if ( inSingleString ) {
                     if (
-                                          c === SINGLE_QUOTE &&
-                            getLeft( src, i ) !== BACKSLASH
-                    ) {
+                        c === SINGLE_QUOTE &&
+                        getLeft( src, i ) !== BACKSLASH
+                        ) {
                         inSingleString = false;
                     }
                 } else if ( inSingleComment ) {
@@ -274,14 +274,14 @@ module quby.parser {
                     }
                 } else if ( multiCommentCount > 0 ) {
                     if (
-                                          c === SLASH &&
-                            getRight( src, i ) === STAR
-                    ) {
+                        c === SLASH &&
+                        getRight( src, i ) === STAR
+                        ) {
                         multiCommentCount++;
                     } else if (
-                                           c === STAR &&
-                            getRight( src, i ) === SLASH
-                    ) {
+                        c === STAR &&
+                        getRight( src, i ) === SLASH
+                        ) {
                         multiCommentCount--;
 
                         // +1 so we include this character too
@@ -301,9 +301,9 @@ module quby.parser {
 
                     // multi-line comment
                     if (
-                            c === SLASH &&
-                            getRight( src, i ) === STAR
-                    ) {
+                        c === SLASH &&
+                        getRight( src, i ) === STAR
+                        ) {
                         newSrc.push( src.substring( startI, i ) );
 
                         startI = i;
@@ -311,9 +311,9 @@ module quby.parser {
 
                         multiCommentCount++;
                     } else if (
-                            c === SLASH &&
-                            getRight( src, i ) === SLASH
-                    ) {
+                        c === SLASH &&
+                        getRight( src, i ) === SLASH
+                        ) {
                         newSrc.push( src.substring( startI, i ) );
 
                         startI = i;
@@ -327,19 +327,19 @@ module quby.parser {
                         inSingleString = true;
                     } else if ( c === HASH ) {
                         if (
-                                getR( src, i + 1 ) === LESS_THAN &&
-                                getR( src, i + 2 ) === HASH
-                        ) {
+                            getR( src, i + 1 ) === LESS_THAN &&
+                            getR( src, i + 2 ) === HASH
+                            ) {
                             inAdmin = true;
 
                             i += 2;
                         } else if (
-                                getR( src, i + 1 ) === LESS_THAN &&
-                                getR( src, i + 2 ) === LOWER_P &&
-                                getR( src, i + 3 ) === LOWER_R &&
-                                getR( src, i + 4 ) === LOWER_E &&
-                                getR( src, i + 5 ) === HASH
-                        ) {
+                            getR( src, i + 1 ) === LESS_THAN &&
+                            getR( src, i + 2 ) === LOWER_P &&
+                            getR( src, i + 3 ) === LOWER_R &&
+                            getR( src, i + 4 ) === LOWER_E &&
+                            getR( src, i + 5 ) === HASH
+                            ) {
                             inPreAdmin = true;
 
                             i += 5;
@@ -371,11 +371,11 @@ module quby.parser {
          *  : ensures all closing braces have an end of line before them
          *  : ensures all 'end' keywords have an end of line before them
          */
-        var preScanParse = function( source: string ): string {
+        var preScanParse = function ( source: string ): string {
             source = source.
-                    toLowerCase().
-                    replace( /\t/g, ' ' ).
-                    replace( /\r/g, '\n' );
+                toLowerCase().
+                replace( /\t/g, ' ' ).
+                replace( /\r/g, '\n' );
 
             return source;
 
@@ -399,12 +399,12 @@ module quby.parser {
             }
         };
 
-        return function( src: string ): string {
+        return function ( src: string ): string {
             return stripComments(
-                    preScanParse( src )
-            );
+                preScanParse( src )
+                );
         };
-    } )();
+    })();
 
     parse.ignore( parse.terminal.WHITESPACE );
 
@@ -412,7 +412,7 @@ module quby.parser {
      * WARNING! The terminal names used here are also used for display purposes.
      *          So give them meaningful names!
      */
-    var terminals : any = parse.terminals( <any> {
+    var terminals: any = parse.terminals( <any> {
         /**
          * Matches an end of line,
          * and also chomps on whitespace.
@@ -420,16 +420,16 @@ module quby.parser {
          * If it contains a semi-colon however,
          * this will fail.
          */
-        endOfLine: function( src, i, code, len ) {
+        endOfLine: function ( src, i, code, len ) {
             if ( code === SLASH_N ) {
                 do {
                     i++;
                     code = src.charCodeAt( i );
                 } while (
-                        code === SLASH_N ||
-                        code === SPACE ||
-                        code === TAB
-                );
+                    code === SLASH_N ||
+                    code === SPACE ||
+                    code === TAB
+                    );
 
                 if ( src.charCodeAt( i ) !== SEMI_COLON ) {
                     return i;
@@ -446,20 +446,20 @@ module quby.parser {
          * Also chomps on whitespace and end of lines,
          * both before and after the semi-colon.
          */
-        endOfStatement: function( src, i, code, len ) {
+        endOfStatement: function ( src, i, code, len ) {
             if (
-                    code === SEMI_COLON ||
-                    code === SLASH_N
-            ) {
+                code === SEMI_COLON ||
+                code === SLASH_N
+                ) {
                 do {
                     i++;
                     code = src.charCodeAt( i );
                 } while (
-                        code === SLASH_N ||
-                        code === SEMI_COLON ||
-                        code === SPACE ||
-                        code === TAB
-                );
+                    code === SLASH_N ||
+                    code === SEMI_COLON ||
+                    code === SPACE ||
+                    code === TAB
+                    );
 
                 return i;
             }
@@ -523,15 +523,15 @@ module quby.parser {
             JSUndefined: '#undefined',
             JSNull: '#null',
 
-            symbol: function( src, i, code, len ) {
+            symbol: function ( src, i, code, len ) {
                 if ( code === COLON ) {
                     code = src.charCodeAt( i + 1 );
 
                     if (
                         // is a lower case letter, or underscore
-                            ( code >= 97 && code <= 122 ) ||
-                            ( code === UNDERSCORE )
-                    ) {
+                        ( code >= 97 && code <= 122 ) ||
+                        ( code === UNDERSCORE )
+                        ) {
                         i += 2;
 
                         while ( isAlphaNumericCode( src.charCodeAt( i ) ) ) {
@@ -556,15 +556,15 @@ module quby.parser {
             subtract: '-',
             modulus: '%',
 
-            colon: function( src, i, code, len ) {
+            colon: function ( src, i, code, len ) {
                 if ( code === COLON ) {
                     code = src.charCodeAt( i + 1 );
 
                     if (
                         // is a lower case letter, or underscore
-                            ( code < 97 || code > 122 ) &&
-                            ( code !== UNDERSCORE )
-                    ) {
+                        ( code < 97 || code > 122 ) &&
+                        ( code !== UNDERSCORE )
+                        ) {
                         return i + 1;
                     }
                 }
@@ -598,12 +598,12 @@ module quby.parser {
         },
 
         identifiers: {
-            variableName: function( src, i, code, len ) {
+            variableName: function ( src, i, code, len ) {
                 if (
                     // is a lower case letter, or underscore
-                        ( code >= 97 && code <= 122 ) ||
-                        ( code === UNDERSCORE )
-                ) {
+                    ( code >= 97 && code <= 122 ) ||
+                    ( code === UNDERSCORE )
+                    ) {
                     i++;
 
                     while ( isAlphaNumericCode( src.charCodeAt( i ) ) ) {
@@ -613,7 +613,7 @@ module quby.parser {
                     return i;
                 }
             },
-            global: function( src, i, code, len ) {
+            global: function ( src, i, code, len ) {
                 if ( code === DOLLAR ) {
                     i++;
 
@@ -624,7 +624,7 @@ module quby.parser {
                     return i;
                 }
             },
-            objectField: function( src, i, code, len ) {
+            objectField: function ( src, i, code, len ) {
                 if ( code === AT ) {
                     i++;
 
@@ -638,21 +638,21 @@ module quby.parser {
         },
 
         admin: {
-            hashDef     : '#def',
+            hashDef: '#def',
 
             jsInstanceOf: '#instanceof',
-            jsTypeOf    : '#typeof',
+            jsTypeOf: '#typeof',
 
-            inline      : '#<#',
-            preInline   : '#<pre#'
+            inline: '#<#',
+            preInline: '#<pre#'
         }
-    } );
+    });
 
     /*
      * Remove the end of lines after certain symbols.
      */
 
-    var applySymbolMatch = function( syms, event ) {
+    var applySymbolMatch = function ( syms, event ) {
         if ( syms.symbolMatch ) {
             syms.symbolMatch( event );
         } else {
@@ -663,42 +663,42 @@ module quby.parser {
     };
 
     applySymbolMatch(
-            [
-                    terminals.ops,
+        [
+            terminals.ops,
 
-                    terminals.keywords.DO,
+            terminals.keywords.DO,
 
-                    terminals.keywords.IF,
+            terminals.keywords.IF,
 
-                    terminals.keywords.ELSE,
-                    terminals.keywords.ELSIF,
-                    terminals.keywords.ELSEIF,
-                    terminals.keywords.ELSE_IF,
+            terminals.keywords.ELSE,
+            terminals.keywords.ELSIF,
+            terminals.keywords.ELSEIF,
+            terminals.keywords.ELSE_IF,
 
-                    terminals.keywords.WHILE,
-                    terminals.keywords.UNTIL,
-                    terminals.keywords.LOOP,
+            terminals.keywords.WHILE,
+            terminals.keywords.UNTIL,
+            terminals.keywords.LOOP,
 
-                    terminals.keywords.NEW,
+            terminals.keywords.NEW,
 
-                    terminals.symbols.comma,
-                    terminals.symbols.leftBracket,
-                    terminals.symbols.leftBrace,
-                    terminals.symbols.leftSquare
-            ],
-            function( src, i, code, len ) {
-                while (
-                        code === SPACE ||
-                        code === SLASH_N ||
-                        code === TAB
+            terminals.symbols.comma,
+            terminals.symbols.leftBracket,
+            terminals.symbols.leftBrace,
+            terminals.symbols.leftSquare
+        ],
+        function ( src, i, code, len ) {
+            while (
+                code === SPACE ||
+                code === SLASH_N ||
+                code === TAB
                 ) {
-                    i++;
-                    code = src.charCodeAt( i );
-                }
-
-                return i;
+                i++;
+                code = src.charCodeAt( i );
             }
-    );
+
+            return i;
+        }
+        );
 
 
     var inlinePostMatch = function ( src, i, code, len ) {
@@ -730,7 +730,7 @@ module quby.parser {
                 code === GREATER_THAN &&
                 src.charCodeAt( i - 1 ) === HASH &&
                 src.charCodeAt( i + 1 ) === HASH
-            ) {
+                ) {
                 return i + 2;
             }
         } while ( i < len );
@@ -746,267 +746,271 @@ module quby.parser {
      * evaluated, and begins being turned into the AST.
      */
 
-    terminals.endOfStatement.onMatch( function() {
+    terminals.endOfStatement.onMatch( function () {
         return null;
-    } );
+    });
 
-    terminals.symbols.comma.onMatch( function() {
+    terminals.symbols.comma.onMatch( function () {
         return null;
-    } )
+    })
 
     /* The onMatch callbacks for altering the symbols when matched. */
-    terminals.literals.TRUE.onMatch( function( symbol ) {
+    terminals.literals.TRUE.onMatch( function ( symbol ) {
         return new quby.ast.Bool( symbol );
-    } );
-    terminals.literals.FALSE.onMatch( function( symbol ) {
+    });
+    terminals.literals.FALSE.onMatch( function ( symbol ) {
         return new quby.ast.Bool( symbol );
-    } );
-    terminals.literals.NULL.onMatch( function( symbol ) {
+    });
+    terminals.literals.NULL.onMatch( function ( symbol ) {
         return new quby.ast.Null( symbol );
-    } );
-    terminals.literals.NIL.onMatch( function( symbol ) {
+    });
+    terminals.literals.NIL.onMatch( function ( symbol ) {
         return new quby.ast.Null( symbol );
-    } );;
-    terminals.literals.JSUndefined.onMatch( function( symbol ) {
+    });;
+    terminals.literals.JSUndefined.onMatch( function ( symbol ) {
         return new quby.ast.JSUndefined( symbol );
-    } );
-    terminals.literals.JSNull.onMatch( function( symbol ) {
+    });
+    terminals.literals.JSNull.onMatch( function ( symbol ) {
         return new quby.ast.JSNull( symbol );
-    } );
-    terminals.literals.symbol.onMatch( function( symbol ) {
+    });
+    terminals.literals.symbol.onMatch( function ( symbol ) {
         return new quby.ast.Symbol( symbol );
-    } );
-    terminals.literals.string.onMatch( function( symbol ) {
+    });
+    terminals.literals.string.onMatch( function ( symbol ) {
         return new quby.ast.String( symbol );
-    } );
-    terminals.literals.number.onMatch( function( symbol ) {
+    });
+    terminals.literals.number.onMatch( function ( symbol ) {
         return new quby.ast.Number( symbol );
-    } );
+    });
 
-    terminals.admin.inline.onMatch( function( symbol ) {
+    terminals.admin.inline.onMatch( function ( symbol ) {
         return new quby.ast.Inline( symbol );
-    } );
-    terminals.admin.preInline.onMatch( function( symbol ) {
+    });
+    terminals.admin.preInline.onMatch( function ( symbol ) {
         return new quby.ast.PreInline( symbol );
-    } );
+    });
 
     var ops = terminals.ops;
 
     /* Parser Rules */
 
     var statementSeperator = parse.
-            name( 'end of statement' ).
-            either(
-                    terminals.endOfLine,
-                    terminals.endOfStatement
-            );
+        name( 'end of statement' ).
+        either(
+        terminals.endOfLine,
+        terminals.endOfStatement
+        );
 
     var statement = parse.rule(),
         expr = parse.rule();
 
     var repeatStatement = parse.repeatSeperator(
-            statement,
-            statementSeperator
-    );
+        statement,
+        statementSeperator
+        );
 
     var statements = parse.
-            name( 'statements' ).
-            optional( statementSeperator ).
-            optional( repeatStatement    ).
-            optional( statementSeperator ).
-            onMatch( function( onStart, stmts, endEnd ) {
-                if ( stmts === null ) {
-                    return new quby.ast.Statements();
-                } else {
-                    return new quby.ast.Statements( stmts );
-                }
-            } );
+        name( 'statements' ).
+        optional( statementSeperator ).
+        optional( repeatStatement ).
+        optional( statementSeperator ).
+        onMatch( function ( onStart, stmts, endEnd ) {
+            if ( stmts === null ) {
+                return new quby.ast.Statements();
+            } else {
+                return new quby.ast.Statements( stmts );
+            }
+        });
 
     var exprs = parse.
-            name( 'expressions' ).
-            repeatSeperator(expr, terminals.symbols.comma).
-            onMatch((exprs) => new quby.ast.Parameters(exprs));
+        name( 'expressions' ).
+        repeatSeperator( expr, terminals.symbols.comma ).
+        onMatch( ( exprs ) => new quby.ast.Parameters( exprs ) );
 
     var variables = parse.
+        either(
+        terminals.identifiers,
+        terminals.keywords.THIS,
+        parse.
+            a( terminals.ops.hash ).
             either(
-                    terminals.identifiers,
-                    terminals.keywords.THIS,
-                    parse.
-                            a( terminals.ops.hash ).
-                            either(
-                                    /*
-                                     * Global is included, to capture the use
-                                     * of a starting dollar symbol.
-                                     */
-                                    terminals.identifiers.variableName,
-                                    terminals.identifiers.global
-                            ).
-                            onMatch( function( hash, name ) {
-                                return new quby.ast.JSVariable( name );
-                            } )
+            /*
+             * Global is included, to capture the use
+             * of a starting dollar symbol.
+             */
+            terminals.identifiers.variableName,
+            terminals.identifiers.global
             ).
-            onMatch( function( identifier ) {
-                var term = identifier.terminal;
+            onMatch( function ( hash, name ) {
+                return new quby.ast.JSVariable( name );
+            })
+        ).
+        onMatch( function ( identifier ) {
+            var term = identifier.terminal;
 
-                if ( term === terminals.identifiers.variableName ) {
-                    return new quby.ast.LocalVariable( identifier );
-                } else if ( term === terminals.identifiers.global ) {
-                    return new quby.ast.GlobalVariable( identifier );
-                } else if ( term === terminals.identifiers.objectField ) {
-                    return new quby.ast.FieldVariable( identifier );
-                } else if ( term === terminals.keywords.THIS ) {
-                    return new quby.ast.ThisVariable( identifier );
-                } else if ( identifier instanceof quby.ast.JSVariable ) {
-                    return identifier;
-                } else {
-                    log( identifier );
-                    throw new Error( "Unknown terminal met for variables: " + identifier );
-                }
-            } );
+            if ( term === terminals.identifiers.variableName ) {
+                return new quby.ast.LocalVariable( identifier );
+            } else if ( term === terminals.identifiers.global ) {
+                return new quby.ast.GlobalVariable( identifier );
+            } else if ( term === terminals.identifiers.objectField ) {
+                return new quby.ast.FieldVariable( identifier );
+            } else if ( term === terminals.keywords.THIS ) {
+                return new quby.ast.ThisVariable( identifier );
+            } else if ( identifier instanceof quby.ast.JSVariable ) {
+                return identifier;
+            } else {
+                log( identifier );
+                throw new Error( "Unknown terminal met for variables: " + identifier );
+            }
+        });
 
     var arrayAccessExtension = parse.
-            name( 'array access' ).
-            a(
-                    terminals.symbols.leftSquare,
-                    expr
-            ).
-            optional( terminals.endOfLine ).
-            then( terminals.symbols.rightSquare ).
-            onMatch( function( leftSquare, keyExpr, endOfLine, rightSquare ) {
-                return new quby.ast.ArrayAccess( null, keyExpr );
-            } );
+        name( 'array access' ).
+        a(
+        terminals.symbols.leftSquare,
+        expr
+        ).
+        optional( terminals.endOfLine ).
+        then( terminals.symbols.rightSquare ).
+        onMatch( function ( leftSquare, keyExpr, endOfLine, rightSquare ) {
+            return new quby.ast.ArrayAccess( null, keyExpr );
+        });
 
     var singleOpExpr = parse.
-            name( 'operator' ).
-            either(
-                    terminals.ops.plus,
-                    terminals.ops.subtract,
-                    terminals.ops.not,
+        name( 'operator' ).
+        either(
+        terminals.ops.plus,
+        terminals.ops.subtract,
+        terminals.ops.not,
 
-                    terminals.admin.jsTypeOf
-            ).
-            then( expr ).
-            onMatch( function( op, expr ) {
-                var term = op.terminal;
+        terminals.admin.jsTypeOf
+        ).
+        then( expr ).
+        onMatch( function ( op, expr ) {
+            var term = op.terminal;
 
-                if ( term === ops.not ) {
-                    return new quby.ast.Not( expr );
-                } else if ( term === ops.subtract ) {
-                    return new quby.ast.SingleSub( expr );
-                } else if ( term === ops.plus ) {
-                    return expr;
-                } else if ( term === terminals.admin.jsTypeOf ) {
-                    return new quby.ast.JSTypeOf( expr );
-                } else {
-                    log( op );
-                    throw new Error( "Unknown singleOpExpr match" );
-                }
-            } );
+            if ( term === ops.not ) {
+                return new quby.ast.Not( expr );
+            } else if ( term === ops.subtract ) {
+                return new quby.ast.SingleSub( expr );
+            } else if ( term === ops.plus ) {
+                return expr;
+            } else if ( term === terminals.admin.jsTypeOf ) {
+                return new quby.ast.JSTypeOf( expr );
+            } else {
+                log( op );
+                throw new Error( "Unknown singleOpExpr match" );
+            }
+        });
 
     var arrayLiteral = parse.
-            name( 'new Array' ).
-            optional( terminals.ops.hash ).
-            then( terminals.symbols.leftSquare ).
-            optional( exprs ).
-            optional( terminals.endOfLine ).
-            then( terminals.symbols.rightSquare ).
-            onMatch( function( hash, lSquare, exprs, endOfLine, rSquare ) {
-                if ( hash !== null ) {
-                    return new quby.ast.JSArrayLiteral( exprs );
-                } else {
-                    return new quby.ast.ArrayLiteral( exprs );
-                }
-            } );
+        name( 'new Array' ).
+        optional( terminals.ops.hash ).
+        then( terminals.symbols.leftSquare ).
+        optional( exprs ).
+        optional( terminals.endOfLine ).
+        then( terminals.symbols.rightSquare ).
+        onMatch( function ( hash, lSquare, exprs, endOfLine, rSquare ) {
+            if ( hash !== null ) {
+                return new quby.ast.JSArrayLiteral( exprs );
+            } else {
+                return new quby.ast.ArrayLiteral( exprs );
+            }
+        });
 
     var hashMapping = parse.
-            name( 'hash mapping' ).
-            a( expr ).
-            either( terminals.ops.colon, terminals.ops.mapArrow ).
-            then( expr ).
-            onMatch( function( left, mapAssign, right ) {
-                return new quby.ast.Mapping( left, right );
-            } );
+        name( 'hash mapping' ).
+        a( expr ).
+        either( terminals.ops.colon, terminals.ops.mapArrow ).
+        then( expr ).
+        onMatch( function ( left, mapAssign, right ) {
+            return new quby.ast.Mapping( left, right );
+        });
 
     var hashLiteral = parse.
-            name( 'new hash literal' ).
-            then( terminals.symbols.leftBrace ).
-            optionalSeperator( hashMapping, terminals.symbols.comma ).
-            optional( terminals.endOfLine ).
-            then( terminals.symbols.rightBrace ).
-            onMatch( function( lBrace, mappings, endOfLine, rBrace ) {
-                if ( mappings !== null ) {
-                    mappings = new quby.ast.Mappings( mappings );
-                }
+        name( 'new hash literal' ).
+        then( terminals.symbols.leftBrace ).
+        optionalSeperator( hashMapping, terminals.symbols.comma ).
+        optional( terminals.endOfLine ).
+        then( terminals.symbols.rightBrace ).
+        onMatch( function ( lBrace, mappings, endOfLine, rBrace ) {
+            if ( mappings !== null ) {
+                mappings = new quby.ast.Mappings( mappings );
+            }
 
-                return new quby.ast.HashLiteral( mappings );
-            } );
+            return new quby.ast.HashLiteral( mappings );
+        });
 
     var jsHashMapping = parse.
-            name( 'js hash mapping' ).
-            a( expr ).
-            either( terminals.ops.colon, terminals.ops.mapArrow ).
-            then( expr ).
-            onMatch( function( left, mapAssign, right ) {
-                return new quby.ast.JSMapping( left, right );
-            } );
+        name( 'js hash mapping' ).
+        a( expr ).
+        either( terminals.ops.colon, terminals.ops.mapArrow ).
+        then( expr ).
+        onMatch( function ( left, mapAssign, right ) {
+            return new quby.ast.JSMapping( left, right );
+        });
 
     var jsHashLiteral = parse.
-            name( 'new JS hash literal' ).
-            a( terminals.ops.hash ).
-            then( terminals.symbols.leftBrace ).
-            optionalSeperator( jsHashMapping, terminals.symbols.comma ).
-            optional( terminals.endOfLine ).
-            then( terminals.symbols.rightBrace ).
-            onMatch( function( hash, lBrace, mappings, endOfLine, rBrace ) {
-                if ( mappings !== null ) {
-                    mappings = new quby.ast.Mappings( mappings );
-                }
+        name( 'new JS hash literal' ).
+        a( terminals.ops.hash ).
+        then( terminals.symbols.leftBrace ).
+        optionalSeperator( jsHashMapping, terminals.symbols.comma ).
+        optional( terminals.endOfLine ).
+        then( terminals.symbols.rightBrace ).
+        onMatch( function ( hash, lBrace, mappings, endOfLine, rBrace ) {
+            if ( mappings !== null ) {
+                mappings = new quby.ast.Mappings( mappings );
+            }
 
-                return new quby.ast.JSObjectLiteral( mappings );
-            } );
+            return new quby.ast.JSObjectLiteral( mappings );
+        });
 
     var yieldExpr = parse.
-            name( 'yield' ).
-            a( terminals.keywords.YIELD ).
-            optional( exprs ).
-            onMatch( function( yld, exprs ) {
-                if ( exprs !== null ) {
-                    return new quby.ast.YieldStmt( exprs, exprs );
-                } else {
-                    return new quby.ast.YieldStmt( yld );
-                }
-            } );
+        name( 'yield' ).
+        a( terminals.keywords.YIELD ).
+        optional( exprs ).
+        onMatch( function ( yld, exprs ) {
+            if ( exprs !== null ) {
+                return new quby.ast.YieldStmt( exprs, exprs );
+            } else {
+                return new quby.ast.YieldStmt( yld );
+            }
+        });
 
     var returnStatement = parse.
-            name( 'return' ).
-            a( terminals.keywords.RETURN ).
-            optional( expr ).
-            onMatch( function( rtn, expr ) {
-                if ( expr !== null ) {
-                    return new quby.ast.ReturnStmt( expr );
-                } else {
-                    return new quby.ast.ReturnStmt(
-                            new quby.ast.Null( rtn )
+        name( 'return' ).
+        a( terminals.keywords.RETURN ).
+        optional( expr ).
+        onMatch( function ( rtn, expr ) {
+            if ( expr !== null ) {
+                return new quby.ast.ReturnStmt( expr );
+            } else {
+                return new quby.ast.ReturnStmt(
+                    new quby.ast.Null( rtn )
                     );
-                }
-            } );
+            }
+        });
 
     /*
      * ### Expressions ###
      */
 
     var parameterFields = parse.
-            repeatSeperator(
-                    parse.either(
-                            variables,
-                            parse.a( terminals.ops.bitwiseAnd, terminals.identifiers.variableName ).
-                                    onMatch( function( bitAnd, name ) {
-                                        return new quby.ast.ParameterBlockVariable( name );
-                                    } )
-                    ),
-                    terminals.symbols.comma
-            ).
-            onMatch( ( params ) => new quby.ast.Parameters(params) )
+        repeatSeperator(
+                parse.either(
+                        variables,
+                        parse.a( terminals.ops.bitwiseAnd, terminals.identifiers.variableName ).
+                        onMatch( function ( bitAnd, name ) {
+                            return new quby.ast.ParameterBlockVariable( name );
+                        })
+                ),
+                terminals.symbols.comma
+        ).
+        onMatch( function ( params ) {
+            if ( params !== null ) {
+                return new quby.ast.Parameters( params );
+            }
+        });
 
     /**
      * These are the definitions for parameters for a function, method or lamda.
@@ -1028,18 +1032,14 @@ module quby.parser {
                             optional(terminals.endOfLine). // needed to allow an end of line before the closing bracket
                             then(terminals.symbols.rightBracket).
                             onMatch(function (lParen, params, end, rParen): quby.ast.ISyntax {
-                                if (params === null) {
-                                    return new quby.ast.Parameters();
-                                } else {
-                                    return params;
-                                }
+                                return params;
                             }),
 
                     parse.a(parameterFields),
 
                     parse.
                             a(statementSeperator).
-                            onMatch(() => new quby.ast.Parameters())
+                            onMatch(() => null)
             );
 
     /**

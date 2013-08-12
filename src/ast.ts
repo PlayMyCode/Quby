@@ -78,6 +78,25 @@ module quby.ast {
         getNumParameters(): number;
     }
 
+    export interface IFunctionDeclarationMeta extends IFunctionMeta {
+        /**
+         * This is used to mark function declarations as being invalid, and
+         * as a result, function invocations to this function will be silenced.
+         * 
+         * By default, this returns false.
+         * 
+         * @return True if this function declaration has some kind of error.
+         */
+        hasDeclarationError(): boolean;
+
+        /**
+         * Call this to mark this function declaration as being invalid.
+         * 
+         * After calling this, hasDeclarationError should always return true.
+         */
+        setInvalid(): void;
+    }
+
     export interface IStatements extends ISyntax {
         length: number;
     }
@@ -458,14 +477,32 @@ module quby.ast {
     export class Parameters extends SyntaxList {
         private blockParam: ParameterBlockVariable;
         private errorParam: ParameterBlockVariable;
-        private blockParamPosition: number;
+        private flagPostBlockParamError: boolean;
 
-        constructor ( params?: ISyntax[] ) {
-            super(',', false, params);
-
+        constructor ( params: ISyntax[] ) {
             this.blockParam = null;
             this.errorParam = null;
-            this.blockParamPosition = -1;
+            this.flagPostBlockParamError = false;
+
+            if ( params !== null ) {
+                for ( var i = 0; i < params.length; i++ ) {
+                    var param = params[i];
+
+                    if ( param instanceof ParameterBlockVariable ) {
+                        this.setBlockParam( <ParameterBlockVariable> param );
+
+                        params.splice( i--, 1 );
+                    } else if ( this.blockParam !== null ) {
+                        this.flagPostBlockParamError = true;
+                    }
+                }
+            }
+
+            super(',', false, params);
+        }
+
+        hasDeclarationError(): boolean {
+            return this.errorParam !== null || this.flagPostBlockParamError;
         }
 
         /**
@@ -526,8 +563,6 @@ module quby.ast {
                 this.errorParam = blockParam;
             } else {
                 this.blockParam = blockParam;
-                // Record the position so we can check if it's the last parameter or not.
-                this.blockParamPosition = this.getStmts().length;
             }
         }
 
@@ -539,7 +574,7 @@ module quby.ast {
             if (this.blockParam != null) {
                 if (this.errorParam != null) {
                     v.parseError(this.errorParam.offset, "Only one block parameter is allowed.");
-                } else if (this.blockParamPosition < this.getStmts().length) {
+                } else if (this.flagPostBlockParamError) {
                     v.parseError(this.blockParam.offset, "Block parameter must be the last parameter.");
                 }
             }
@@ -1130,7 +1165,7 @@ module quby.ast {
     /**
      * Defines a function or method declaration.
      */
-    export class FunctionDeclaration extends NamedSyntax implements IFunctionMeta {
+    export class FunctionDeclaration extends NamedSyntax implements IFunctionDeclarationMeta {
         static FUNCTION = 0;
         static METHOD = 1;
         static CONSTRUCTOR = 2;
@@ -1150,6 +1185,8 @@ module quby.ast {
          * of a function call, to ensure they are not undefined.
          */
         private preVariables: Variable[];
+
+        private isValid: boolean;
 
         constructor(symName: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
             super(symName, symName.getMatch(), '');
@@ -1171,6 +1208,15 @@ module quby.ast {
             this.preVariables = [];
 
             this.autoReturn = false;
+            this.isValid = true;
+        }
+
+        hasDeclarationError() {
+            return !this.isValid || (this.parameters !== null && this.parameters.hasDeclarationError());
+        }
+
+        setInvalid() {
+            this.isValid = false;
         }
 
         /**
@@ -1231,11 +1277,15 @@ module quby.ast {
                 var strOtherType = (otherFun.isMethod() ? "method" : "function");
 
                 v.parseError(this.offset, "Function '" + this.getName() + "' is defined within " + strOtherType + " '" + otherFun.getName() + "', this is not allowed.");
+                this.isValid = false;
+
                 isOutFun = false;
             } else {
                 var strType = (this.isMethod() ? "Method" : "Function");
 
-                v.ensureOutBlock(this, strType + " '" + this.getName() + "' is within a block, this is not allowed.");
+                if ( ! v.ensureOutBlock( this, strType + " '" + this.getName() + "' is within a block, this is not allowed." ) ) {
+                    this.isValid = false;
+                }
             }
 
             if (isOutFun) {
@@ -1366,12 +1416,16 @@ module quby.ast {
 
                 this.isExtensionClass = v.isInsideExtensionClass();
                 if (this.isExtensionClass) {
-                    v.ensureAdminMode(this, "Cannot add constructor to core class: '" + v.getCurrentClass().getClass().getName() + "'");
+                    if ( !v.ensureAdminMode( this, "Cannot add constructor to core class: '" + v.getCurrentClass().getClass().getName() + "'" ) ) {
+                        this.setInvalid();
+                    }
                 }
 
                 v.setInConstructor(true);
                 super.validate(v);
                 v.setInConstructor(false);
+            } else {
+                this.setInvalid();
             }
         }
 
@@ -3130,7 +3184,7 @@ module quby.ast {
      *
      * It handles storing common items.
      */
-    class FunctionGenerator implements IFunctionMeta {
+    class FunctionGenerator implements IFunctionDeclarationMeta {
         public offset: parse.Symbol;
         public callName: string;
 
@@ -3150,6 +3204,8 @@ module quby.ast {
 
         private isJSLiteralFlag: boolean;
 
+        private isValid: boolean;
+
         constructor(obj:FunctionCall, methodName: string, numParams: number) {
             this.offset = obj.offset;
 
@@ -3165,6 +3221,12 @@ module quby.ast {
             this.callName = quby.runtime.formatFun(methodName, numParams);
 
             this.isJSLiteralFlag = false;
+
+            this.isValid = true;
+        }
+
+        hasDeclarationError() {
+            return this.isValid;
         }
 
         isJSLiteral() {
@@ -3207,6 +3269,10 @@ module quby.ast {
             return this.modifierName;
         }
 
+        setInvalid() {
+            this.isValid = false;
+        }
+
         /* This validation code relies on the fact that when a function
          * is defined on a class, it becomes the current function for that
          * callname, regardless of if it's a diplicate function or not.
@@ -3224,6 +3290,8 @@ module quby.ast {
                 v.popScope();
 
                 v.onEndValidate((v:quby.core.Validator) => this.onEndValidate(v));
+            } else {
+                this.isValid = false;
             }
         }
 
@@ -3252,6 +3320,8 @@ module quby.ast {
                         "'" + this.modifierName + "' modifier in class '" + this.klass.getClass().getName() + "' clashes with defined method: '" + this.name + '"';
 
                 v.parseError(this.offset, errMsg);
+
+                this.isValid = false;
 
                 return false;
             } else {
@@ -3303,6 +3373,7 @@ module quby.ast {
                 super.validate(v);
             } else {
                 v.parseError(this.fieldObj.offset, " Invalid parameter for generating '" + this.getName() + "' method");
+                this.setInvalid();
             }
         }
 
@@ -3332,6 +3403,7 @@ module quby.ast {
 
                 if (!klass.hasFieldCallName(field.getCallName())) {
                     v.parseError(this.offset, "field '" + field.getName() + "' never written to in class '" + klass.getClass().getName() + "' for generating method " + this.getName());
+                    this.setInvalid();
                 }
             })
         }
@@ -3367,6 +3439,7 @@ module quby.ast {
             this.withField((field: FieldVariable) => {
                 if (!this.getClassValidator().hasFieldCallName(field.getCallName())) {
                     v.parseError(this.offset, "field '" + field.getName() + "' never written to in class '" + this.getClassValidator().getClass().getName() + "' for generating method " + this.getName() );
+                    this.setInvalid();
                 }
             })
         }
