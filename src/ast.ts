@@ -1879,16 +1879,16 @@ module quby.ast {
 
             // this can only be validated after the classes have been fully defined
             v.onEndValidate((v: quby.core.Validator) => {
-                var klassVal = v.getClass(this.className);
+                var klassVal:quby.core.ClassValidator = v.getClass(this.className);
 
                 if (klassVal) {
-                    var klass = klassVal.getClass();
+                    var klass:IClassDeclaration = klassVal.getClass();
 
                     if (
                            (!klassVal.hasNew(this))
                         || (klassVal.noNews() && this.getNumParameters() > 0)
                     ) {
-                        if (klassVal.noNews() && klass.isExtensionClass) {
+                        if (klassVal.noNews() && klass.isExtensionClass()) {
                             v.parseError(this.getOffset(), "Cannot manually create new instances of '" + klass.getName() + "', it doesn't have a constructor.");
                         } else {
                             v.parseError(this.offset, "Called constructor for class '" + klass.getName() + "' with wrong number of parameters: " + this.getNumParameters());
