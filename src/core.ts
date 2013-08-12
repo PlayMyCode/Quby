@@ -1434,7 +1434,7 @@ module quby.core {
 
             // if no constructors, add a default no-args constructor
             // but only for non-core classes
-            if (this.news.length == 0 && !this.klass.isExtensionClass) {
+            if (this.news.length === 0 && !this.klass.isExtensionClass()) {
                 var constructorObj = new quby.ast.Constructor(
                         thisKlass.offset.clone("new"),
                         null,
