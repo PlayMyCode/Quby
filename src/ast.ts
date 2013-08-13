@@ -1246,7 +1246,7 @@ module quby.ast {
         }
 
         isMethod() {
-            return this.type !== FunctionDeclaration.METHOD;
+            return this.type === FunctionDeclaration.METHOD;
         }
 
         isConstructor() {
@@ -1266,10 +1266,6 @@ module quby.ast {
         }
 
         validate(v: quby.core.Validator) {
-            if (this.isFunction() && v.isInsideClass()) {
-                this.setType(FunctionDeclaration.METHOD);
-            }
-
             var isOutFun = true;
 
             if (v.isInsideFun()) {
@@ -1309,11 +1305,13 @@ module quby.ast {
         }
 
         print(p: quby.core.Printer) {
-            if (!this.isMethod()) {
+            if (this.isFunction()) {
                 p.setCodeMode(false);
             }
 
-            if (this.isMethod() && !this.isConstructor()) {
+            if (this.isMethod()) {
+console.log( this );
+console.log( this.isMethod() );
                 p.append(this.getCallName(), '=function');
             } else {
                 p.append('function ', this.getCallName());
@@ -1322,7 +1320,7 @@ module quby.ast {
             this.printParameters(p);
             this.printBody(p);
 
-            if (!this.isMethod()) {
+            if (this.isFunction()) {
                 p.setCodeMode(true);
             }
         }

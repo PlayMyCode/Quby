@@ -1573,9 +1573,9 @@ module quby.core {
      */
 
     export class Printer {
-        private tempVarCounter = 0;
+        private tempVarCounter: number;
 
-        private isCode = true;
+        private isCode: boolean;
 
         private pre: string[];
         private stmts: string[];
@@ -1593,22 +1593,44 @@ module quby.core {
             this.currentPre = new PrinterStatement();
             this.currentStmt = new PrinterStatement();
             this.current = this.currentStmt;
+
+            this.isCode = true;
+            this.tempVarCounter = 0;
         }
 
         getTempVariable(): string {
             return quby.runtime.TEMP_VARIABLE + (this.tempVarCounter++);
         }
 
-        setCodeMode(isCode: boolean) {
-            if (isCode) {
-                this.current = this.currentStmt;
-                this.preOrStmts = this.stmts;
-            } else {
-                this.current = this.currentPre;
-                this.preOrStmts = this.pre;
-            }
+        /**
+         * Sets this to enter, or more importantly leave, the 'code' printing mode.
+         * Code printing is the normal statements, non-code appeares before the code 
+         * statements.
+         * 
+         * Essentially 'setCodeMode(false)' allows you to inject code at the start of 
+         * the resulting JS.
+         * 
+         * @param
+         * @return The previous setting for code mode.
+         */
+        setCodeMode(isCode: boolean) : boolean {
+            if ( this.isCode !== isCode ) {
+                if ( isCode ) {
+                    this.current = this.currentStmt;
+                    this.preOrStmts = this.stmts;
+                    this.isCode = true;
 
-            this.isCode = isCode;
+                    return false;
+                } else {
+                    this.current = this.currentPre;
+                    this.preOrStmts = this.pre;
+                    this.isCode = false;
+
+                    return true;
+                }
+            } else {
+                return isCode;
+            }
         }
 
         appendExtensionClassStmts(name: string, stmts) {
