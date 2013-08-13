@@ -1062,7 +1062,7 @@ var parse;
 
         Symbol.prototype.getLower = function () {
             if (this.lower === undefined) {
-                return (this.lower = this.match.toLowerCase());
+                return (this.lower = this.getMatch().toLowerCase());
             } else {
                 return this.lower;
             }
@@ -3118,12 +3118,30 @@ var quby;
         var Parameters = (function (_super) {
             __extends(Parameters, _super);
             function Parameters(params) {
-                _super.call(this, ',', false, params);
-
                 this.blockParam = null;
                 this.errorParam = null;
-                this.blockParamPosition = -1;
+                this.flagPostBlockParamError = false;
+
+                if (params !== null) {
+                    for (var i = 0; i < params.length; i++) {
+                        var param = params[i];
+
+                        if (param instanceof ParameterBlockVariable) {
+                            this.setBlockParam(param);
+
+                            params.splice(i--, 1);
+                        } else if (this.blockParam !== null) {
+                            this.flagPostBlockParamError = true;
+                        }
+                    }
+                }
+
+                _super.call(this, ',', false, params);
             }
+            Parameters.prototype.hasDeclarationError = function () {
+                return this.errorParam !== null || this.flagPostBlockParamError;
+            };
+
             Parameters.prototype.add = function (param) {
                 if (param instanceof ParameterBlockVariable) {
                     this.setBlockParam(param);
@@ -3163,8 +3181,6 @@ var quby;
                     this.errorParam = blockParam;
                 } else {
                     this.blockParam = blockParam;
-
-                    this.blockParamPosition = this.getStmts().length;
                 }
             };
 
@@ -3176,7 +3192,7 @@ var quby;
                 if (this.blockParam != null) {
                     if (this.errorParam != null) {
                         v.parseError(this.errorParam.offset, "Only one block parameter is allowed.");
-                    } else if (this.blockParamPosition < this.getStmts().length) {
+                    } else if (this.flagPostBlockParamError) {
                         v.parseError(this.blockParam.offset, "Block parameter must be the last parameter.");
                     }
                 }
@@ -3701,7 +3717,16 @@ var quby;
                 this.preVariables = [];
 
                 this.autoReturn = false;
+                this.isValid = true;
             }
+            FunctionDeclaration.prototype.hasDeclarationError = function () {
+                return !this.isValid || (this.parameters !== null && this.parameters.hasDeclarationError());
+            };
+
+            FunctionDeclaration.prototype.setInvalid = function () {
+                this.isValid = false;
+            };
+
             FunctionDeclaration.prototype.markAutoReturn = function () {
                 this.autoReturn = true;
             };
@@ -3754,11 +3779,15 @@ var quby;
                     var strOtherType = (otherFun.isMethod() ? "method" : "function");
 
                     v.parseError(this.offset, "Function '" + this.getName() + "' is defined within " + strOtherType + " '" + otherFun.getName() + "', this is not allowed.");
+                    this.isValid = false;
+
                     isOutFun = false;
                 } else {
                     var strType = (this.isMethod() ? "Method" : "Function");
 
-                    v.ensureOutBlock(this, strType + " '" + this.getName() + "' is within a block, this is not allowed.");
+                    if (!v.ensureOutBlock(this, strType + " '" + this.getName() + "' is within a block, this is not allowed.")) {
+                        this.isValid = false;
+                    }
                 }
 
                 if (isOutFun) {
@@ -3882,12 +3911,16 @@ var quby;
 
                     this.isExtensionClass = v.isInsideExtensionClass();
                     if (this.isExtensionClass) {
-                        v.ensureAdminMode(this, "Cannot add constructor to core class: '" + v.getCurrentClass().getClass().getName() + "'");
+                        if (!v.ensureAdminMode(this, "Cannot add constructor to core class: '" + v.getCurrentClass().getClass().getName() + "'")) {
+                            this.setInvalid();
+                        }
                     }
 
                     v.setInConstructor(true);
                     _super.prototype.validate.call(this, v);
                     v.setInConstructor(false);
+                } else {
+                    this.setInvalid();
                 }
             };
 
@@ -4312,7 +4345,7 @@ var quby;
                         var klass = klassVal.getClass();
 
                         if ((!klassVal.hasNew(_this)) || (klassVal.noNews() && _this.getNumParameters() > 0)) {
-                            if (klassVal.noNews() && klass.isExtensionClass) {
+                            if (klassVal.noNews() && klass.isExtensionClass()) {
                                 v.parseError(_this.getOffset(), "Cannot manually create new instances of '" + klass.getName() + "', it doesn't have a constructor.");
                             } else {
                                 v.parseError(_this.offset, "Called constructor for class '" + klass.getName() + "' with wrong number of parameters: " + _this.getNumParameters());
@@ -4508,16 +4541,21 @@ var quby;
 
             GenericOp.prototype.validate = function (v) {
                 if (this.proxy !== null) {
-                    this.proxy.validate(v);
+                    var proxy = this.proxy;
+                    this.proxy = null;
+
+                    proxy.validate(v);
+
+                    this.proxy = proxy;
                 } else if (this.balanceDone) {
                     this.validateOp(v);
                 } else {
                     var self = this.rebalance();
 
                     if (self !== this) {
-                        this.proxy = self;
-
                         self.validate(v);
+
+                        this.proxy = self;
                     } else {
                         this.validateOp(v);
                     }
@@ -4525,10 +4563,15 @@ var quby;
             };
 
             GenericOp.prototype.print = function (p) {
-                if (this.proxy === null) {
-                    this.printOp(p);
+                if (this.proxy !== null) {
+                    var proxy = this.proxy;
+                    this.proxy = null;
+
+                    proxy.print(p);
+
+                    this.proxy = proxy;
                 } else {
-                    this.proxy.print(p);
+                    this.printOp(p);
                 }
             };
 
@@ -4738,6 +4781,7 @@ var quby;
                     if (right instanceof GenericOp) {
                         if (this.testSwap(right)) {
                             this.right = (right).swapExpr(this);
+
                             return right;
                         } else {
                             this.right = right;
@@ -5443,7 +5487,13 @@ var quby;
                 this.callName = quby.runtime.formatFun(methodName, numParams);
 
                 this.isJSLiteralFlag = false;
+
+                this.isValid = true;
             }
+            FunctionGenerator.prototype.hasDeclarationError = function () {
+                return this.isValid;
+            };
+
             FunctionGenerator.prototype.isJSLiteral = function () {
                 return this.isJSLiteralFlag;
             };
@@ -5484,6 +5534,10 @@ var quby;
                 return this.modifierName;
             };
 
+            FunctionGenerator.prototype.setInvalid = function () {
+                this.isValid = false;
+            };
+
             FunctionGenerator.prototype.validate = function (v) {
                 var _this = this;
                 this.klass = v.getCurrentClass();
@@ -5499,6 +5553,8 @@ var quby;
                     v.onEndValidate(function (v) {
                         return _this.onEndValidate(v);
                     });
+                } else {
+                    this.isValid = false;
                 }
             };
 
@@ -5523,6 +5579,8 @@ var quby;
                     var errMsg = (currentFun instanceof FunctionGenerator) ? "'" + this.modifierName + "' modifier in class '" + this.klass.getClass().getName() + "' clashes with modifier '" + (currentFun).getModifier() + '", for generating: "' + this.name + '" method' : "'" + this.modifierName + "' modifier in class '" + this.klass.getClass().getName() + "' clashes with defined method: '" + this.name + '"';
 
                     v.parseError(this.offset, errMsg);
+
+                    this.isValid = false;
 
                     return false;
                 } else {
@@ -5566,6 +5624,7 @@ var quby;
                     _super.prototype.validate.call(this, v);
                 } else {
                     v.parseError(this.fieldObj.offset, " Invalid parameter for generating '" + this.getName() + "' method");
+                    this.setInvalid();
                 }
             };
 
@@ -5599,6 +5658,7 @@ var quby;
 
                     if (!klass.hasFieldCallName(field.getCallName())) {
                         v.parseError(_this.offset, "field '" + field.getName() + "' never written to in class '" + klass.getClass().getName() + "' for generating method " + _this.getName());
+                        _this.setInvalid();
                     }
                 });
             };
@@ -5630,6 +5690,7 @@ var quby;
                 this.withField(function (field) {
                     if (!_this.getClassValidator().hasFieldCallName(field.getCallName())) {
                         v.parseError(_this.offset, "field '" + field.getName() + "' never written to in class '" + _this.getClassValidator().getClass().getName() + "' for generating method " + _this.getName());
+                        _this.setInvalid();
                     }
                 });
             };
@@ -6263,10 +6324,12 @@ var quby;
                             var found = this.searchForMethodLike(method), name = method.getName().toLowerCase(), errMsg = null;
 
                             if (found !== null) {
-                                if (name === found.getName().toLowerCase()) {
-                                    errMsg = "Method '" + method.getName() + "' called with incorrect number of parameters, " + method.getNumParameters() + " instead of " + found.getNumParameters();
-                                } else {
-                                    errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.getName() + "'?";
+                                if (!found.hasDeclarationError()) {
+                                    if (name === found.getName().toLowerCase()) {
+                                        errMsg = "Method '" + method.getName() + "' called with incorrect number of parameters, " + method.getNumParameters() + " instead of " + found.getNumParameters();
+                                    } else {
+                                        errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.getName() + "'?";
+                                    }
                                 }
                             } else {
                                 errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class.";
@@ -6823,7 +6886,7 @@ var quby;
             ClassValidator.prototype.endValidate = function () {
                 var thisKlass = this.klass;
 
-                if (this.news.length == 0 && !this.klass.isExtensionClass) {
+                if (this.news.length === 0 && !this.klass.isExtensionClass()) {
                     var constructorObj = new quby.ast.Constructor(thisKlass.offset.clone("new"), null, null);
                     constructorObj.setClass(thisKlass);
 
@@ -8081,17 +8144,15 @@ var quby;
         var parameterFields = parse.repeatSeperator(parse.either(variables, parse.a(terminals.ops.bitwiseAnd, terminals.identifiers.variableName).onMatch(function (bitAnd, name) {
             return new quby.ast.ParameterBlockVariable(name);
         })), terminals.symbols.comma).onMatch(function (params) {
-            return new quby.ast.Parameters(params);
+            if (params !== null) {
+                return new quby.ast.Parameters(params);
+            }
         });
 
         var parameterDefinition = parse.name('parameters').either(parse.a(terminals.symbols.leftBracket).optional(parameterFields).optional(terminals.endOfLine).then(terminals.symbols.rightBracket).onMatch(function (lParen, params, end, rParen) {
-            if (params === null) {
-                return new quby.ast.Parameters();
-            } else {
-                return params;
-            }
+            return params;
         }), parse.a(parameterFields), parse.a(statementSeperator).onMatch(function () {
-            return new quby.ast.Parameters();
+            return null;
         }));
 
         var parameterExprs = parse.name('expressions').a(terminals.symbols.leftBracket).optional(exprs).optional(terminals.endOfLine).then(terminals.symbols.rightBracket).onMatch(function (lParen, exprs, end, rParen) {
