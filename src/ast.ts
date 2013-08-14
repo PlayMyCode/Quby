@@ -494,7 +494,7 @@ module quby.ast {
                 var paramsLen = params.length;
 
                 for ( var i = 0; i < paramsLen; i++ ) {
-                    var param = params[paramsLen];
+                    var param = params[i];
 
                     if ( param instanceof ParameterBlockVariable ) {
                         var blockParam = <ParameterBlockVariable> param;
