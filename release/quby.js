@@ -2,7 +2,7 @@
 (function (Date) {
     if (Date.now === undefined) {
         Date.now = function () {
-            return (new Date()).getTime();
+            return new Date().getTime();
         };
     }
 })(window['Date']);
@@ -345,18 +345,18 @@ var util;
         }
         future.map = map;
 
-        function interval(callback, element) {
+        function interval(callback) {
             if (requestAnimFrame !== null) {
                 var isRunningHolder = { isRunning: true };
 
                 var recursiveCallback = function () {
                     if (isRunningHolder.isRunning) {
                         callback();
-                        requestAnimFrame(recursiveCallback, element);
+                        requestAnimFrame(recursiveCallback);
                     }
                 };
 
-                requestAnimFrame(recursiveCallback, element);
+                requestAnimFrame(recursiveCallback);
 
                 var id = intervalFunID++;
                 intervalFuns[id] = isRunningHolder;
@@ -734,6 +734,53 @@ var parse;
             return letter.toUpperCase();
         });
     };
+
+    function processResult(arg) {
+        if (arg === null) {
+            return arg;
+        } else if (arg instanceof Symbol) {
+            return arg.onFinish();
+        } else if (isFunction(arg)) {
+            return arg();
+        } else if (arg instanceof Array) {
+            for (var i = 0; i < arg.length; i++) {
+                arg[i] = processResult(arg[i]);
+            }
+
+            return arg;
+        } else if (arg.apply) {
+            var args = arg.args;
+            var argsLen = args.length;
+
+            if (argsLen === 0) {
+                return arg.onFinish();
+            } else if (argsLen === 1) {
+                return arg.onFinish(processResult(args[0]));
+            } else if (argsLen === 2) {
+                return arg.onFinish(processResult(args[0]), processResult(args[1]));
+            } else if (argsLen === 3) {
+                return arg.onFinish(processResult(args[0]), processResult(args[1]), processResult(args[2]));
+            } else if (argsLen === 4) {
+                return arg.onFinish(processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]));
+            } else if (argsLen === 5) {
+                return arg.onFinish(processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]));
+            } else if (argsLen === 6) {
+                return arg.onFinish(processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]));
+            } else if (argsLen === 7) {
+                return arg.onFinish(processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]), processResult(args[6]));
+            } else if (argsLen === 8) {
+                return arg.onFinish(processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]), processResult(args[6]), processResult(args[7]));
+            } else if (argsLen === 9) {
+                return arg.onFinish(processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]), processResult(args[6]), processResult(args[7]), processResult(args[8]));
+            } else if (argsLen === 10) {
+                return arg.onFinish(processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]), processResult(args[6]), processResult(args[7]), processResult(args[8]), processResult(args[9]));
+            } else {
+                return arg.onFinish.apply(null, processResult(arg.args));
+            }
+        } else {
+            return arg.onFinish(processResult(arg.args));
+        }
+    }
 
     var Term = (function () {
         function Term(match, name) {
@@ -1911,7 +1958,7 @@ var parse;
 
                     if (!symbols.hasMore()) {
                         return {
-                            result: onFinish(),
+                            result: processResult(onFinish),
                             errors: errors
                         };
                     } else {
@@ -1944,104 +1991,30 @@ var parse;
                     var finallyFun = this.finallyFun;
 
                     if (finallyFun === null) {
-                        return function () {
-                            for (var i = 0; i < args.length; i++) {
-                                var arg = args[i];
-
-                                if (isFunction(arg)) {
-                                    arg = arg();
-                                } else if (arg instanceof Symbol) {
-                                    arg = arg.onFinish();
-                                }
-
-                                if (arg === undefined) {
-                                    throw new Error("onMatch result is undefined");
-                                }
-
-                                args[i] = arg;
-                            }
-
-                            return args;
-                        };
+                        return args;
                     } else {
-                        return function () {
-                            for (var i = 0; i < args.length; i++) {
-                                var arg = args[i];
-
-                                if (isFunction(arg)) {
-                                    arg = arg();
-                                } else if (arg instanceof Symbol) {
-                                    arg = arg.onFinish();
-                                }
-
-                                if (arg === undefined) {
-                                    throw new Error("onMatch result is undefined");
-                                }
-
-                                args[i] = arg;
-                            }
-
-                            return finallyFun(args);
+                        return {
+                            onFinish: finallyFun,
+                            args: args,
+                            apply: false
                         };
                     }
                 }
             } else {
-                var args = this.ruleTestNormal(symbols, inputSrc);
+                var finallyFun = this.finallyFun;
 
-                if (args === null) {
-                    return null;
+                if (finallyFun === null) {
+                    return this.ruleTestNormal(symbols, inputSrc, true);
                 } else {
-                    var finallyFun = this.finallyFun;
+                    var args = this.ruleTestNormal(symbols, inputSrc, false);
 
-                    if (finallyFun !== null) {
-                        return function () {
-                            for (var i = 0; i < args.length; i++) {
-                                var arg = args[i];
-
-                                if (isFunction(arg)) {
-                                    var r = arg();
-
-                                    if (r === undefined) {
-                                        throw new Error("onMatch result is undefined");
-                                    } else {
-                                        args[i] = r;
-                                    }
-                                } else if (arg instanceof Symbol) {
-                                    var r = arg.onFinish();
-
-                                    if (r === undefined) {
-                                        throw new Error("onMatch result is undefined");
-                                    } else {
-                                        args[i] = r;
-                                    }
-                                }
-                            }
-
-                            return finallyFun.apply(null, args);
-                        };
+                    if (args === null) {
+                        return null;
                     } else {
-                        var arg = args[0];
-
-                        return function () {
-                            if (isFunction(arg)) {
-                                var r = arg();
-
-                                if (r === undefined) {
-                                    throw new Error("onMatch result is undefined");
-                                } else {
-                                    return r;
-                                }
-                            } else if (arg instanceof Symbol) {
-                                var r = arg.onFinish();
-
-                                if (r === undefined) {
-                                    throw new Error("onMatch result is undefined");
-                                } else {
-                                    return r;
-                                }
-                            } else {
-                                return arg;
-                            }
+                        return {
+                            onFinish: finallyFun,
+                            args: args,
+                            apply: true
                         };
                     }
                 }
@@ -2202,7 +2175,7 @@ var parse;
             }
         };
 
-        ParserRuleImplementation.prototype.ruleTestNormal = function (symbols, inputSrc) {
+        ParserRuleImplementation.prototype.ruleTestNormal = function (symbols, inputSrc, returnOnlyFirstArg) {
             var startSymbolI = symbols.idIndex(), peekID = symbols.peekID();
 
             if (this.internalCount === 0) {
@@ -2231,11 +2204,13 @@ var parse;
 
                 if (rule === undefined) {
                     if (optional[i]) {
-                        if (args === null) {
-                            args = [null];
-                            this.isRecursive = NO_RECURSION;
-                        } else {
-                            args.push(null);
+                        if (!returnOnlyFirstArg) {
+                            if (args === null) {
+                                args = [null];
+                                this.isRecursive = NO_RECURSION;
+                            } else {
+                                args.push(null);
+                            }
                         }
                     } else {
                         if (i !== 0) {
@@ -2282,7 +2257,11 @@ var parse;
                         args = null;
                         break;
                     } else {
-                        if (args === null) {
+                        if (returnOnlyFirstArg) {
+                            if (args === null) {
+                                args = onFinish;
+                            }
+                        } else if (args === null) {
                             args = [onFinish];
                             this.isRecursive = NO_RECURSION;
                         } else {
@@ -2356,17 +2335,36 @@ var parse;
         ParserRuleImplementation.prototype.parseSymbolsInner = function (inputSrc, src, name) {
             var sourceLines = new SourceLines(inputSrc, name);
 
-            var symbolI = 0, len = src.length, symbols = [], symbolIDs = [], ignores = getIgnores(this.parseParent), literals = this.compiled.literals, terminals = this.compiled.terminals, allTerms = ignores.concat(literals, terminals), ignoresLen = ignores.length, literalsLen = ignoresLen + literals.length, termsLen = literalsLen + terminals.length, ignoresTests = new Array(ignoresLen), literalsData = new Array(literalsLen), literalsMatches = new Array(literalsLen), literalsType = new Array(literalsLen), symbolIDToTerms = this.compiled.idToTerms, postMatches = new Array(termsLen), termTests = new Array(termsLen), termIDs = new Array(termsLen), multipleIgnores = (ignores.length > 1), NO_ERROR = -1, errorStart = NO_ERROR, errors = [];
+            var symbolI = 0, len = src.length, symbols = [], symbolIDs = [], ignores = getIgnores(this.parseParent), literals = this.compiled.literals, terminals = this.compiled.terminals, allTerms = ignores.concat(literals, terminals), ignoresLen = ignores.length, literalsLen = ignoresLen + literals.length, termsLen = literalsLen + terminals.length, literalsCharArrays = [], literalsType = [], symbolIDToTerms = this.compiled.idToTerms, postMatches = new Array(termsLen), termTests = [], termIDs = new Array(termsLen), multipleIgnores = (ignores.length > 1), NO_ERROR = -1, errorStart = NO_ERROR, errors = [];
+
+            var literalsLookup = [];
 
             for (var i = 0; i < allTerms.length; i++) {
                 var term = allTerms[i], test = term.testData;
 
                 if (i < ignoresLen) {
-                    ignoresTests[i] = test;
+                    termTests.push(test);
+                    literalsType.push(0);
+                    literalsCharArrays.push(null);
                 } else if (i < literalsLen) {
-                    literalsData[i] = term.testData;
-                    literalsMatches[i] = term.literal;
-                    literalsType[i] = term.type;
+                    termTests.push(null);
+                    literalsType.push(term.type);
+
+                    var code;
+                    if (term.type === TYPE_STRING) {
+                        code = term.testData[0];
+                        literalsCharArrays.push(term.testData);
+                    } else {
+                        code = term.testData;
+                        literalsCharArrays.push(null);
+                    }
+
+                    var arr = literalsLookup[code];
+                    if (arr === undefined) {
+                        literalsLookup[code] = [i];
+                    } else {
+                        arr.push(i);
+                    }
                 } else {
                     termTests[i] = test;
                 }
@@ -2393,7 +2391,7 @@ var parse;
                     var r;
 
                     while (j < ignoresLen) {
-                        r = ignoresTests[j](src, i, code, len);
+                        r = termTests[j](src, i, code, len);
 
                         if (r !== undefined && r !== false && r > i) {
                             code = src.charCodeAt(r);
@@ -2421,70 +2419,70 @@ var parse;
                     }
 
                     r = 0;
-                    scan_literals:
-                    while (j < literalsLen) {
-                        var type = literalsType[j], match = literalsData[j];
 
-                        if (type === TYPE_STRING) {
-                            var testLen = match.length;
+                    var litsLookups = literalsLookup[code];
+                    if (litsLookups === undefined) {
+                        j = literalsLen;
+                    } else {
+                        scan_literals:
+                        for (var k = 0; k < litsLookups.length; k++) {
+                            var termI = litsLookups[k];
+                            var type = literalsType[termI];
 
-                            for (var testI = 0; testI < testLen; testI++) {
-                                if (src.charCodeAt(i + testI) !== match[testI]) {
-                                    j++;
+                            if (type === TYPE_STRING) {
+                                var matchArray = literalsCharArrays[termI];
+                                var testLen = matchArray.length;
+
+                                for (var testI = 0; testI < testLen; testI++) {
+                                    if (src.charCodeAt(i + testI) !== matchArray[testI]) {
+                                        continue scan_literals;
+                                    }
+                                }
+
+                                if (!isWordCharAt(src, i + testI)) {
+                                    r = i + testI;
+                                } else {
+                                    continue scan_literals;
+                                }
+                            } else if (type === TYPE_CODE) {
+                                r = i + 1;
+                            } else if (type === TYPE_WORD_CODE) {
+                                if (!isWordCode(src.charCodeAt(i + 1))) {
+                                    r = i + 1;
+                                } else {
                                     continue scan_literals;
                                 }
                             }
 
-                            if (!isWordCharAt(src, i + testI)) {
-                                r = i + testI;
-                            } else {
-                                j++;
-                                continue scan_literals;
-                            }
-                        } else if (type === TYPE_CODE) {
-                            if (code === match) {
-                                r = i + 1;
-                            } else {
-                                j++;
-                                continue scan_literals;
-                            }
-                        } else if (type === TYPE_WORD_CODE) {
-                            if (code === match && !isWordCode(src.charCodeAt(i + 1))) {
-                                r = i + 1;
-                            } else {
-                                j++;
-                                continue scan_literals;
-                            }
-                        }
+                            if (r > i) {
+                                symbolIDs[symbolI] = termIDs[termI];
 
-                        if (r > i) {
-                            symbolIDs[symbolI] = termIDs[j];
+                                if (errorStart !== NO_ERROR) {
+                                    errors.push(new SymbolError(sourceLines, errorStart, i));
 
-                            if (errorStart !== NO_ERROR) {
-                                errors.push(new SymbolError(sourceLines, errorStart, i));
-
-                                errorStart = NO_ERROR;
-                            }
-
-                            var postMatchEvent = postMatches[j];
-                            if (postMatchEvent !== null) {
-                                code = src.charCodeAt(r);
-
-                                var r2 = postMatchEvent(src, r, code, len);
-
-                                if (r2 !== undefined && r2 > r) {
-                                    r = r2;
+                                    errorStart = NO_ERROR;
                                 }
+
+                                var postMatchEvent = postMatches[termI];
+                                if (postMatchEvent !== null) {
+                                    code = src.charCodeAt(r);
+
+                                    var r2 = postMatchEvent(src, r, code, len);
+
+                                    if (r2 !== undefined && r2 > r) {
+                                        r = r2;
+                                    }
+                                }
+
+                                symbols[symbolI++] = new Symbol(allTerms[termI], sourceLines, i, r);
+
+                                i = r;
+
+                                continue scan;
                             }
-
-                            symbols[symbolI++] = new Symbol(allTerms[j], sourceLines, i, r);
-
-                            i = r;
-
-                            continue scan;
                         }
 
-                        j++;
+                        j = literalsLen;
                     }
 
                     while (j < termsLen) {
@@ -2840,6 +2838,8 @@ var parse;
 var quby;
 (function (quby) {
     (function (ast) {
+        var EMPTY_ARRAY = [];
+
         var EmptyStub = (function () {
             function EmptyStub(offset) {
                 if (typeof offset === "undefined") { offset = null; }
@@ -2892,14 +2892,17 @@ var quby;
             if (modifierFactory) {
                 var params = fun.getParameters();
 
-                if (params.length === 1) {
-                    return modifierFactory(fun, params.getStmts()[0]);
+                if (params === null || params.length === 0) {
+                    v.parseError(fun.getOffset(), "fields are missing for " + fun.getName());
+                } else if (params.length === 1) {
+                    return modifierFactory(fun, params.getFirstStmt());
                 } else {
                     var generators = [];
 
-                    params.each(function (param) {
-                        generators.push(modifierFactory(fun, param));
-                    });
+                    var paramStmts = params.getStmts();
+                    for (var i = 0; i < paramStmts.length; i++) {
+                        generators.push(modifierFactory(fun, paramStmts[i]));
+                    }
 
                     if (generators.length > 0) {
                         return new TransparentList(generators);
@@ -3010,14 +3013,14 @@ var quby;
 
         var SyntaxList = (function () {
             function SyntaxList(strSeperator, appendToLast, stmts) {
-                if (typeof stmts === "undefined") { stmts = []; }
                 this.stmts = stmts;
                 this.seperator = strSeperator;
                 this.appendToLast = appendToLast;
                 this.offset = null;
-                this.length = stmts.length;
 
-                for (var i = 0; i < stmts.length; i++) {
+                var stmtsLen = this.length = stmts.length;
+
+                for (var i = 0; i < stmtsLen; i++) {
                     var offset = stmts[i].getOffset();
 
                     if (offset) {
@@ -3038,57 +3041,53 @@ var quby;
                 this.seperator = seperator;
             };
 
-            SyntaxList.prototype.add = function (stmt) {
-                this.ensureOffset(stmt);
-                this.stmts.push(stmt);
-                this.length++;
-
-                return this;
-            };
-            SyntaxList.prototype.unshift = function (stmt) {
-                this.ensureOffset(stmt);
-                this.stmts.unshift(stmt);
-                this.length++;
-
-                return this;
-            };
             SyntaxList.prototype.ensureOffset = function (stmt) {
                 if (this.offset === null) {
                     this.offset = stmt.offset;
                 }
             };
             SyntaxList.prototype.print = function (p) {
-                var length = this.stmts.length;
+                var length = this.length;
 
-                for (var i = 0; i < length; i++) {
-                    this.stmts[i].print(p);
+                if (length !== 0) {
+                    var stmts = this.stmts;
 
-                    if (this.appendToLast || i < length - 1) {
-                        p.append(this.seperator);
+                    var appendToLast = this.appendToLast;
+                    var seperator = this.seperator;
+
+                    for (var i = 0; i < length; i++) {
+                        stmts[i].print(p);
+
+                        if (appendToLast || i < length - 1) {
+                            p.append(seperator);
+                        }
                     }
                 }
             };
 
-            SyntaxList.prototype.setArr = function (arr) {
-                this.stmts = arr;
-                this.length = arr.length;
-
-                if (arr.length > 0) {
-                    this.ensureOffset(arr[0]);
-                }
-
-                return this;
-            };
-
             SyntaxList.prototype.validate = function (v) {
-                for (var i = 0; i < this.stmts.length; i++) {
-                    this.stmts[i].validate(v);
+                var length = this.length;
+
+                if (length !== 0) {
+                    var stmts = this.stmts;
+
+                    for (var i = 0; i < length; i++) {
+                        stmts[i].validate(v);
+                    }
                 }
             };
 
-            SyntaxList.prototype.each = function (fun) {
-                for (var i = 0; i < this.stmts.length; i++) {
-                    fun(this.stmts[i]);
+            SyntaxList.prototype.hasOneStmt = function () {
+                return this.length === 0;
+            };
+
+            SyntaxList.prototype.getFirstStmt = function () {
+                if (this.length === 0) {
+                    return null;
+                } else if (this.length === 1) {
+                    return this.stmts[0];
+                } else {
+                    return this.stmts[0];
                 }
             };
 
@@ -3109,7 +3108,11 @@ var quby;
                 _super.call(this, '', false, stmtsArray);
             }
             Statements.prototype.print = function (p) {
-                p.printArray(this.getStmts());
+                var stmts = this.getStmts();
+
+                if (stmts !== null) {
+                    p.printArray(this.getStmts());
+                }
             };
             return Statements;
         })(SyntaxList);
@@ -3123,65 +3126,40 @@ var quby;
                 this.flagPostBlockParamError = false;
 
                 if (params !== null) {
-                    for (var i = 0; i < params.length; i++) {
-                        var param = params[i];
+                    var paramsLen = params.length;
+
+                    for (var i = 0; i < paramsLen; i++) {
+                        var param = params[paramsLen];
 
                         if (param instanceof ParameterBlockVariable) {
-                            this.setBlockParam(param);
+                            var blockParam = param;
 
-                            params.splice(i--, 1);
+                            if (this.errorParam === null) {
+                                if (this.blockParam === null) {
+                                    this.blockParam = blockParam;
+                                } else {
+                                    this.errorParam = blockParam;
+                                }
+                            }
+
+                            if (paramsLen === 1) {
+                                params = EMPTY_ARRAY;
+                                break;
+                            } else {
+                                params.splice(i--, 1);
+                            }
                         } else if (this.blockParam !== null) {
                             this.flagPostBlockParamError = true;
                         }
                     }
+                } else {
+                    params = EMPTY_ARRAY;
                 }
 
                 _super.call(this, ',', false, params);
             }
             Parameters.prototype.hasDeclarationError = function () {
                 return this.errorParam !== null || this.flagPostBlockParamError;
-            };
-
-            Parameters.prototype.add = function (param) {
-                if (param instanceof ParameterBlockVariable) {
-                    this.setBlockParam(param);
-                } else {
-                    SyntaxList.call(this, param);
-                }
-
-                return this;
-            };
-
-            Parameters.prototype.addFirst = function (param) {
-                if (param instanceof ParameterBlockVariable) {
-                    this.setBlockParam(param);
-                } else {
-                    SyntaxList.call(this, param);
-
-                    this.getStmts().pop();
-                    this.getStmts().unshift(param);
-                }
-
-                return this;
-            };
-
-            Parameters.prototype.setArr = function (params) {
-                for (var i = 0; i < params.length; i++) {
-                    if (params[i] instanceof ParameterBlockVariable) {
-                        this.setBlockParam(params[i]);
-                        params.splice(i, 1);
-                    }
-                }
-
-                return _super.prototype.setArr.call(this, params);
-            };
-
-            Parameters.prototype.setBlockParam = function (blockParam) {
-                if (this.blockParam !== null) {
-                    this.errorParam = blockParam;
-                } else {
-                    this.blockParam = blockParam;
-                }
             };
 
             Parameters.prototype.getBlockParam = function () {
@@ -3221,8 +3199,10 @@ var quby;
             function StmtBlock(condition, stmts) {
                 if (condition !== null) {
                     _super.call(this, condition.offset);
-                } else {
+                } else if (stmts !== null) {
                     _super.call(this, stmts.offset);
+                } else {
+                    _super.call(this, null);
                 }
 
                 this.condition = condition;
@@ -3233,7 +3213,9 @@ var quby;
                     this.condition.validate(v);
                 }
 
-                this.stmts.validate(v);
+                if (this.stmts !== null) {
+                    this.stmts.validate(v);
+                }
             };
 
             StmtBlock.prototype.getCondition = function () {
@@ -3247,7 +3229,11 @@ var quby;
                 p.append(preCondition);
                 this.getCondition().printAsCondition(p);
                 p.append(postCondition).flush();
-                this.getStmts().print(p);
+
+                if (this.stmts !== null) {
+                    this.stmts.print(p);
+                }
+
                 p.append(postBlock);
             };
             return StmtBlock;
@@ -3257,14 +3243,16 @@ var quby;
         var IfStmt = (function (_super) {
             __extends(IfStmt, _super);
             function IfStmt(ifs, elseIfs, elseBlock) {
-                _super.call(this, ifs.getOffset());
+                _super.call(this, ifs !== null ? ifs.getOffset() : null);
 
                 this.ifStmts = ifs;
                 this.elseIfStmts = elseIfs;
                 this.elseStmt = elseBlock;
             }
             IfStmt.prototype.validate = function (v) {
-                this.ifStmts.validate(v);
+                if (this.ifStmts !== null) {
+                    this.ifStmts.validate(v);
+                }
 
                 if (this.elseIfStmts !== null) {
                     this.elseIfStmts.validate(v);
@@ -3276,7 +3264,9 @@ var quby;
             };
 
             IfStmt.prototype.print = function (p) {
-                this.ifStmts.print(p);
+                if (this.ifStmts !== null) {
+                    this.ifStmts.print(p);
+                }
 
                 if (this.elseIfStmts !== null) {
                     p.append('else ');
@@ -3327,7 +3317,10 @@ var quby;
                     v.parseError(this.getOffset(), "no conditions provided for when clause");
                 } else {
                     this.exprs.validate(v);
-                    this.stmts.validate(v);
+
+                    if (this.stmts !== null) {
+                        this.stmts.validate(v);
+                    }
                 }
             };
 
@@ -3346,7 +3339,9 @@ var quby;
                 p.append(')');
 
                 p.append('{');
-                this.stmts.print(p);
+                if (this.stmts !== null) {
+                    this.stmts.print(p);
+                }
                 p.append('}');
             };
             return WhenClause;
@@ -3443,7 +3438,10 @@ var quby;
             }
             LoopWhile.prototype.print = function (p) {
                 p.append('do{');
-                this.getStmts().print(p);
+                var statements = this.getStmts();
+                if (statements !== null) {
+                    statements.print(p);
+                }
                 p.append('}while(');
                 this.getCondition().printAsCondition(p);
                 p.append(')');
@@ -3459,7 +3457,10 @@ var quby;
             }
             LoopUntil.prototype.print = function (p) {
                 p.append('do{');
-                this.getStmts().print(p);
+                var statements = this.getStmts();
+                if (statements !== null) {
+                    statements.print(p);
+                }
                 p.append('}while(!(');
                 this.getCondition().printAsCondition(p);
                 p.append('))');
@@ -3714,7 +3715,7 @@ var quby;
 
                 this.stmtBody = stmtBody;
 
-                this.preVariables = [];
+                this.preVariables = null;
 
                 this.autoReturn = false;
                 this.isValid = true;
@@ -3748,7 +3749,7 @@ var quby;
             };
 
             FunctionDeclaration.prototype.isMethod = function () {
-                return this.type !== FunctionDeclaration.METHOD;
+                return this.type === FunctionDeclaration.METHOD;
             };
 
             FunctionDeclaration.prototype.isConstructor = function () {
@@ -3764,14 +3765,14 @@ var quby;
             };
 
             FunctionDeclaration.prototype.addPreVariable = function (variable) {
-                this.preVariables.push(variable);
+                if (this.preVariables === null) {
+                    this.preVariables = [variable];
+                } else {
+                    this.preVariables.push(variable);
+                }
             };
 
             FunctionDeclaration.prototype.validate = function (v) {
-                if (this.isFunction() && v.isInsideClass()) {
-                    this.setType(FunctionDeclaration.METHOD);
-                }
-
                 var isOutFun = true;
 
                 if (v.isInsideFun()) {
@@ -3811,11 +3812,11 @@ var quby;
             };
 
             FunctionDeclaration.prototype.print = function (p) {
-                if (!this.isMethod()) {
+                if (this.isFunction()) {
                     p.setCodeMode(false);
                 }
 
-                if (this.isMethod() && !this.isConstructor()) {
+                if (this.isMethod()) {
                     p.append(this.getCallName(), '=function');
                 } else {
                     p.append('function ', this.getCallName());
@@ -3824,7 +3825,7 @@ var quby;
                 this.printParameters(p);
                 this.printBody(p);
 
-                if (!this.isMethod()) {
+                if (this.isFunction()) {
                     p.setCodeMode(true);
                 }
             };
@@ -3854,15 +3855,17 @@ var quby;
             };
 
             FunctionDeclaration.prototype.printPreVars = function (p) {
-                if (this.preVariables.length > 0) {
+                var preVars = this.preVariables;
+
+                if (preVars !== null) {
                     p.append('var ');
 
-                    for (var i = 0; i < this.preVariables.length; i++) {
+                    for (var i = 0; i < preVars.length; i++) {
                         if (i > 0) {
                             p.append(',');
                         }
 
-                        var variable = this.preVariables[i];
+                        var variable = preVars[i];
                         p.append(variable.getCallName(), '=null');
                     }
 
@@ -5265,7 +5268,7 @@ var quby;
             __extends(ComplexLiteral, _super);
             function ComplexLiteral(pre, parameters, post) {
                 var offset;
-                if (parameters) {
+                if (parameters !== null) {
                     offset = parameters.offset;
                 } else {
                     parameters = null;
@@ -5866,6 +5869,7 @@ var quby;
                 var expected = termError.expected;
                 if (expected.length > 0) {
                     strErr += ', expected ';
+
                     if (expected.length > 1) {
                         strErr += expected.slice(0, expected.length - 1).join(', ') + ' or ' + expected[expected.length - 1];
                     } else {
@@ -6241,13 +6245,21 @@ var quby;
                 this.endValidateCallbacks.push(callback);
             };
 
-            Validator.prototype.finaliseProgram = function () {
+            Validator.prototype.finaliseProgram = function (times) {
+                var start = Date.now();
                 this.endValidate();
+                var end = Date.now();
+
+                var finaliseTime = end - start;
+                times.finalise = finaliseTime;
 
                 if (this.hasErrors()) {
                     return '';
                 } else {
-                    return this.generateCode();
+                    var code = this.generateCode();
+                    times.print = Date.now() - end;
+
+                    return code;
                 }
             };
 
@@ -6382,7 +6394,7 @@ var quby;
                 if (!quby.compilation.hints.useMethodMissing()) {
                     var rootKlass = this.getRootClass().getClass(), callNames = [], extensionStr = [];
 
-                    p.append(quby.runtime.FUNCTION_DEFAULT_TABLE_NAME, "={");
+                    p.append('var ', quby.runtime.FUNCTION_DEFAULT_TABLE_NAME, "={");
 
                     var errFun = ":function(){quby_errFunStub(this,arguments);}";
                     var printComma = false;
@@ -6435,9 +6447,12 @@ var quby;
 
                 var classes = quby.runtime.CORE_CLASSES;
                 var stmts = this.rootClass.getPrintStmts();
-                for (var i = 0; i < classes.length; i++) {
-                    var name = classes[i];
-                    p.appendExtensionClassStmts(name, stmts);
+
+                if (stmts !== null) {
+                    for (var i = 0; i < classes.length; i++) {
+                        var name = classes[i];
+                        p.appendExtensionClassStmts(name, stmts);
+                    }
                 }
             };
 
@@ -6636,7 +6651,7 @@ var quby;
             FunctionTable.prototype.print = function (p) {
                 var fs = this.funs;
 
-                p.append(quby.runtime.FUNCTION_TABLE_NAME, '={');
+                p.append('var ', quby.runtime.FUNCTION_TABLE_NAME, '={');
 
                 var printComma = false;
                 for (var callName in fs) {
@@ -6693,9 +6708,15 @@ var quby;
 
             RootClassProxy.prototype.getPrintStmts = function () {
                 if (this.rootClass === null) {
-                    return [];
+                    return null;
                 } else {
-                    return this.rootClass.getClass().getStatements().getStmts();
+                    var statements = this.rootClass.getClass().getStatements();
+
+                    if (statements !== null) {
+                        return statements.getStmts();
+                    } else {
+                        return null;
+                    }
                 }
             };
             return RootClassProxy;
@@ -6790,6 +6811,7 @@ var quby;
             };
 
             ClassValidator.prototype.addNew = function (fun) {
+                console.log(fun);
                 var index = fun.getNumParameters();
 
                 if (this.news[index] !== undefined) {
@@ -6965,8 +6987,6 @@ var quby;
 
         var Printer = (function () {
             function Printer() {
-                this.tempVarCounter = 0;
-                this.isCode = true;
                 this.pre = [];
                 this.stmts = [];
                 this.preOrStmts = this.stmts;
@@ -6974,21 +6994,32 @@ var quby;
                 this.currentPre = new PrinterStatement();
                 this.currentStmt = new PrinterStatement();
                 this.current = this.currentStmt;
+
+                this.isCode = true;
+                this.tempVarCounter = 0;
             }
             Printer.prototype.getTempVariable = function () {
                 return quby.runtime.TEMP_VARIABLE + (this.tempVarCounter++);
             };
 
             Printer.prototype.setCodeMode = function (isCode) {
-                if (isCode) {
-                    this.current = this.currentStmt;
-                    this.preOrStmts = this.stmts;
-                } else {
-                    this.current = this.currentPre;
-                    this.preOrStmts = this.pre;
-                }
+                if (this.isCode !== isCode) {
+                    if (isCode) {
+                        this.current = this.currentStmt;
+                        this.preOrStmts = this.stmts;
+                        this.isCode = true;
 
-                this.isCode = isCode;
+                        return false;
+                    } else {
+                        this.current = this.currentPre;
+                        this.preOrStmts = this.pre;
+                        this.isCode = false;
+
+                        return true;
+                    }
+                } else {
+                    return isCode;
+                }
             };
 
             Printer.prototype.appendExtensionClassStmts = function (name, stmts) {
@@ -7096,7 +7127,6 @@ var quby;
 
                 return this;
             };
-        } else {
         }
 
         var PrinterStatement = (function () {
@@ -7442,11 +7472,16 @@ var quby;
             Parser.prototype.finalize = function (callback) {
                 var _this = this;
                 util.future.run(function () {
-                    var output = _this.validator.finaliseProgram();
+                    var times = {
+                        finalise: 0,
+                        print: 0
+                    };
+
+                    var output = _this.validator.finaliseProgram(times);
                     var result = new Result(output, _this.validator.getErrors());
 
                     util.future.runFun(function () {
-                        callback(result);
+                        callback(result, times);
                     });
                 });
             };
@@ -8041,17 +8076,21 @@ var quby;
 
         var statements = parse.name('statements').optional(statementSeperator).optional(repeatStatement).optional(statementSeperator).onMatch(function (onStart, stmts, endEnd) {
             if (stmts === null) {
-                return new quby.ast.Statements();
+                return null;
             } else {
                 return new quby.ast.Statements(stmts);
             }
         });
 
         var exprs = parse.name('expressions').repeatSeperator(expr, terminals.symbols.comma).onMatch(function (exprs) {
-            return new quby.ast.Parameters(exprs);
+            if (exprs !== null) {
+                return new quby.ast.Parameters(exprs);
+            } else {
+                return null;
+            }
         });
 
-        var variables = parse.either(terminals.identifiers, terminals.keywords.THIS, parse.a(terminals.ops.hash).either(terminals.identifiers.variableName, terminals.identifiers.global).onMatch(function (hash, name) {
+        var variable = parse.either(terminals.identifiers, terminals.keywords.THIS, parse.a(terminals.ops.hash).either(terminals.identifiers.variableName, terminals.identifiers.global).onMatch(function (hash, name) {
             return new quby.ast.JSVariable(name);
         })).onMatch(function (identifier) {
             var term = identifier.terminal;
@@ -8068,7 +8107,7 @@ var quby;
                 return identifier;
             } else {
                 log(identifier);
-                throw new Error("Unknown terminal met for variables: " + identifier);
+                throw new Error("Unknown terminal met for variable: " + identifier);
             }
         });
 
@@ -8141,11 +8180,13 @@ var quby;
             }
         });
 
-        var parameterFields = parse.repeatSeperator(parse.either(variables, parse.a(terminals.ops.bitwiseAnd, terminals.identifiers.variableName).onMatch(function (bitAnd, name) {
+        var parameterFields = parse.repeatSeperator(parse.either(variable, parse.a(terminals.ops.bitwiseAnd, terminals.identifiers.variableName).onMatch(function (bitAnd, name) {
             return new quby.ast.ParameterBlockVariable(name);
         })), terminals.symbols.comma).onMatch(function (params) {
             if (params !== null) {
                 return new quby.ast.Parameters(params);
+            } else {
+                return null;
             }
         });
 
@@ -8163,7 +8204,7 @@ var quby;
             }
         });
 
-        var blockParamVariables = parse.repeatSeperator(variables, terminals.symbols.comma);
+        var blockParamVariables = parse.repeatSeperator(variable, terminals.symbols.comma);
 
         var blockParams = parse.name('block parameters').a(terminals.ops.bitwiseOr).optional(blockParamVariables).optional(terminals.endOfLine).then(terminals.ops.bitwiseOr).onMatch(function (lOr, params, end, rOr) {
             if (params !== null) {
@@ -8285,7 +8326,7 @@ var quby;
             }
         }));
 
-        expr.name('expression').either(singleOpExpr, arrayLiteral, hashLiteral, jsHashLiteral, yieldExpr, exprInParenthesis, newInstance, functionCall, variables, lambda, terminals.literals, terminals.admin.inline, terminals.admin.preInline).optional(exprExtension).onMatch(function (expr, rest) {
+        expr.name('expression').either(singleOpExpr, arrayLiteral, hashLiteral, jsHashLiteral, yieldExpr, exprInParenthesis, newInstance, functionCall, variable, lambda, terminals.literals, terminals.admin.inline, terminals.admin.preInline).optional(exprExtension).onMatch(function (expr, rest) {
             if (rest !== null) {
                 rest.appendLeft(expr);
 

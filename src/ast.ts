@@ -493,9 +493,7 @@ module quby.ast {
             if ( params !== null ) {
                 var paramsLen = params.length;
 
-                // we for loop in reverse, from len to 0, because of the splice
-                // this means we don't have to readjust the index, after making the splice
-                while ( paramsLen-- > 0 ) {
+                for ( var i = 0; i < paramsLen; i++ ) {
                     var param = params[paramsLen];
 
                     if ( param instanceof ParameterBlockVariable ) {
@@ -513,7 +511,7 @@ module quby.ast {
                             params = EMPTY_ARRAY;
                             break;
                         } else {
-                            params.splice( paramsLen, 1 );
+                            params.splice( i--, 1 );
                         }
                     } else if ( this.blockParam !== null ) {
                         this.flagPostBlockParamError = true;
