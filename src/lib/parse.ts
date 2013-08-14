@@ -3436,33 +3436,31 @@ module parse {
         private parseSymbolsInner(inputSrc: string, src: string, name: string) {
             var sourceLines = new SourceLines(inputSrc, name);
 
-            var symbolI = 0,
+            var symbolI:number = 0,
 
-                len = src.length,
+                len:number = src.length,
 
                 symbols: Symbol[] = [],
                 symbolIDs: number[] = [],
 
-                ignores: Term[] = getIgnores(this.parseParent),
+                ignores: Term[] = getIgnores( this.parseParent ),
                 literals: Term[] = this.compiled.literals,
                 terminals: Term[] = this.compiled.terminals,
 
-                allTerms: Term[] = ignores.concat(literals, terminals),
+                allTerms: Term[] = ignores.concat( literals, terminals ),
 
-                ignoresLen = ignores.length,
-                literalsLen = ignoresLen + literals.length,
-                termsLen = literalsLen + terminals.length,
+                ignoresLen:number = ignores.length,
+                literalsLen:number = ignoresLen + literals.length,
+                termsLen:number = literalsLen + terminals.length,
 
-                ignoresTests: TerminalFunction[] = new Array(ignoresLen),
-                literalsData = new Array(literalsLen),
-                literalsMatches = new Array(literalsLen),
-                literalsType = new Array(literalsLen),
+                literalsCharArrays: number[][] = [],
+                literalsType: number[] = [],
 
                 symbolIDToTerms = this.compiled.idToTerms,
 
                 postMatches: TerminalFunction[] = new Array(termsLen),
 
-                termTests: TerminalFunction[] = new Array(termsLen),
+                termTests: TerminalFunction[] = [],
                 termIDs: number[] = new Array(termsLen),
                 multipleIgnores: boolean = (ignores.length > 1),
 
@@ -3476,6 +3474,8 @@ module parse {
                 NO_ERROR = -1,
                 errorStart = NO_ERROR,
                 errors = [];
+
+            var literalsLookup: number[][] = [];
 
             /*
              * Move the test, id and returnMathFlag so they are on
@@ -3492,11 +3492,28 @@ module parse {
                     test = term.testData;
 
                 if (i < ignoresLen) {
-                    ignoresTests[i] = test;
+                    termTests.push( test );
+                    literalsType.push( 0 );
+                    literalsCharArrays.push( null );
                 } else if (i < literalsLen) {
-                    literalsData[i] = term.testData;
-                    literalsMatches[i] = term.literal;
-                    literalsType[i] = term.type;
+                    termTests.push( null );
+                    literalsType.push( term.type );
+
+                    var code:number;
+                    if ( term.type === TYPE_STRING ) {
+                        code = term.testData[0];
+                        literalsCharArrays.push( term.testData );
+                    } else {
+                        code = term.testData;
+                        literalsCharArrays.push( null );
+                    }
+
+                    var arr: number[] = literalsLookup[code];
+                    if ( arr === undefined ) {
+                        literalsLookup[code] = [i];
+                    } else {
+                        arr.push( i );
+                    }
                 } else {
                     termTests[i] = test;
                 }
@@ -3547,7 +3564,7 @@ module parse {
                      */
 
                     while (j < ignoresLen) {
-                        r = ignoresTests[j](src, i, code, len);
+                        r = termTests[j](src, i, code, len);
 
                         if (r !== undefined && r !== false && r > i) {
                             code = src.charCodeAt(r);
@@ -3579,99 +3596,99 @@ module parse {
                      */
 
                     r = 0;
-                    scan_literals:
-                    while (j < literalsLen) {
-                        var type = literalsType[j],
-                            match = literalsData[j];
 
-                        /*
-                         * A string,
-                         * but it is actually an array of code characters.
-                         */
-                        if (type === TYPE_STRING) {
-                            var testLen = match.length;
+                    var litsLookups = literalsLookup[code];
+                    if ( litsLookups === undefined ) {
+                        j = literalsLen;
+                    } else {
+                        scan_literals:
+                        for ( var k = 0; k < litsLookups.length; k++ ) {
+                            var termI = litsLookups[k];
+                            var type = literalsType[termI];
 
-                            for (var testI = 0; testI < testLen; testI++) {
-                                if (src.charCodeAt(i + testI) !== match[testI]) {
-                                    j++;
+                            /*
+                             * A string,
+                             * but it is actually an array of code characters.
+                             */
+                            if (type === TYPE_STRING) {
+                                var matchArray:number[] = literalsCharArrays[termI];
+                                var testLen = matchArray.length;
+
+                                for (var testI = 0; testI < testLen; testI++) {
+                                    if (src.charCodeAt(i + testI) !== matchArray[testI]) {
+                                        continue scan_literals;
+                                    }
+                                }
+
+                                if (!isWordCharAt(src, i + testI)) {
+                                    r = i + testI;
+                                } else {
+                                    continue scan_literals;
+                                }
+
+                            /*
+                             * Non-alphanumeric codes, such as '+'.
+                             */
+                            } else if (type === TYPE_CODE) {
+                                // no inner check needed here, because the lookup in the array it's self, is enough to confirm
+                                r = i + 1;
+
+                            /*
+                             * Single alpha-numeric codes, such as 'a' or 'b'.
+                             *
+                             * I expect it is unpopular, which is why it is last.
+                             */
+                            } else if (type === TYPE_WORD_CODE) {
+                                if ( ! isWordCode(src.charCodeAt(i + 1)) ) {
+                                    r = i + 1;
+                                } else {
                                     continue scan_literals;
                                 }
                             }
 
-                            if (!isWordCharAt(src, i + testI)) {
-                                r = i + testI;
-                            } else {
-                                j++;
-                                continue scan_literals;
-                            }
+                            if (r > i) {
+                                symbolIDs[symbolI] = termIDs[termI];
 
-                        /*
-                         * Non-alphanumeric codes, such as '+'.
-                         */
-                        } else if (type === TYPE_CODE) {
-                            if (code === match) {
-                                r = i + 1;
-                            } else {
-                                j++;
-                                continue scan_literals;
-                            }
+                                // If we were in error mode,
+                                // report the error section.
+                                //
+                                // This is from the last terminal,
+                                // to this one, but ignores whitespace.
+                                if (errorStart !== NO_ERROR) {
+                                    errors.push(new SymbolError(
+                                            sourceLines,
+                                            errorStart,
+                                            i
+                                    ));
 
-                        /*
-                         * Single alpha-numeric codes, such as 'a' or 'b'.
-                         *
-                         * I expect it is unpopular, which is why it is last.
-                         */
-                        } else if (type === TYPE_WORD_CODE) {
-                            if (code === match && !isWordCode(src.charCodeAt(i + 1))) {
-                                r = i + 1;
-                            } else {
-                                j++;
-                                continue scan_literals;
-                            }
-                        }
-
-                        if (r > i) {
-                            symbolIDs[symbolI] = termIDs[j];
-
-                            // If we were in error mode,
-                            // report the error section.
-                            //
-                            // This is from the last terminal,
-                            // to this one, but ignores whitespace.
-                            if (errorStart !== NO_ERROR) {
-                                errors.push(new SymbolError(
-                                        sourceLines,
-                                        errorStart,
-                                        i
-                                ));
-
-                                errorStart = NO_ERROR;
-                            }
-
-                            var postMatchEvent = postMatches[j];
-                            if (postMatchEvent !== null) {
-                                code = src.charCodeAt(r);
-
-                                var r2 = postMatchEvent(src, r, code, len);
-
-                                if (r2 !== undefined && r2 > r) {
-                                    r = r2;
+                                    errorStart = NO_ERROR;
                                 }
+
+                                var postMatchEvent = postMatches[termI];
+                                if (postMatchEvent !== null) {
+                                    code = src.charCodeAt(r);
+
+                                    var r2 = postMatchEvent(src, r, code, len);
+
+                                    if (r2 !== undefined && r2 > r) {
+                                        r = r2;
+                                    }
+                                }
+
+                                symbols[symbolI++] = new Symbol(
+                                        allTerms[termI],
+                                        sourceLines,
+                                        i,
+                                        r
+                                );
+
+                                i = r;
+
+                                continue scan;
                             }
-
-                            symbols[symbolI++] = new Symbol(
-                                    allTerms[j],
-                                    sourceLines,
-                                    i,
-                                    r
-                            );
-
-                            i = r;
-
-                            continue scan;
                         }
 
-                        j++;
+                        j = literalsLen;
                     }
 
                     /*
