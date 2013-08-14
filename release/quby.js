@@ -3129,7 +3129,7 @@ var quby;
                     var paramsLen = params.length;
 
                     for (var i = 0; i < paramsLen; i++) {
-                        var param = params[paramsLen];
+                        var param = params[i];
 
                         if (param instanceof ParameterBlockVariable) {
                             var blockParam = param;
@@ -3147,6 +3147,7 @@ var quby;
                                 break;
                             } else {
                                 params.splice(i--, 1);
+                                paramsLen--;
                             }
                         } else if (this.blockParam !== null) {
                             this.flagPostBlockParamError = true;
@@ -3167,18 +3168,17 @@ var quby;
             };
 
             Parameters.prototype.validate = function (v) {
-                if (this.blockParam != null) {
-                    if (this.errorParam != null) {
+                if (this.blockParam !== null) {
+                    if (this.errorParam !== null) {
                         v.parseError(this.errorParam.offset, "Only one block parameter is allowed.");
                     } else if (this.flagPostBlockParamError) {
                         v.parseError(this.blockParam.offset, "Block parameter must be the last parameter.");
                     }
-                }
 
-                _super.prototype.validate.call(this, v);
-
-                if (this.blockParam != null) {
+                    _super.prototype.validate.call(this, v);
                     this.blockParam.validate(v);
+                } else {
+                    _super.prototype.validate.call(this, v);
                 }
             };
             return Parameters;
@@ -6811,7 +6811,6 @@ var quby;
             };
 
             ClassValidator.prototype.addNew = function (fun) {
-                console.log(fun);
                 var index = fun.getNumParameters();
 
                 if (this.news[index] !== undefined) {
