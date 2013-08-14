@@ -396,17 +396,22 @@ module quby.main {
          * As a UK citizen, spelling this 'finalize',
          * makes me feel dirty : ( .
          */
-        finalize(callback: (result: Result) => void ): void {
+        finalize( callback: ( result: Result, times?: { finalise: number; print: number; }) => void ): void {
             util.future.run(
                     () => {
-                        var output = this.validator.finaliseProgram();
+                        var times = {
+                            finalise: 0,
+                            print: 0
+                        };
+
+                        var output = this.validator.finaliseProgram(times);
                         var result = new Result(
                                 output,
                                 this.validator.getErrors()
                         );
-
+                        
                         util.future.runFun(function() {
-                            callback(result);
+                            callback( result, times );
                         });
                     }
             );

@@ -635,13 +635,21 @@ module quby.core {
          * or at best, you will receive an incomplete program with random
          * bits missing (which shouldn't be used).
          */
-        finaliseProgram():string {
+        finaliseProgram( times: { finalise: number; print: number; }):string {
+            var start = Date.now();
             this.endValidate();
+            var end = Date.now();
+
+            var finaliseTime = end - start;
+            times.finalise = finaliseTime;
 
             if (this.hasErrors()) {
                 return '';
             } else {
-                return this.generateCode();
+                var code = this.generateCode();
+                times.print = Date.now() - end;
+
+                return code;
             }
         }
 

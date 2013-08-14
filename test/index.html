@@ -139,8 +139,8 @@
                     float: right; 
                     clear: right;
                     text-align: right;
-                    font-size : 18px;
                     margin-top: -9px;
+                    font-size : 16px;
                 }
     		
     	    .line-numbers {
@@ -430,14 +430,39 @@
                         var compileTime = 0,
                             symbolsTime = 0,
                             rulesTime = 0,
-                            totalTime = 0;
+                            totalTime = 0,
+                            printTime = 0,
+                            finalizeTime = 0;
 
                         var updateControlsTime = function() {
+                            var timeLen = Math.max(
+                                    (compileTime+"").length,
+                                    (symbolsTime+"").length,
+                                    (rulesTime+"").length,
+                                    (totalTime+"").length,
+                                    (printTime+"").length,
+                                    (finalizeTime+"").length
+                            ) + 1;
+
+                            var pad = function( time ) {
+                                var padLen = timeLen;
+                                var len = (""+time).length;
+
+                                while ( padLen -- > len ) {
+                                    time = "&#x2002;" + time;
+                                }
+
+                                return time;
+                            }
+
                             document.getElementsByClassName('controls-time-info')[0].innerHTML =
-                                    "compile " + compileTime + "ms<br/>" +
-                                    "symbols " + symbolsTime + "ms<br/>" +
-                                    "rules " + rulesTime + "ms<br/>" +
-                                    "total " + totalTime + "ms";
+                                    "compile " + pad(compileTime) + "ms<br/>" +
+                                    "symbols " + pad(symbolsTime) + "ms<br/>" +
+                                      "rules " + pad(  rulesTime) + "ms<br/>" +
+                                      "total " + pad(  totalTime) + "ms<br/>" +
+                                                                      "<br/>" +
+                                      "print " + pad(  printTime) + "ms<br/>" +
+                                   "finalize " + pad(finalizeTime) + "ms" ;
                         };
 
                         if (includeCore) {
@@ -483,7 +508,7 @@
                         }
 
                         parser.
-                                finalize(function(result) {
+                                finalize(function(result, times) {
                                     outputCode.value = result.getCode();
                                     handleError(
                                             ( outputError.value = result.hasErrors() ?
@@ -492,6 +517,11 @@
                                     );
 
                                     _result = result;
+
+                                    printTime = times.print;
+                                    finalizeTime = times.finalise;
+
+                                    updateControlsTime();
 
                                     if (callback) {
                                         callback();
@@ -578,11 +608,14 @@
         </script>
         
         <script id="example_code" type="quby">//<![CDATA[
-            a = 3
-            a = 3
-            #<# foobar kdkdk #>#
-            b = 5
-            a = 3
+class Array
+    def f(&block)
+    end
+end
+
+foo = null
+foo.f() do
+end
         //]]></script>
 
         <!-- Out example script code -->
