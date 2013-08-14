@@ -1310,8 +1310,6 @@ module quby.ast {
             }
 
             if (this.isMethod()) {
-console.log( this );
-console.log( this.isMethod() );
                 p.append(this.getCallName(), '=function');
             } else {
                 p.append('function ', this.getCallName());
