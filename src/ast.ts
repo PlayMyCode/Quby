@@ -512,6 +512,7 @@ module quby.ast {
                             break;
                         } else {
                             params.splice( i--, 1 );
+                            paramsLen--;
                         }
                     } else if ( this.blockParam !== null ) {
                         this.flagPostBlockParamError = true;
@@ -533,18 +534,17 @@ module quby.ast {
         }
 
         validate(v: quby.core.Validator) {
-            if (this.blockParam != null) {
-                if (this.errorParam != null) {
+            if (this.blockParam !== null) {
+                if (this.errorParam !== null) {
                     v.parseError(this.errorParam.offset, "Only one block parameter is allowed.");
                 } else if (this.flagPostBlockParamError) {
                     v.parseError(this.blockParam.offset, "Block parameter must be the last parameter.");
                 }
-            }
 
-            super.validate(v);
-
-            if (this.blockParam != null) {
+                super.validate(v);
                 this.blockParam.validate(v);
+            } else {
+                super.validate(v);
             }
         }
     }
