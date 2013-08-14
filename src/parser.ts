@@ -807,7 +807,7 @@ module quby.parser {
     var repeatStatement = parse.repeatSeperator(
         statement,
         statementSeperator
-        );
+    );
 
     var statements = parse.
         name( 'statements' ).
@@ -816,7 +816,7 @@ module quby.parser {
         optional( statementSeperator ).
         onMatch( function ( onStart, stmts, endEnd ) {
             if ( stmts === null ) {
-                return new quby.ast.Statements();
+                return null;
             } else {
                 return new quby.ast.Statements( stmts );
             }
@@ -825,21 +825,27 @@ module quby.parser {
     var exprs = parse.
         name( 'expressions' ).
         repeatSeperator( expr, terminals.symbols.comma ).
-        onMatch( ( exprs ) => new quby.ast.Parameters( exprs ) );
+        onMatch( function ( exprs ) {
+            if ( exprs !== null ) {
+                return new quby.ast.Parameters( exprs );
+            } else {
+                return null;
+            }
+        });
 
-    var variables = parse.
+    var variable = parse.
         either(
-        terminals.identifiers,
-        terminals.keywords.THIS,
-        parse.
-            a( terminals.ops.hash ).
-            either(
-            /*
-             * Global is included, to capture the use
-             * of a starting dollar symbol.
-             */
-            terminals.identifiers.variableName,
-            terminals.identifiers.global
+            terminals.identifiers,
+            terminals.keywords.THIS,
+            parse.
+                a( terminals.ops.hash ).
+                either(
+                /*
+                 * Global is included, to capture the use
+                 * of a starting dollar symbol.
+                 */
+                terminals.identifiers.variableName,
+                terminals.identifiers.global
             ).
             onMatch( function ( hash, name ) {
                 return new quby.ast.JSVariable( name );
@@ -860,7 +866,7 @@ module quby.parser {
                 return identifier;
             } else {
                 log( identifier );
-                throw new Error( "Unknown terminal met for variables: " + identifier );
+                throw new Error( "Unknown terminal met for variable: " + identifier );
             }
         });
 
@@ -998,7 +1004,7 @@ module quby.parser {
     var parameterFields = parse.
         repeatSeperator(
                 parse.either(
-                        variables,
+                        variable,
                         parse.a( terminals.ops.bitwiseAnd, terminals.identifiers.variableName ).
                         onMatch( function ( bitAnd, name ) {
                             return new quby.ast.ParameterBlockVariable( name );
@@ -1009,6 +1015,8 @@ module quby.parser {
         onMatch( function ( params ) {
             if ( params !== null ) {
                 return new quby.ast.Parameters( params );
+            } else {
+                return null;
             }
         });
 
@@ -1067,7 +1075,7 @@ module quby.parser {
             } );
 
     var blockParamVariables = parse.repeatSeperator(
-            variables,
+            variable,
             terminals.symbols.comma
     );
 
@@ -1347,7 +1355,7 @@ module quby.parser {
                     newInstance,
                     functionCall,
 
-                    variables,
+                    variable,
 
                     lambda,
 

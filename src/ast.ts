@@ -42,6 +42,8 @@
  * another contexts prefix.
  */
 module quby.ast {
+    var EMPTY_ARRAY: any[] = [];
+    
     export interface ISyntax {
         offset: parse.Symbol;
 
@@ -211,17 +213,20 @@ module quby.ast {
         if (modifierFactory) {
             var params = fun.getParameters();
 
+            if ( params === null || params.length === 0 ) {
+                v.parseError( fun.getOffset(), "fields are missing for " + fun.getName() );
             // this is to avoid building a FactoryGenerators middle-man collection
-            if (params.length === 1) {
-                return modifierFactory( fun, <INamedExpr> params.getStmts()[0] );
+            } else if (params.length === 1) {
+                return modifierFactory( fun, <INamedExpr> params.getFirstStmt() );
             } else {
                 var generators: ISyntax[] = [];
 
                 // sort the good parameters from the bad
                 // they must all be Varaibles
-                params.each((param) => {
-                    generators.push(modifierFactory(fun, <INamedExpr> param));
-                });
+                var paramStmts = params.getStmts();
+                for ( var i = 0; i < paramStmts.length; i++ ) {
+                    generators.push(modifierFactory(fun, <INamedExpr> paramStmts[i]));
+                }
 
                 if (generators.length > 0) {
                     return new TransparentList(generators);
@@ -372,17 +377,18 @@ module quby.ast {
 
         private isJSLiteralFlag: boolean;
 
-        constructor (strSeperator: string, appendToLast: boolean, stmts: ISyntax[] = []) {
+        constructor (strSeperator: string, appendToLast: boolean, stmts: ISyntax[]) {
             this.stmts = stmts;
             this.seperator = strSeperator;
             this.appendToLast = appendToLast;
             this.offset = null;
-            this.length = stmts.length;
 
-            for (var i = 0; i < stmts.length; i++) {
+            var stmtsLen = this.length = stmts.length;
+
+            for ( var i = 0; i < stmtsLen; i++ ) {
                 var offset = stmts[i].getOffset();
 
-                if (offset) {
+                if ( offset ) {
                     this.offset = offset;
                     break;
                 }
@@ -401,57 +407,53 @@ module quby.ast {
             this.seperator = seperator;
         }
 
-        add(stmt: ISyntax) {
-            this.ensureOffset(stmt);
-            this.stmts.push(stmt);
-            this.length++;
-
-            return this;
-        }
-        unshift(stmt: ISyntax) {
-            this.ensureOffset(stmt);
-            this.stmts.unshift(stmt);
-            this.length++;
-
-            return this;
-        }
         ensureOffset(stmt: ISyntax) {
             if (this.offset === null) {
                 this.offset = stmt.offset;
             }
         }
         print(p: quby.core.Printer) {
-            var length = this.stmts.length;
+            var length = this.length;
 
-            for (var i = 0; i < length; i++) {
-                this.stmts[i].print(p);
+            if ( length !== 0 ) {
+                var stmts = this.stmts;
 
-                if (this.appendToLast || i < length - 1) {
-                    p.append(this.seperator);
+                var appendToLast = this.appendToLast;
+                var seperator = this.seperator;
+
+                for ( var i = 0; i < length; i++ ) {
+                    stmts[i].print( p );
+
+                    if ( appendToLast || i < length - 1 ) {
+                        p.append( seperator );
+                    }
                 }
             }
         }
 
-        setArr(arr: ISyntax[]): SyntaxList {
-            this.stmts = arr;
-            this.length = arr.length;
-
-            if (arr.length > 0) {
-                this.ensureOffset(arr[0]);
-            }
-
-            return this;
-        }
-
         validate(v: quby.core.Validator) {
-            for (var i = 0; i < this.stmts.length; i++) {
-                this.stmts[i].validate(v);
+            var length = this.length;
+
+            if ( length !== 0 ) {
+                var stmts = this.stmts;
+
+                for ( var i = 0; i < length; i++ ) {
+                    stmts[i].validate( v );
+                }
             }
         }
 
-        each(fun: (stmt: ISyntax) => void ) {
-            for (var i = 0; i < this.stmts.length; i++) {
-                fun(this.stmts[i]);
+        hasOneStmt() {
+            return this.length === 0;
+        }
+
+        getFirstStmt() {
+            if ( this.length === 0 ) {
+                return null;
+            } else if ( this.length === 1 ) {
+                return this.stmts[0];
+            } else {
+                return this.stmts[0];
             }
         }
 
@@ -470,7 +472,11 @@ module quby.ast {
         }
 
         print(p: quby.core.Printer) {
-            p.printArray(this.getStmts());
+            var stmts = this.getStmts();
+
+            if ( stmts !== null ) {
+                p.printArray( this.getStmts() );
+            }
         }
     }
 
@@ -485,17 +491,36 @@ module quby.ast {
             this.flagPostBlockParamError = false;
 
             if ( params !== null ) {
-                for ( var i = 0; i < params.length; i++ ) {
-                    var param = params[i];
+                var paramsLen = params.length;
+
+                // we for loop in reverse, from len to 0, because of the splice
+                // this means we don't have to readjust the index, after making the splice
+                while ( paramsLen-- > 0 ) {
+                    var param = params[paramsLen];
 
                     if ( param instanceof ParameterBlockVariable ) {
-                        this.setBlockParam( <ParameterBlockVariable> param );
+                        var blockParam = <ParameterBlockVariable> param;
 
-                        params.splice( i--, 1 );
+                        if ( this.errorParam === null ) {
+                            if ( this.blockParam === null ) {
+                                this.blockParam = blockParam;
+                            } else {
+                                this.errorParam = blockParam;
+                            }
+                        }
+
+                        if ( paramsLen === 1 ) {
+                            params = EMPTY_ARRAY;
+                            break;
+                        } else {
+                            params.splice( paramsLen, 1 );
+                        }
                     } else if ( this.blockParam !== null ) {
                         this.flagPostBlockParamError = true;
                     }
                 }
+            } else {
+                params = EMPTY_ARRAY;
             }
 
             super(',', false, params);
@@ -503,67 +528,6 @@ module quby.ast {
 
         hasDeclarationError(): boolean {
             return this.errorParam !== null || this.flagPostBlockParamError;
-        }
-
-        /**
-         * Adds to the ends of the parameters.
-         */
-        /*
-         * Override the add so that block parameters are stored seperately from
-         * other parameters.
-         */
-        add(param: IAssignable) {
-            if (param instanceof ParameterBlockVariable) {
-                this.setBlockParam(<ParameterBlockVariable>param);
-            } else {
-                SyntaxList.call(this, param);
-            }
-
-            return this;
-        }
-
-        /**
-         * Adds to the beginning of the parameters.
-         */
-        addFirst(param: IAssignable) {
-            if (param instanceof ParameterBlockVariable) {
-                this.setBlockParam(<ParameterBlockVariable>param);
-            } else {
-                SyntaxList.call(this, param);
-
-                this.getStmts().pop();
-                this.getStmts().unshift(param);
-            }
-
-            return this;
-        }
-
-        setArr(params: IAssignable[]) {
-            for (var i = 0; i < params.length; i++) {
-                if (params[i] instanceof ParameterBlockVariable) {
-                    this.setBlockParam( <ParameterBlockVariable>params[i] );
-                    params.splice(i, 1);
-                }
-            }
-
-            return super.setArr(params);
-        }
-
-        /**
-         * Sets the block parameter for this set of parameters.
-         * This can only be set once, and no more parameters should be set after
-         * this has been called.
-         *
-         * @param blockParam A block parameter for this set of parameters.
-         */
-        setBlockParam(blockParam: ParameterBlockVariable) {
-            // You can only have 1 block param.
-            // If a second is given, store it later for a validation error.
-            if (this.blockParam !== null) {
-                this.errorParam = blockParam;
-            } else {
-                this.blockParam = blockParam;
-            }
         }
 
         getBlockParam(): ParameterBlockVariable {
@@ -605,10 +569,12 @@ module quby.ast {
         private stmts: IStatements;
 
         constructor (condition: IExpr, stmts: IStatements) {
-            if (condition !== null) {
-                super(condition.offset);
+            if ( condition !== null ) {
+                super( condition.offset );
+            } else if ( stmts !== null ) {
+                super( stmts.offset );
             } else {
-                super(stmts.offset);
+                super( null );
             }
 
             this.condition = condition;
@@ -620,7 +586,9 @@ module quby.ast {
                 this.condition.validate(v);
             }
 
-            this.stmts.validate(v);
+            if ( this.stmts !== null ) {
+                this.stmts.validate( v );
+            }
         }
 
         getCondition(): IExpr {
@@ -634,7 +602,11 @@ module quby.ast {
             p.append(preCondition);
             this.getCondition().printAsCondition(p)
             p.append(postCondition).flush();
-            this.getStmts().print(p);
+
+            if ( this.stmts !== null ) {
+                this.stmts.print( p );
+            }
+
             p.append(postBlock);
         }
     }
@@ -645,7 +617,7 @@ module quby.ast {
         private elseStmt: Statements;
 
         constructor (ifs: Statements, elseIfs: Statements, elseBlock: Statements) {
-            super(ifs.getOffset());
+            super(ifs !== null ? ifs.getOffset() : null);
 
             this.ifStmts = ifs;
             this.elseIfStmts = elseIfs;
@@ -653,7 +625,9 @@ module quby.ast {
         }
 
         validate(v: quby.core.Validator) {
-            this.ifStmts.validate(v);
+            if ( this.ifStmts !== null ) {
+                this.ifStmts.validate(v);
+            }
 
             if (this.elseIfStmts !== null) {
                 this.elseIfStmts.validate(v);
@@ -665,7 +639,9 @@ module quby.ast {
         }
 
         print(p: quby.core.Printer) {
-            this.ifStmts.print(p);
+            if ( this.ifStmts !== null ) {
+                this.ifStmts.print( p );
+            }
 
             if (this.elseIfStmts !== null) {
                 p.append('else ');
@@ -712,7 +688,10 @@ module quby.ast {
                 v.parseError(this.getOffset(), "no conditions provided for when clause");
             } else {
                 this.exprs.validate(v);
-                this.stmts.validate(v);
+
+                if ( this.stmts !== null ) {
+                    this.stmts.validate( v );
+                }
             }
         }
 
@@ -731,7 +710,9 @@ module quby.ast {
             p.append(')'); // close whole if condition
 
             p.append('{');
-            this.stmts.print(p);
+            if ( this.stmts !== null ) {
+                this.stmts.print( p );
+            }
             p.append('}');
         }
     }
@@ -844,7 +825,10 @@ module quby.ast {
             // flush isn't needed here,
             // because statements on the first line will always take place
             p.append('do{');
-            this.getStmts().print(p);
+            var statements = this.getStmts();
+            if ( statements !== null ) {
+                statements.print( p );
+            }
             p.append('}while(');
             this.getCondition().printAsCondition(p);
             p.append(')');
@@ -858,7 +842,10 @@ module quby.ast {
 
         print(p: quby.core.Printer) {
             p.append('do{');
-            this.getStmts().print(p);
+            var statements = this.getStmts();
+            if ( statements !== null ) {
+                statements.print( p );
+            }
             p.append('}while(!(');
             this.getCondition().printAsCondition(p);
             p.append('))');
@@ -1205,7 +1192,7 @@ module quby.ast {
 
             this.stmtBody = stmtBody;
 
-            this.preVariables = [];
+            this.preVariables = null;
 
             this.autoReturn = false;
             this.isValid = true;
@@ -1262,7 +1249,11 @@ module quby.ast {
         }
 
         addPreVariable(variable: quby.ast.Variable) {
-            this.preVariables.push(variable);
+            if ( this.preVariables === null ) {
+                this.preVariables = [variable];
+            } else {
+                this.preVariables.push(variable);
+            }
         }
 
         validate(v: quby.core.Validator) {
@@ -1349,19 +1340,21 @@ module quby.ast {
         }
 
         printPreVars(p: quby.core.Printer) {
+            var preVars = this.preVariables;
+
             /*
              * Either pre-print all local vars + the block var,
              * or print just the block var.
              */
-            if (this.preVariables.length > 0) {
+            if (preVars !== null) {
                 p.append('var ');
 
-                for (var i = 0; i < this.preVariables.length; i++) {
+                for (var i = 0; i < preVars.length; i++) {
                     if (i > 0) {
                         p.append(',');
                     }
 
-                    var variable = this.preVariables[i];
+                    var variable = preVars[i];
                     p.append( variable.getCallName(), '=null' );
                 }
 
@@ -2980,7 +2973,7 @@ module quby.ast {
 
         constructor( pre: string, parameters: IStatements, post: string ) {
             var offset;
-            if ( parameters ) {
+            if ( parameters !== null ) {
                 offset = parameters.offset;
             } else {
                 parameters = null;

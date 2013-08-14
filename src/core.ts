@@ -863,9 +863,12 @@ module quby.core {
             // print the Object functions for each of the extension classes
             var classes = quby.runtime.CORE_CLASSES;
             var stmts = this.rootClass.getPrintStmts();
-            for (var i = 0; i < classes.length; i++) {
-                var name = classes[i];
-                p.appendExtensionClassStmts(name, stmts);
+
+            if ( stmts !== null ) {
+                for ( var i = 0; i < classes.length; i++ ) {
+                    var name = classes[i];
+                    p.appendExtensionClassStmts( name, stmts );
+                }
             }
         }
 
@@ -1207,9 +1210,15 @@ module quby.core {
          */
         getPrintStmts() : quby.ast.ISyntax[] {
             if (this.rootClass === null) {
-                return [];
+                return null;
             } else {
-                return this.rootClass.getClass().getStatements().getStmts();
+                var statements:quby.ast.Statements = this.rootClass.getClass().getStatements();
+
+                if ( statements !== null ) {
+                    return statements.getStmts();
+                } else {
+                    return null;
+                }
             }
         }
     }
