@@ -903,6 +903,53 @@ module parse {
                 replace(/\b([a-z])/g, function (t, letter) { return letter.toUpperCase(); });
     }
 
+    function processResult( arg: any ): any {
+        if ( arg === null ) {
+            return arg;
+        } else if ( arg instanceof Symbol ) {
+            return arg.onFinish();
+        } else if ( isFunction( arg ) ) {
+            return arg();
+        } else if ( arg instanceof Array ) {
+            for ( var i = 0; i < arg.length; i++ ) {
+                arg[i] = processResult( arg[i] );
+            }
+
+            return arg;
+        } else if ( arg.apply ) {
+            var args = arg.args;
+            var argsLen = args.length;
+
+            if ( argsLen === 0 ) {
+                return arg.onFinish();
+            } else if ( argsLen === 1 ) {
+                return arg.onFinish( processResult(args[0]) );
+            } else if ( argsLen === 2 ) {
+                return arg.onFinish( processResult(args[0]), processResult(args[1]) );
+            } else if ( argsLen === 3 ) {
+                return arg.onFinish( processResult(args[0]), processResult(args[1]), processResult(args[2]) );
+            } else if ( argsLen === 4 ) {
+                return arg.onFinish( processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]) );
+            } else if ( argsLen === 5 ) {
+                return arg.onFinish( processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]) );
+            } else if ( argsLen === 6 ) {
+                return arg.onFinish( processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]) );
+            } else if ( argsLen === 7 ) {
+                return arg.onFinish( processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]), processResult(args[6]) );
+            } else if ( argsLen === 8 ) {
+                return arg.onFinish( processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]), processResult(args[6]), processResult(args[7]) );
+            } else if ( argsLen === 9 ) {
+                return arg.onFinish( processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]), processResult(args[6]), processResult(args[7]), processResult(args[8]) );
+            } else if ( argsLen === 10 ) {
+                return arg.onFinish( processResult(args[0]), processResult(args[1]), processResult(args[2]), processResult(args[3]), processResult(args[4]), processResult(args[5]), processResult(args[6]), processResult(args[7]), processResult(args[8]), processResult(args[9]) );
+            } else {
+                return arg.onFinish.apply( null, processResult( arg.args ) );
+            }
+        } else {
+            return arg.onFinish( processResult(arg.args) );
+        }
+    }
+
     /**
      * If given a string, it will match if it is
      * followed by a word boundary.
@@ -2898,7 +2945,7 @@ module parse {
 
                     if (!symbols.hasMore()) {
                         return {
-                            result: onFinish(),
+                            result: processResult( onFinish ),
                             errors: errors
                         };
                     } else {
@@ -2915,7 +2962,7 @@ module parse {
             };
         }
 
-        private ruleTest(symbols: SymbolResult, inputSrc: string): () =>any {
+        private ruleTest(symbols: SymbolResult, inputSrc: string): any {
             if (this.isSeperator || this.isCyclic) {
                 var args = null;
 
@@ -2931,105 +2978,30 @@ module parse {
                     var finallyFun = this.finallyFun;
 
                     if (finallyFun === null) {
-                        return function () {
-                            for (var i = 0; i < args.length; i++) {
-                                var arg = args[i];
-
-                                if (isFunction(arg)) {
-                                    arg = arg();
-                                } else if (arg instanceof Symbol) {
-                                    arg = arg.onFinish();
-                                }
-
-                                if (arg === undefined) {
-                                    throw new Error("onMatch result is undefined");
-                                }
-
-                                args[i] = arg;
-                            }
-
-                            return args;
-                        };
+                        return args;
                     } else {
-                        return function () {
-                            for (var i = 0; i < args.length; i++) {
-                                var arg = args[i];
-
-                                if (isFunction(arg)) {
-                                    arg = arg();
-                                } else if (arg instanceof Symbol) {
-                                    arg = arg.onFinish();
-                                }
-
-                                if (arg === undefined) {
-                                    throw new Error("onMatch result is undefined");
-                                }
-
-                                args[i] = arg;
-                            }
-
-                            return finallyFun(args);
+                        return {
+                            onFinish: finallyFun,
+                            args: args,
+                            apply: false
                         };
                     }
                 }
             } else {
-                var args = this.ruleTestNormal(symbols, inputSrc);
+                var finallyFun = this.finallyFun;
 
-                if (args === null) {
-                    return null;
+                if ( finallyFun === null ) {
+                    return this.ruleTestNormal( symbols, inputSrc, true );
                 } else {
-                    var finallyFun = this.finallyFun;
+                    var args = this.ruleTestNormal( symbols, inputSrc, false );
 
-                    if (finallyFun !== null) {
-                        return function () {
-                            // evaluate all args, bottom up
-                            for (var i = 0; i < args.length; i++) {
-                                var arg = args[i];
-
-                                if (isFunction(arg)) {
-                                    var r = arg();
-
-                                    if (r === undefined) {
-                                        throw new Error("onMatch result is undefined");
-                                    } else {
-                                        args[i] = r;
-                                    }
-                                } else if (arg instanceof Symbol) {
-                                    var r = arg.onFinish();
-
-                                    if (r === undefined) {
-                                        throw new Error("onMatch result is undefined");
-                                    } else {
-                                        args[i] = r;
-                                    }
-                                }
-                            }
-
-                            return finallyFun.apply(null, args);
-                        };
+                    if ( args === null ) {
+                        return null;
                     } else {
-                        var arg = args[0];
-
-                        return function () {
-                            if (isFunction(arg)) {
-                                var r = arg();
-
-                                if (r === undefined) {
-                                    throw new Error("onMatch result is undefined");
-                                } else {
-                                    return r;
-                                }
-                            } else if (arg instanceof Symbol) {
-                                var r = arg.onFinish();
-
-                                if (r === undefined) {
-                                    throw new Error("onMatch result is undefined");
-                                } else {
-                                    return r;
-                                }
-                            } else {
-                                return arg;
-                            }
+                        return {
+                            onFinish: finallyFun,
+                            args: args,
+                            apply: true
                         };
                     }
                 }
@@ -3210,7 +3182,7 @@ module parse {
             }
         }
 
-        private ruleTestNormal(symbols: SymbolResult, inputSrc: string): { (): any; }[] {
+        private ruleTestNormal(symbols: SymbolResult, inputSrc: string, returnOnlyFirstArg:boolean): { (): any; }[] {
             /*
              * Recursive re-entrance rules.
              *
@@ -3275,11 +3247,13 @@ module parse {
 
                 if (rule === undefined) {
                     if (optional[i]) {
-                        if (args === null) {
-                            args = [null];
-                            this.isRecursive = NO_RECURSION;
-                        } else {
-                            args.push(null);
+                        if ( !returnOnlyFirstArg ) {
+                            if ( args === null ) {
+                                args = [null];
+                                this.isRecursive = NO_RECURSION;
+                            } else {
+                                args.push( null );
+                            }
                         }
                     } else {
                         if (i !== 0) {
@@ -3333,7 +3307,11 @@ module parse {
                         args = null;
                         break;
                     } else {
-                        if (args === null) {
+                        if ( returnOnlyFirstArg ) {
+                            if ( args === null ) {
+                                args = onFinish;
+                            }
+                        } else if (args === null) {
                             args = [onFinish];
                             this.isRecursive = NO_RECURSION;
                         } else {
