@@ -1,0 +1,265 @@
+h1, h2, h3, h4, h5, a, div,
+input, html, body {
+    font-family: Segoe UI, Segoe WP, Helvetica Neue, Roboto, sans-serif; 
+    font-weight: 100;
+}
+html, body {
+    padding: 0;
+    margin : 0;
+}
+body {
+    background: #23232a;
+    color: #fff;
+
+    font-size: 21px;
+
+    padding: 0 18px;
+}
+.line-numbers,
+textarea {
+    font-family: consolas;
+    font-size: 14px;
+
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+textarea,
+select {
+    background: #1a1a1a;
+    color: #dee;
+    border: 1px solid #111;
+
+}
+textarea {
+    width: 100%;
+
+    padding: 3px;
+
+    border-radius: 2px;
+}
+select {
+}
+
+h1 {
+    margin:     9px 0 6px 0;
+    padding:    0 0 0 3px;
+    font-size:  50px;
+    font-weight: 100;
+}
+h2 {
+    margin:      9px 0 3px 0;
+    padding:     0 0 0 3px;
+    font-size:   36px;
+    font-weight: 100;
+}
+.left .line-numbers,
+.left .code-box {
+    float: left;
+    clear: none;
+}
+.right .line-numbers,
+.right .code-box {
+    float: right;
+    clear: none;
+}
+.line-numbers,
+.code-box {
+    height:     520px;
+}
+
+#controls {
+    width: 100%;
+    float: left;
+    clear: both;
+
+    background: #ffffff; /* Old browsers */
+    background: -moz-linear-gradient(top,  #ffffff 0, #ededed 100%); /* FF3.6+ */
+    background: -webkit-gradient(linear, left top, left bottom, color-stop(0,#ffffff), color-stop(100%,#ededed)); /* Chrome,Safari4+ */
+    background: -webkit-linear-gradient(top,  #ffffff 0,#ededed 100%); /* Chrome10+,Safari5.1+ */
+    background: -o-linear-gradient(top,  #ffffff 0,#ededed 100%); /* Opera 11.10+ */
+    background: -ms-linear-gradient(top,  #ffffff 0,#ededed 100%); /* IE10+ */
+    background: linear-gradient(to bottom,  #ffffff 0,#ededed 100%); /* W3C */
+
+    border-bottom: 1px solid #aaa;
+
+    color: black;
+
+    box-shadow: 0 8px 12px rgba( 0, 0, 0, 0.3 );
+
+    padding: 18px 18px;
+    margin-left: -18px;
+
+    position: relative;
+}
+    .controls-button,
+    .controls-options {
+        float: left;
+    }
+    .controls-button {
+        border: none;
+        background: #1BA1E2;
+        color: #fff;
+
+        text-align: center;
+        font-size  : 32px;
+        font-weight: 100;
+        text-transform: lowercase;
+
+        padding: 0 0 9px 0;
+        margin-right: 12px;
+        width : 120px;
+        height: 90px;
+
+        -moz-opacity: 0.75;
+        opacity: 0.75;
+
+        cursor: pointer;
+
+        transition: opacity 200ms linear;
+    }
+    .controls-button:hover {
+        -moz-opacity: 1;
+        opacity: 1;
+    }
+    .button-parse {
+    }
+    .controls-options {
+        padding: 0 0 0 9px;
+    }
+        .controls-options > label {
+            font-size: 21px;
+        }
+    .controls-time-info {
+        float: right; 
+        clear: right;
+        text-align: right;
+        margin-top: -9px;
+        font-size : 16px;
+    }
+
+.line-numbers {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    min-width: 40px;
+
+    padding: 4px 9px;
+
+    text-align: right;
+    border: 1px solid transparent;
+
+    overflow: hidden;
+
+    color: #555;
+}
+
+.code-top {
+    float: left;
+    width: 100%;
+    vertical-align: bottom;
+    position: relative;
+}
+    .code-title {
+        float: left;
+        clear: left;
+    }
+    .code-files {
+        position: absolute;
+        left: 140px;
+        bottom: 9px;
+        right: 0;
+        display: block;
+    }
+        .code-files > select {
+            width: 100%;
+        }
+
+.code-wrap {
+    float: left;
+    width: 100%;
+    position: relative;
+}
+.code-box {
+    padding-left: 48px;
+
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+
+    border-left: none;
+    width: 100%;
+}
+
+.left,
+.right,
+.left_70,
+.right_30 {
+    position: relative;
+
+       -moz-box-sizing: border-box;
+            box-sizing: border-box;
+}
+
+.left,
+.right {
+    width:   50%;
+}
+
+.left_70,
+.left {
+    float:      left;
+    clear:      left;
+    padding-right: 5px;
+}
+
+.right_30,
+.right {
+    float:      right;
+    clear:      right;
+    padding-left: 5px;
+}
+
+.left_70 {
+    width: 70%;
+}
+.right_30 {
+    width: 30%;
+}
+
+.output-error,
+.output-symbols {
+    height: 320px;
+
+    font-size: 18px;
+    font-weight: 100;
+
+    padding: 6px 12px;
+}
+.output-error {
+    color: #c63;
+
+    z-index: 1;
+
+    transition: width 200ms linear, color 200ms linear;
+
+    position: absolute;
+    width: 100%;
+}
+/*
+ * This makes it also cover the symbols section.
+ */
+.output-error.error {
+    width: 143%;
+    color: #f42;
+}
+
+.footer {
+    width: 100%;
+    text-align: center;
+    color: #888;
+    float: left;
+    clear: both;
+    font-size: 18px;
+    margin: 32px 0 24px 0;
+}
+

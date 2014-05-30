@@ -1,0 +1,10 @@
+class Array
+    def f(&block)
+    end
+end
+
+foo = null
+foo.f do
+    return 4
+end
+
