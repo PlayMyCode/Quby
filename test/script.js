@@ -326,6 +326,51 @@ function addQubyFiles( name, src ) {
     }
 }
 
+var DocumentCookies = (function() {
+    var cookies = {};
+
+    var strCookies = document.cookie;
+    if ( strCookies ) {
+        strCookies = strCookies.split(';');
+
+        for ( var i = 0; i < strCookies.length; i++ ) {
+            var strCookie = strCookies[i];
+
+            if ( strCookies !== '' ) {
+                var equal = strCookie.indexOf('=');
+
+                if ( equal !== -1 ) {
+                    cookies[ strCookie.substring(0, equal) ] =
+                            strCookie.substring( equal+1 );
+                }
+            }
+        }
+    }
+
+    return {
+        setCookie: function( cookie, value ) {
+            cookies[ cookie ] = value;
+
+            var strCookies = '';
+            for ( var k in cookies ) {
+                if ( cookies.hasOwnProperty(k) ) {
+                    strCookies += k + '=' + cookies[k] + ';' ;
+                }
+            }
+
+            document.cookie = strCookies;
+        },
+
+        getCookie: function( cookie ) {
+            if ( cookies.hasOwnProperty(cookie) ) {
+                return cookies[ cookie ];
+            } else {
+                return null;
+            }
+        }
+    };
+})();
+
 window.addEventListener( 'load', function() {
     setCheckbox( 'checkbox_include' , includeCore );
     setCheckbox( 'checkbox_debug'   , debugMode   );
@@ -336,17 +381,6 @@ window.addEventListener( 'load', function() {
 
     addNumbersToCodePanes();
 
-    var filesDom = document.querySelector( '.js-code-files' );
-    for ( var i = 0; i < qubyFiles.length; i++ ) {
-        var qbFile = qubyFiles[i];
-        var optionDom = document.createElement( 'option' );
-
-        optionDom.textContent = qbFile.name;
-        optionDom.value = qbFile.src;
-
-        filesDom.appendChild( optionDom );
-    }
-
     /*
      * Handle the file switching selector.
      */
@@ -356,21 +390,39 @@ window.addEventListener( 'load', function() {
 
     var setQbSrc = function( nextOption ) {
         if ( currentOption !== nextOption ) {
+            qbFileCache[ currentOption ] = getCodePane();
+
             if ( qbFileCache.hasOwnProperty(nextOption) ) {
-                qbFileCache[ currentOption ] = getCodePane();
                 setCodePane( qbFileCache[nextOption] );
-                currentOption = nextOption;
             } else if ( nextOption === '' ) {
-                qbFileCache[ currentOption ] = getCodePane();
                 setCodePane( '' );
-                currentOption = nextOption;
             } else {
-                qbFileCache[ currentOption ] = getCodePane();
                 setCodePane( getSourceFile(nextOption) );
-                currentOption = nextOption;
             }
+
+            currentOption = nextOption;
+            DocumentCookies.setCookie( 'qb-file', nextOption );
         }
     };
+
+    var qbCookieFile = DocumentCookies.getCookie( 'qb-file' );
+    if ( qbCookieFile !== null ) {
+        setQbSrc( qbCookieFile );
+    }
+
+    var filesDom = document.querySelector( '.js-code-files' );
+    for ( var i = 0; i < qubyFiles.length; i++ ) {
+        var qbFile = qubyFiles[i];
+        var optionDom = document.createElement( 'option' );
+
+        optionDom.textContent = qbFile.name;
+        optionDom.value = qbFile.src;
+        if ( qbFile.src === qbCookieFile ) {
+            optionDom.selected = true;
+        }
+
+        filesDom.appendChild( optionDom );
+    }
 
     filesDom.addEventListener( 'change', function(ev) {
         var selectedOption = this.selectedOptions.item(0);
