@@ -336,7 +336,7 @@ module quby.core {
         isInsideClass() : boolean {
             return this.currentClass !== null;
         }
-        isInsideExtensionClass() : boolean {
+        isInsideExtensionClass(): boolean {
             return this.currentClass !== null && this.currentClass.getClass().isExtensionClass();
         }
         useField(field) {
@@ -1395,7 +1395,7 @@ module quby.core {
             return this.news.length === 0;
         }
 
-        setNoMethPrintFuns(callNames:string[]) {
+        setNoMethPrintFuns( callNames: string[] ) {
             this.noMethPrintFuns = callNames;
         }
 

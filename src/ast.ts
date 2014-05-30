@@ -969,6 +969,9 @@ module quby.ast {
         }
     }
 
+    /**
+     * For fully fledged pure 'Quby' classes.
+     */
     export class ClassDeclaration extends NamedSyntax implements IClassDeclaration {
         private classValidator: quby.core.ClassValidator;
 
@@ -976,39 +979,27 @@ module quby.ast {
         private statements: Statements;
 
         constructor (classHeader: ClassHeader, statements: Statements) {
-            /*
-             * Extension Class
-             *
-             * A real JS prototype, or existing type, which we are adding stuff
-             * to.
-             */
-            if (quby.runtime.isCoreClass(classHeader.getName().toLowerCase())) {
-                return new ExtensionClassDeclaration(classHeader, statements);
-                /*
-                 * Quby class
-                 *
-                 * Entirely user declared and created.
-                 */
-            } else {
-                var name = classHeader.getName();
+            var name = classHeader.getName();
 
-                super(
-                        classHeader.offset,
-                        name,
-                        quby.runtime.formatClass( name )
-                )
+            super(
+                    classHeader.offset,
+                    name,
+                    quby.runtime.formatClass( name )
+            )
 
-                this.header = classHeader;
-                this.statements = statements;
+            this.header = classHeader;
+            this.statements = statements;
 
-                this.classValidator = null;
-            }
+            this.classValidator = null;
         }
 
         getStatements() {
             return this.statements;
         }
 
+        /**
+         * @return False, always.
+         */
         isExtensionClass() {
             return false;
         }
@@ -1085,6 +1076,9 @@ module quby.ast {
             return this.statements;
         }
 
+        /**
+         * @Return True, always.
+         */
         isExtensionClass() {
             return true;
         }
@@ -1376,33 +1370,30 @@ module quby.ast {
      */
     export class Constructor extends FunctionDeclaration {
         private className: string;
-        private klass: ClassDeclaration;
-        private isExtensionClass: boolean;
+        private klass: IClassDeclaration;
 
         constructor (sym: parse.Symbol, parameters: Parameters, stmtBody: Statements) {
             super(sym, parameters, stmtBody);
 
             this.className = '';
             this.klass = null;
-            this.isExtensionClass = false;
 
             this.setType(FunctionDeclaration.CONSTRUCTOR);
         }
 
-        setClass(klass) {
+        setClass(klass:IClassDeclaration) {
             this.klass = klass;
 
-            this.setCallName( quby.runtime.formatNew(klass.name, this.getNumParameters()) );
+            this.setCallName( quby.runtime.formatNew(klass.getName(), this.getNumParameters()) );
 
-            this.className = klass.callName;
+            this.className = klass.getCallName();
         }
 
         validate(v: quby.core.Validator) {
             if (v.ensureInClass(this, "Constructors must be defined within a class.")) {
                 this.setClass( v.getCurrentClass().getClass() );
 
-                this.isExtensionClass = v.isInsideExtensionClass();
-                if (this.isExtensionClass) {
+                if ( this.klass.isExtensionClass() ) {
                     if ( !v.ensureAdminMode( this, "Cannot add constructor to core class: '" + v.getCurrentClass().getClass().getName() + "'" ) ) {
                         this.setInvalid();
                     }
@@ -1419,7 +1410,7 @@ module quby.ast {
         printParameters(p: quby.core.Printer) {
             p.append('(');
 
-            if (!this.isExtensionClass) {
+            if (!this.klass.isExtensionClass()) {
                 p.append(quby.runtime.THIS_VARIABLE, ',');
             }
 
@@ -1442,7 +1433,7 @@ module quby.ast {
                 stmts.print(p);
             }
 
-            if (!this.isExtensionClass) {
+            if (!this.klass.isExtensionClass()) {
                 p.append('return ', quby.runtime.THIS_VARIABLE, ';');
             }
 

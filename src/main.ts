@@ -520,11 +520,10 @@ module quby.main {
             iframe.style.position = 'fixed';
             iframe.style.marginLeft = '-400px';
 
-            iframe.onload = function() {
-                var iDoc = iframe.contentWindow || iframe.contentDocument;
-
-                if (iDoc.document) {
-                    iDoc = iDoc.document;
+            iframe.onload = function () {
+                var iDoc: Document = <Document> ( iframe.contentWindow || iframe.contentDocument );
+                if ( iDoc['document'] ) {
+                    iDoc = < Document > iDoc['document'];
                 }
 
                 var html = [];
@@ -554,8 +553,8 @@ module quby.main {
 
                 var iBody = iDoc.getElementsByTagName('body')[0];
                 iBody.innerHTML = html.join('');
-                iBody.style.margin = 0;
-                iBody.style.padding = 0;
+                iBody.style.margin = '0';
+                iBody.style.padding = '0';
 
                 iframe.style.opacity = '1';
             }

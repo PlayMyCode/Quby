@@ -1411,9 +1411,13 @@ module quby.parser {
             then( classHeader ).
             optional( statements ).
             then( terminals.keywords.END ).
-            onMatch( function( klass, header, stmts, end ) {
-                return new quby.ast.ClassDeclaration( header, stmts );
-            } );
+            onMatch( function ( klass: parse.Symbol, header: quby.ast.ClassHeader, stmts: quby.ast.Statements, end: parse.Symbol ): quby.ast.IClassDeclaration {
+                if ( quby.runtime.isCoreClass( header.getName().toLowerCase() ) ) {
+                    return new quby.ast.ExtensionClassDeclaration( header, stmts );
+                } else {
+                    return new quby.ast.ClassDeclaration( header, stmts );
+                }
+            });
 
     var functionDeclaration = parse.
             name( 'Function Declaration' ).
@@ -1422,20 +1426,23 @@ module quby.parser {
             then( parameterDefinition ).
             optional(statements).
             then(terminals.keywords.END).
-            onMatch( function( def, name, params, stmts, end ) : quby.ast.ISyntax {
+            onMatch( function ( def, name, params, stmts, end ): quby.ast.ISyntax {
                 if ( def.terminal === terminals.keywords.DEF ) {
+
                     // 'new' method, class constructor
                     if ( name.terminal === terminals.keywords.NEW ) {
                         return new quby.ast.Constructor( name, params, stmts );
+
                     // normal function
                     } else {
                         return new quby.ast.FunctionDeclaration( name, params, stmts );
                     }
+
                 // admin method
                 } else {
                     return new quby.ast.AdminMethod( name, params, stmts );
                 }
-            } );
+            });
 
     /*
      * Statements

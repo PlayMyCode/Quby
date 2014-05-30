@@ -320,7 +320,7 @@ module parse {
         }
 
         arguments[0] = str;
-        console.log.apply(console, arguments);
+        console.log.apply( console, arguments );
     };
 
     /**
@@ -1198,16 +1198,17 @@ module parse {
             }
         }
 
-        getParentTerm() {
-            if (this.terminalParent !== null) {
+        getParentTerm():Term {
+            if ( this.terminalParent !== null ) {
                 return this.terminalParent.getParentTerm();
             } else {
                 return this;
             }
         }
 
-        setParentTerm(parent) {
+        setParentTerm(parent:Term):Term {
             this.terminalParent = parent;
+            return this;
         }
 
         name(name: string): Term;
@@ -1221,15 +1222,16 @@ module parse {
             }
         }
 
-        setName(name: string) {
+        setName(name: string):Term {
             this.termName = name;
+            return this;
         }
 
         getName(): string {
             return this.termName;
         }
 
-        setID(id: number) {
+        setID(id: number):Term {
             this.id = id;
 
             /*
@@ -1258,8 +1260,8 @@ module parse {
          *
          * @param callback The callback to run; null for no callback, or a valid function.
          */
-        symbolMatch(callback: TerminalFunction) {
-            if (callback !== null && !isFunction(callback)) {
+        symbolMatch( callback: TerminalFunction ):Term {
+            if ( callback !== null && !isFunction( callback ) ) {
                 throw new Error("symbolMatch callback is not valid: " + callback);
             }
 
@@ -1287,8 +1289,8 @@ module parse {
          * @param callback The function to call (or null to clear a previous one).
          * @return This object to allow chaining.
          */
-        onMatch(callback: MatchFoundFunction) {
-            if (!callback) {
+        onMatch( callback: MatchFoundFunction ): Term {
+            if ( !callback ) {
                 this.onMatchFun = null;
             } else {
                 this.onMatchFun = callback;
@@ -1316,17 +1318,17 @@ module parse {
         public offset: number;
         public endOffset: number;
 
-        constructor (source, offset, endI) {
+        constructor( source:SourceLines, offset:number, endI:number ) {
             this.source = source;
             this.offset = offset;
             this.endOffset = endI;
         }
 
-        getMatch() {
+        getMatch(): string {
             return this.source.substring( this.offset, this.endOffset );
         }
 
-        getLine() {
+        getLine(): number {
             return this.source.getLine(this.offset);
         }
     }
@@ -1341,7 +1343,7 @@ module parse {
     export class SymbolError extends ParseError {
         public isSymbol = true;
 
-        constructor (sourceLines, i, endI) {
+        constructor( sourceLines: SourceLines, i: number, endI: number ) {
             super( sourceLines, i, endI );
 
             this.isSymbol = true;
@@ -1393,20 +1395,23 @@ module parse {
      */
     export class SourceLines {
         // altered when indexed ...
-        private numLines = 0;
-        private lineOffsets: number[] = null;
+        private numLines: number;
+        private lineOffsets: number[];
 
         private source: string;
         private name: string;
 
-        constructor (src, name) {
+        constructor( src: string, name: string ) {
             // source code altered and should be used for indexing
             this.source = src;
-
             this.name = name || '<Unknown Script>';
+
+            // these get altered when indexing occurres ...
+            this.numLines = 0;
+            this.lineOffsets = null;
         }
 
-        private index() {
+        private index():void {
             // index source code on the fly, only if needed
             if (this.lineOffsets == null) {
                 var src = this.source;
@@ -1453,18 +1458,18 @@ module parse {
             return this.source.substring( i, end );
         }
 
-        getSourceName() {
+        getSourceName():string {
             return this.name;
         }
 
-        getLine(offset: number) {
+        getLine(offset: number): number {
             this.index();
 
             for (var line = 0; line < this.lineOffsets.length; line++) {
                 // lineOffset is from the end of the line.
                 // If it's greater then offset, then we return that line.
                 // It's +1 to start lines from 1 rather then 0.
-                if (this.lineOffsets[line] > offset) {
+                if ( this.lineOffsets[line] > offset ) {
                     return line + 1;
                 }
             }
@@ -1472,7 +1477,7 @@ module parse {
             return this.numLines;
         }
 
-        getSource() {
+        getSource(): string {
             return this.source;
         }
     };
@@ -1501,7 +1506,7 @@ module parse {
             this.lower = undefined;
         }
 
-        clone(newMatch: string) {
+        clone( newMatch: string ): Symbol {
             var sym = new Symbol(this.terminal, this.source, this.offset, this.endOffset);
 
             sym.match = this.match;
@@ -1555,11 +1560,11 @@ module parse {
             }
         }
 
-        getLine() {
+        getLine():number {
             return this.source.getLine(this.offset);
         }
 
-        getSourceName() {
+        getSourceName(): string {
             return this.source.getSourceName();
         }
     }
@@ -1635,14 +1640,14 @@ module parse {
         symbolIDToTerms: Term[];
 
         constructor (
-                errors,
+                errors:SymbolError[],
 
-                symbols,
-                symbolIDs,
+                symbols: Symbol[],
+                symbolIDs: number[],
 
-                symbolLength,
+                symbolLength:number,
 
-                symbolIDToTerms 
+                symbolIDToTerms :Term[]
         ) {
             this.errors = errors;
 
@@ -1695,7 +1700,7 @@ module parse {
         /**
          * @return The maximum id value the symbol result has moved up to.
          */
-        maxID() {
+        maxID():number {
             if (this.i > this.maxI) {
                 return this.i;
             } else {
@@ -1703,16 +1708,16 @@ module parse {
             }
         }
 
-        maxSymbol() {
-            var maxID = Math.max(0, this.maxID() - 1);
-            return this.symbols[ maxID ];
+        maxSymbol():Symbol {
+            var maxID = Math.max( 0, this.maxID() - 1 );
+            return this.symbols[maxID];
         }
 
-        hasErrors() {
+        hasErrors():boolean {
             return this.errors.length > 0;
         }
 
-        getTerminals() {
+        getTerminals():Term[] {
             var symbols: Term[] = [];
 
             for (var i = 0; i < this.length; i++) {
@@ -1722,22 +1727,22 @@ module parse {
             return symbols;
         }
 
-        getErrors() {
+        getErrors():ParseError[] {
             return this.errors;
         }
 
         /**
          * @return True if this currently points to a symbol.
          */
-        hasMore() {
+        hasMore():boolean {
             return this.symbolIndex < this.length;
         }
 
-        isMoving() {
+        isMoving():boolean {
             return this.i !== this.symbolIndex;
         }
 
-        finalizeMove() {
+        finalizeMove():void {
             var i = this.i;
 
             if (i < this.length) {
@@ -1749,7 +1754,7 @@ module parse {
             }
         }
 
-        next() {
+        next():Symbol {
             this.i++;
 
             if (this.i < this.length) {
@@ -1764,7 +1769,7 @@ module parse {
             }
         }
 
-        back(increments: number, maxRule: ParserRuleImplementation, maxRuleI: number) {
+        back(increments: number, maxRule: ParserRuleImplementation, maxRuleI: number):void {
             var i = this.i;
 
             if (i > this.maxI) {
@@ -1782,25 +1787,25 @@ module parse {
             }
         }
 
-        skip() {
+        skip():Symbol {
             this.i++;
             this.finalizeMove();
 
             return this.symbols[this.i - 1];
         }
 
-        index() {
+        index():number {
             return this.symbolIndex;
         }
 
         /**
          * @return The current index for the current symbol ID.
          */
-        idIndex() {
+        idIndex():number {
             return this.i;
         }
 
-        peekID() {
+        peekID():number {
             if (this.i >= this.length) {
                 return INVALID_TERMINAL;
             }
@@ -2825,7 +2830,7 @@ module parse {
                 compileTime = this.compileTime,
                 start = Date.now();
 
-            this.parseSymbols(input, parseInput, name, function (symbols, symbolsTime) {
+            this.parseSymbols( input, parseInput, name, function ( symbols, symbolsTime ) {
                 if (symbols.hasErrors()) {
                     callback([], symbols.getErrors());
                     callParseDebug(debugCallback, symbols,
@@ -2963,9 +2968,9 @@ module parse {
         }
 
         private ruleTest(symbols: SymbolResult, inputSrc: string): any {
-            if (this.isSeperator || this.isCyclic) {
-                var args = null;
+            var args: any;
 
+            if ( this.isSeperator || this.isCyclic ) {
                 if (this.isSeperator) {
                     args = this.ruleTestSeperator(symbols, inputSrc);
                 } else {
@@ -2982,8 +2987,8 @@ module parse {
                     } else {
                         return {
                             onFinish: finallyFun,
-                            args: args,
-                            apply: false
+                            args    : args,
+                            apply   : false
                         };
                     }
                 }
@@ -2993,15 +2998,15 @@ module parse {
                 if ( finallyFun === null ) {
                     return this.ruleTestNormal( symbols, inputSrc, true );
                 } else {
-                    var args = this.ruleTestNormal( symbols, inputSrc, false );
+                    args = this.ruleTestNormal( symbols, inputSrc, false );
 
                     if ( args === null ) {
                         return null;
                     } else {
                         return {
                             onFinish: finallyFun,
-                            args: args,
-                            apply: true
+                            args    : args,
+                            apply   : true
                         };
                     }
                 }
@@ -3440,7 +3445,7 @@ module parse {
 
                 termTests: TerminalFunction[] = [],
                 termIDs: number[] = new Array(termsLen),
-                multipleIgnores: boolean = (ignores.length > 1),
+                multipleIgnores: boolean = ( ignores.length > 1 ),
 
                 /**
                  * An invalid index in the string, used to denote
@@ -4105,7 +4110,7 @@ module parse {
         * which people can use to quickly build a language.
         */
 
-        export var WHITESPACE:TerminalFunction = function( src, i, code, len ) {
+        export var WHITESPACE: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
             while ( code === SPACE || code === TAB ) {
                 i++;
                 code = src.charCodeAt( i );
@@ -4117,7 +4122,7 @@ module parse {
         /**
         * A terminal that matches: tabs, spaces, \n and \r characters.
         */
-        export var WHITESPACE_END_OF_LINE:TerminalFunction = function (src, i, code, len) {
+        export var WHITESPACE_END_OF_LINE:TerminalFunction = function (src:string, i:number, code:number, len:number): number {
             while (code === SPACE || code === TAB || code === SLASH_N || code === SLASH_R) {
                 i++;
                 code = src.charCodeAt(i);
@@ -4129,49 +4134,50 @@ module parse {
         /**
         * A number terminal.
         */
-        export var NUMBER:TerminalFunction = function( src, i, code, len ) {
-            if ( code < ZERO || code > NINE ) {
-                return;
+        export var NUMBER: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
+            if ( ZERO <= code && code <= NINE ) {
+
                 // 0x hex number
-            } else if (
-                    code === ZERO &&
-                    src.charCodeAt( i + 1 ) === LOWER_X
-            ) {
-                i += 1;
+                if ( code === ZERO ) {
+                    if ( src.charCodeAt( i + 1 ) === LOWER_X ) {
+                        i += 1;
 
-                do {
-                    i++;
-                    code = src.charCodeAt( i );
-                } while (
-                        code === UNDERSCORE ||
-                        isHexCode( code )
-                )
+                        do {
+                            i++;
+                            code = src.charCodeAt( i );
+                        } while (
+                            code === UNDERSCORE ||
+                            isHexCode( code )
+                        )
+                    }
+
                 // normal number
-            } else {
-                var start = i;
-                do {
-                    i++;
-                    code = src.charCodeAt( i );
-                } while (
-                        code === UNDERSCORE ||
-                        ( code >= ZERO && code <= NINE )
-                )
-
-                // Look for Decimal Number
-                if (
-                        src.charCodeAt( i ) === FULL_STOP &&
-                        isNumericCode( src.charCodeAt( i + 1 ) )
-                ) {
-                    var code;
-                    i++;
+                } else {
+                    var start: number = i;
 
                     do {
                         i++;
                         code = src.charCodeAt( i );
                     } while (
+                        code === UNDERSCORE ||
+                        ( code >= ZERO && code <= NINE )
+                    )
+
+                    // Look for Decimal Number
+                    if (
+                        src.charCodeAt( i ) === FULL_STOP &&
+                        isNumericCode( src.charCodeAt( i + 1 ) )
+                        ) {
+                        i++;
+
+                        do {
+                            i++;
+                            code = src.charCodeAt( i );
+                        } while (
                             code === UNDERSCORE ||
                             ( code >= ZERO && code <= NINE )
-                    )
+                        )
+                    }
                 }
             }
 
@@ -4183,7 +4189,7 @@ module parse {
         * 
         * Matches everything from a // onwards.
         */
-        export var C_SINGLE_LINE_COMMENT:TerminalFunction = function( src, i, code, len ) {
+        export var C_SINGLE_LINE_COMMENT: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
             if ( code === SLASH && src.charCodeAt( i + 1 ) === SLASH ) {
                 i++;
 
@@ -4194,15 +4200,17 @@ module parse {
                         i < len &&
                         code !== SLASH_N
                 );
-
-                return i;
             }
+
+            return i;
         }
 
         /**
         * A C-like multi line comment, matches everything from '/ *' to a '* /', (without the spaces).
         */
-        export var C_MULTI_LINE_COMMENT:TerminalFunction = function( src, i, code, len ) {
+        export var C_MULTI_LINE_COMMENT: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
+            var start = i;
+
             if ( code === SLASH && src.charCodeAt( i + 1 ) === STAR ) {
                 // this is so we end up skipping two characters,
                 // the / and the *, before we hit the next char to check
@@ -4213,7 +4221,7 @@ module parse {
 
                     // error!
                     if ( i >= len ) {
-                        return;
+                        return start;
                     }
                 } while ( !(
                         src.charCodeAt( i ) === STAR &&
@@ -4222,13 +4230,15 @@ module parse {
 
                 // plus 2 to include the end of the comment
                 return i + 2;
+            } else {
+                return i;
             }
         }
 
         /**
         * A terminal for a string, double or single quoted.
         */
-        export var STRING:TerminalFunction = function( src, i, code, len ) {
+        export var STRING: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
             var start = i;
 
             // double quote string
@@ -4238,7 +4248,7 @@ module parse {
 
                     // error!
                     if ( i >= len ) {
-                        return;
+                        return start;
                     }
                 } while ( !(
                         src.charCodeAt( i ) === DOUBLE_QUOTE &&
@@ -4253,7 +4263,7 @@ module parse {
 
                     // error!
                     if ( i >= len ) {
-                        return;
+                        return start;
                     }
                 } while ( !(
                         src.charCodeAt( i ) === SINGLE_QUOTE &&
@@ -4262,6 +4272,8 @@ module parse {
 
                 return i + 1;
             }
+
+            return i;
         }
     }
 }
