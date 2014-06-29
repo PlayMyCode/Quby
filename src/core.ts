@@ -58,7 +58,7 @@ module quby.core {
                 instance.getName(),
 
                 function(program:quby.ast.ISyntax, errors:parse.ParseError[]) {
-                    validator.errorHandler(errHandler);
+                    validator.errorHandler( errHandler );
                     validator.adminMode( instance.isAdmin() );
                     validator.strictMode( instance.isStrict() );
 
@@ -95,7 +95,7 @@ module quby.core {
         var errLine:number = error.getLine(),
             strErr:string;
 
-        if (error.isSymbol) {
+        if ( error.isSymbol ) {
             strErr = "error parsing '" + error.getMatch() + "'";
         } else if (error.isTerminal) {
             var termError = <parse.TerminalError> error;
@@ -122,7 +122,7 @@ module quby.core {
 
         return {
                 line: errLine,
-                msg: strErr
+                msg : strErr
         };
     }
 
@@ -144,7 +144,7 @@ module quby.core {
          */
         private lastErrorName: string;
 
-        private isStrict: boolean;
+        private isStrictModeOn: boolean;
         private isAdminMode: boolean;
 
         private isParameters: boolean;
@@ -204,7 +204,7 @@ module quby.core {
 
             this.lastErrorName = null;
 
-            this.isStrict = true;
+            this.isStrictModeOn = true;
 
             this.classes = {};
             this.currentClass = null;
@@ -266,7 +266,7 @@ module quby.core {
         }
 
         strictMode( mode:boolean ) {
-            this.isStrict = mode;
+            this.isStrictModeOn = mode;
         }
 
         adminMode( mode:boolean ) {
@@ -309,7 +309,7 @@ module quby.core {
                     oldKlass.setHeader(klassHead);
                 } else if (oldKlassHead.hasSuper() && klassHead.hasSuper()) {
                     if (oldKlassHead.getSuperCallName() != klassHead.getSuperCallName()) {
-                        this.parseError(klass.offset, "Super class cannot be redefined for class '" + klass.getName() + "'.");
+                        this.parseError(klass.getOffset(), "Super class cannot be redefined for class '" + klass.getName() + "'.");
                     }
                 }
             }
@@ -516,7 +516,7 @@ module quby.core {
                 // Functions
             } else {
                 if (this.funs[fun.getCallName()] !== undefined) {
-                    this.parseError(fun.offset, "Function is already defined: '" + fun.getName() + "', with " + fun.getNumParameters() + " parameters.");
+                    this.parseError(fun.getOffset(), "Function is already defined: '" + fun.getName() + "', with " + fun.getNumParameters() + " parameters.");
                 }
 
                 this.funs[fun.getCallName()] = fun;
@@ -553,7 +553,7 @@ module quby.core {
          * behaviour does not change).
          */
         strictError(lineInfo:parse.Symbol, msg:string) {
-            if (this.isStrict) {
+            if ( this.isStrictModeOn ) {
                 this.parseError(lineInfo, msg);
             }
         }
@@ -562,24 +562,28 @@ module quby.core {
             if (sym) {
                 this.parseErrorLine(sym.getLine(), msg, sym.getSourceName());
             } else {
-                this.parseErrorLine(null, msg);
+                this.parseErrorLine(-1, msg);
             }
         }
 
         parseErrorLine(line:number, error:string, name?:string) {
-            var msg:string;
-
-            if (line !== null && line !== undefined || line < 1) {
-                msg = "line " + line + ", " + error;
-            } else {
-                msg = error
+            if ( line === null || line === undefined ) {
                 line = -1;
             }
+            line = line | 0;
 
             if (!name && name !== '') {
                 name = this.lastErrorName;
             } else {
                 this.lastErrorName = name;
+            }
+
+            var msg:string;
+
+            if ( line !== -1 ) {
+                msg = "line " + line + ", " + error;
+            } else {
+                msg = error
             }
 
             this.errors.push({
@@ -596,9 +600,19 @@ module quby.core {
             if (errors.length > 0) {
                 errors.sort( (a:ErrorInfo, b:ErrorInfo) => {
                     if (a.name === b.name) {
-                        return a.line - b.line;
+                        var aLine = a.line;
+                        if ( aLine === null ) {
+                            aLine = -1;
+                        }
+
+                        var bLine = b.line;
+                        if ( bLine === null ) {
+                            bLine = -1;
+                        }
+
+                        return aLine - bLine;
                     } else {
-                        return a.name.localeCompare(b.name);
+                        return a.name.localeCompare( b.name );
                     }
                 });
             }
@@ -696,77 +710,14 @@ module quby.core {
          *
          * Runs all final validation checks.
          * After this step the program is fully validated.
+         * 
+         * At the time of writing, Chrome fails to be able to optimize methods which include a try-catch
+         * statement. So the statement must be pushed out into an outer method.
          */
-        endValidate() {
+        private endValidate() {
             try {
-                /* Go through all function calls we have stored, which have not been
-                 * confirmed as being defined. Note this can include multiple calls
-                 * to the same functions. */
-                for (var usedFunsI in this.usedFunsStack) {
-                    var fun:quby.ast.FunctionCall = this.usedFunsStack[usedFunsI];
-                    var callName = fun.getCallName();
+                this.endValidateInner();
 
-                    // check if the function is not defined
-                    if ( this.funs[callName] === undefined ) {
-                        this.searchMissingFunAndError(fun, this.funs, 'function');
-                    }
-                }
-
-                /* Check all used globals were assigned to, at some point. */
-                for (var strGlobal in this.usedGlobals) {
-                    if ( this.globals[strGlobal] === undefined ) {
-                        var global = this.usedGlobals[strGlobal];
-                        this.parseError(global.offset, "Global used but never assigned to: '" + global.getName() + "'.");
-                    }
-                }
-
-                /* finalise all classes */
-                for (var klassI in this.classes) {
-                    var klass = this.classes[klassI];
-                    klass.endValidate();
-                }
-
-                /* Ensure all called methods do exist (somewhere) */
-                for (var methodI in this.calledMethods) {
-                    var methodFound = false;
-                    var method:quby.ast.IFunctionMeta = this.calledMethods[methodI];
-
-                    for (var klassI in this.classes) {
-                        if (this.classes[klassI].hasFun(method)) {
-                            methodFound = true;
-                            break;
-                        }
-                    }
-
-                    if (!methodFound) {
-                        var found:quby.ast.IFunctionDeclarationMeta = this.searchForMethodLike(method),
-                            name = method.getName().toLowerCase(),
-                            errMsg:string = null;
-
-                        if (found !== null) {
-                            if ( !found.hasDeclarationError() ) {
-                                if ( name === found.getName().toLowerCase() ) {
-                                    errMsg = "Method '" + method.getName() + "' called with incorrect number of parameters, " + method.getNumParameters() + " instead of " + found.getNumParameters();
-                                } else {
-                                    errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.getName() + "'?";
-                                }
-                            }
-                        } else {
-                            // no alternative method found
-                            errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class.";
-                        }
-
-                        this.parseError(method.offset, errMsg);
-                    }
-                }
-
-                this.lateUsedFuns.endValidate(this.funs);
-
-                // finally, run the callbacks
-                while (this.endValidateCallbacks.length > 0) {
-                    var callback = this.endValidateCallbacks.shift();
-                    callback(this);
-                }
             } catch (err) {
                 this.parseError(null, 'Unknown issue with your code has caused the parser to crash!');
 
@@ -780,6 +731,79 @@ module quby.core {
                     }
                 }
             }
+        }
+
+        private endValidateInner() {
+            /* 
+             * Go through all function calls we have stored, which have not been
+             * confirmed as being defined. Note this can include multiple calls
+             * to the same functions. 
+             */
+            for (var usedFunsI in this.usedFunsStack) {
+                var fun:quby.ast.FunctionCall = this.usedFunsStack[usedFunsI];
+                var callName = fun.getCallName();
+
+                // check if the function is not defined
+                if ( this.funs[callName] === undefined ) {
+                    this.searchMissingFunAndError(fun, this.funs, 'function');
+                }
+            }
+
+            /* Check all used globals were assigned to, at some point. */
+            for (var strGlobal in this.usedGlobals) {
+                if ( this.globals[strGlobal] === undefined ) {
+                    var global = this.usedGlobals[strGlobal];
+
+                    this.parseError(global.getOffset(), "Global used but never assigned to: '" + global.getName() + "'.");
+                }
+            }
+
+            /* finalise all classes */
+            for (var klassI in this.classes) {
+                this.classes[klassI].endValidate();
+            }
+
+            /* Ensure all called methods do exist (somewhere) */
+            for (var methodI in this.calledMethods) {
+                var methodFound = false;
+                var method:quby.ast.IFunctionMeta = this.calledMethods[methodI];
+
+                for (var klassI in this.classes) {
+                    if (this.classes[klassI].hasFun(method)) {
+                        methodFound = true;
+                        break;
+                    }
+                }
+
+                if (!methodFound) {
+                    var found:quby.ast.IFunctionDeclarationMeta = this.searchForMethodLike(method),
+                        name = method.getName().toLowerCase(),
+                        errMsg:string = null;
+
+                    if (found !== null) {
+                        if ( !found.hasDeclarationError() ) {
+                            if ( name === found.getName().toLowerCase() ) {
+                                errMsg = "Method '" + method.getName() + "' called with incorrect number of parameters, " + method.getNumParameters() + " instead of " + found.getNumParameters();
+                            } else {
+                                errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class. Did you mean: '" + found.getName() + "'?";
+                            }
+                        }
+                    } else {
+                        // no alternative method found
+                        errMsg = "Method '" + method.getName() + "' called with " + method.getNumParameters() + " parameters, but is not defined in any class.";
+                    }
+
+                    this.parseError(method.getOffset(), errMsg);
+                }
+            }
+
+            this.lateUsedFuns.endValidate(this.funs);
+
+            // finally run the callbacks
+            for ( var i = 0; i < this.endValidateCallbacks.length; i++ ) {
+                this.endValidateCallbacks[i]( this );
+            }
+            this.endValidateCallbacks = [];
         }
 
         /**
@@ -981,15 +1005,19 @@ module quby.core {
                 altNames.push('set' + name);
             }
 
-            for (var funIndex in searchFuns) {
+            var keys = Object.keys( searchFuns );
+            var keysLen = keys.length;
+            for ( var i = 0; i < keysLen; i++ ) {
+                var funIndex = keys[i];
+
                 var searchFun = searchFuns[funIndex];
                 var searchName = searchFun.getName().toLowerCase();
 
                 if (searchName === name) {
                     return searchFun;
                 } else if (altFun === null) {
-                    for (var i = 0; i < altNames.length; i++) {
-                        var altName = altNames[i];
+                    for (var j = 0; j < altNames.length; j++) {
+                        var altName = altNames[j];
 
                         if (searchName == altName) {
                             altFun = searchFun;

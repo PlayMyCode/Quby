@@ -400,9 +400,7 @@ module quby.parser {
         };
 
         return function ( src: string ): string {
-            return stripComments(
-                preScanParse( src )
-                );
+            return stripComments( preScanParse( src ) );
         };
     })();
 
@@ -420,21 +418,24 @@ module quby.parser {
          * If it contains a semi-colon however,
          * this will fail.
          */
-        endOfLine: function ( src, i, code, len ) {
+        endOfLine: function ( src, origI, code, len ) {
+            var i = origI;
+
             if ( code === SLASH_N ) {
                 do {
-                    i++;
-                    code = src.charCodeAt( i );
+                    code = src.charCodeAt( ++i );
                 } while (
                     code === SLASH_N ||
                     code === SPACE ||
                     code === TAB
-                    );
+                );
 
                 if ( src.charCodeAt( i ) !== SEMI_COLON ) {
                     return i;
                 }
             }
+
+            return origI;
         },
 
         /**
@@ -448,21 +449,20 @@ module quby.parser {
          */
         endOfStatement: function ( src, i, code, len ) {
             if (
-                code === SEMI_COLON ||
-                code === SLASH_N
-                ) {
+                    code === SEMI_COLON ||
+                    code === SLASH_N
+            ) {
                 do {
-                    i++;
-                    code = src.charCodeAt( i );
+                    code = src.charCodeAt( ++i );
                 } while (
                     code === SLASH_N ||
                     code === SEMI_COLON ||
                     code === SPACE ||
                     code === TAB
-                    );
-
-                return i;
+                );
             }
+
+            return i;
         },
 
         keywords: {
@@ -528,22 +528,64 @@ module quby.parser {
                     code = src.charCodeAt( i + 1 );
 
                     if (
-                        // is a lower case letter, or underscore
-                        ( code >= 97 && code <= 122 ) ||
-                        ( code === UNDERSCORE )
-                        ) {
+                            // is a lower case letter, or underscore
+                            ( code >= 97 && code <= 122 ) ||
+                            ( code === UNDERSCORE )
+                    ) {
                         i += 2;
 
                         while ( isAlphaNumericCode( src.charCodeAt( i ) ) ) {
                             i++;
                         }
-
-                        return i;
                     }
+                }
+
+                return i;
+            },
+
+            /**
+             * This will match very generic numbers, that are 'number-like' but not neccessarilly
+             * correct. 
+             * 
+             * For example it will match the hex value '0xzzz', even though there are no z's in
+             * hexadecimal.
+             * 
+             * This is so they are validated later, and can give a much more intelligent error 
+             * message.
+             */
+            number: function ( src: string, i: number, code: number, len: number ): number {
+                if ( ZERO <= code && code <= NINE ) {
+                    do {
+                        code = src.charCodeAt( ++i );
+                    } while (
+                        code === UNDERSCORE ||
+                        ( ZERO <= code && code <= NINE ) ||
+                        ( LOWER_A <= code && code <= LOWER_Z )
+                    )
+
+                    // look for a decimal
+                    if ( src.charCodeAt( i ) === FULL_STOP ) {
+                        code = src.charCodeAt( i + 1 );
+
+                        if ( ZERO <= code && code <= NINE ) {
+                            i++;
+
+                            do {
+                                code = src.charCodeAt( ++i );
+                            } while (
+                                code === UNDERSCORE ||
+                                ( ZERO <= code && code <= NINE ) ||
+                                ( LOWER_A <= code && code <= LOWER_Z )
+                            )
+                        }
+                    }
+
+                    return i;
+                } else {
+                    return 0;
                 }
             },
 
-            number: parse.terminal.NUMBER,
             string: parse.terminal.STRING
         },
 
@@ -561,13 +603,15 @@ module quby.parser {
                     code = src.charCodeAt( i + 1 );
 
                     if (
-                        // is a lower case letter, or underscore
-                        ( code < 97 || code > 122 ) &&
-                        ( code !== UNDERSCORE )
-                        ) {
+                            // is a lower case letter, or underscore
+                            ( code < 97 || code > 122 ) &&
+                            ( code !== UNDERSCORE )
+                    ) {
                         return i + 1;
                     }
                 }
+
+                return i;
             },
 
             mapArrow: '=>',
@@ -600,40 +644,32 @@ module quby.parser {
         identifiers: {
             variableName: function ( src, i, code, len ) {
                 if (
-                    // is a lower case letter, or underscore
-                    ( code >= 97 && code <= 122 ) ||
-                    ( code === UNDERSCORE )
-                    ) {
-                    i++;
-
-                    while ( isAlphaNumericCode( src.charCodeAt( i ) ) ) {
-                        i++;
-                    }
-
+                        // is a lower case letter, or underscore
+                        ( code >= 97 && code <= 122 ) ||
+                        ( code === UNDERSCORE )
+                ) {
+                    // just chomp up all following alpha-numeric codes
+                    while ( isAlphaNumericCode( src.charCodeAt( ++i ) ) ) { }
                     return i;
                 }
+
+                return 0;
             },
             global: function ( src, i, code, len ) {
                 if ( code === DOLLAR ) {
-                    i++;
-
-                    while ( isAlphaNumericCode( src.charCodeAt( i ) ) ) {
-                        i++;
-                    }
-
+                    while ( isAlphaNumericCode( src.charCodeAt( ++i ) ) ) { }
                     return i;
                 }
+
+                return 0;
             },
             objectField: function ( src, i, code, len ) {
                 if ( code === AT ) {
-                    i++;
-
-                    while ( isAlphaNumericCode( src.charCodeAt( i ) ) ) {
-                        i++;
-                    }
-
+                    while ( isAlphaNumericCode( src.charCodeAt( ++i ) ) ) { }
                     return i;
                 }
+
+                return 0;
             }
         },
 
@@ -663,43 +699,41 @@ module quby.parser {
     };
 
     applySymbolMatch(
-        [
-            terminals.ops,
+            [
+                terminals.ops,
 
-            terminals.keywords.DO,
+                terminals.keywords.DO,
 
-            terminals.keywords.IF,
+                terminals.keywords.IF,
 
-            terminals.keywords.ELSE,
-            terminals.keywords.ELSIF,
-            terminals.keywords.ELSEIF,
-            terminals.keywords.ELSE_IF,
+                terminals.keywords.ELSE,
+                terminals.keywords.ELSIF,
+                terminals.keywords.ELSEIF,
+                terminals.keywords.ELSE_IF,
 
-            terminals.keywords.WHILE,
-            terminals.keywords.UNTIL,
-            terminals.keywords.LOOP,
+                terminals.keywords.WHILE,
+                terminals.keywords.UNTIL,
+                terminals.keywords.LOOP,
 
-            terminals.keywords.NEW,
+                terminals.keywords.NEW,
 
-            terminals.symbols.comma,
-            terminals.symbols.leftBracket,
-            terminals.symbols.leftBrace,
-            terminals.symbols.leftSquare
-        ],
-        function ( src, i, code, len ) {
-            while (
-                code === SPACE ||
-                code === SLASH_N ||
-                code === TAB
+                terminals.symbols.comma,
+                terminals.symbols.leftBracket,
+                terminals.symbols.leftBrace,
+                terminals.symbols.leftSquare
+            ],
+            function ( src, i, code, len ) {
+                while (
+                        code === SPACE ||
+                        code === SLASH_N ||
+                        code === TAB
                 ) {
-                i++;
-                code = src.charCodeAt( i );
+                    code = src.charCodeAt( ++i );
+                }
+
+                return i;
             }
-
-            return i;
-        }
-        );
-
+    );
 
     var inlinePostMatch = function ( src, i, code, len ) {
         /*
@@ -714,23 +748,23 @@ module quby.parser {
             if ( code === HASH ) {
                 // land at the end of the closing section
                 if (
-                    src.charCodeAt( i - 1 ) === GREATER_THAN &&
-                    src.charCodeAt( i - 2 ) === HASH
-                    ) {
+                        src.charCodeAt( i - 1 ) === GREATER_THAN &&
+                        src.charCodeAt( i - 2 ) === HASH
+                ) {
                     return i + 1;
                     // land at the beginning
                 } else if (
-                    src.charCodeAt( i + 1 ) === GREATER_THAN &&
-                    src.charCodeAt( i + 2 ) === HASH
-                    ) {
+                        src.charCodeAt( i + 1 ) === GREATER_THAN &&
+                        src.charCodeAt( i + 2 ) === HASH
+                ) {
                     return i + 3;
                 }
                 // land in the middle
             } else if (
-                code === GREATER_THAN &&
-                src.charCodeAt( i - 1 ) === HASH &&
-                src.charCodeAt( i + 1 ) === HASH
-                ) {
+                    code === GREATER_THAN &&
+                    src.charCodeAt( i - 1 ) === HASH &&
+                    src.charCodeAt( i + 1 ) === HASH
+            ) {
                 return i + 2;
             }
         } while ( i < len );
@@ -756,17 +790,17 @@ module quby.parser {
 
     /* The onMatch callbacks for altering the symbols when matched. */
     terminals.literals.TRUE.onMatch( function ( symbol ) {
-        return new quby.ast.Bool( symbol );
+        return new quby.ast.BoolTrue( symbol );
     });
     terminals.literals.FALSE.onMatch( function ( symbol ) {
-        return new quby.ast.Bool( symbol );
+        return new quby.ast.BoolFalse( symbol );
     });
     terminals.literals.NULL.onMatch( function ( symbol ) {
         return new quby.ast.Null( symbol );
     });
     terminals.literals.NIL.onMatch( function ( symbol ) {
         return new quby.ast.Null( symbol );
-    });;
+    });
     terminals.literals.JSUndefined.onMatch( function ( symbol ) {
         return new quby.ast.JSUndefined( symbol );
     });
@@ -840,13 +874,13 @@ module quby.parser {
             parse.
                 a( terminals.ops.hash ).
                 either(
-                /*
-                 * Global is included, to capture the use
-                 * of a starting dollar symbol.
-                 */
-                terminals.identifiers.variableName,
-                terminals.identifiers.global
-            ).
+                    /*
+                     * Global is included, to capture the use
+                     * of a starting dollar symbol.
+                     */
+                    terminals.identifiers.variableName,
+                    terminals.identifiers.global
+                ).
             onMatch( function ( hash, name ) {
                 return new quby.ast.JSVariable( name );
             })
@@ -856,10 +890,10 @@ module quby.parser {
 
             if ( term === terminals.identifiers.variableName ) {
                 return new quby.ast.LocalVariable( identifier );
-            } else if ( term === terminals.identifiers.global ) {
-                return new quby.ast.GlobalVariable( identifier );
             } else if ( term === terminals.identifiers.objectField ) {
                 return new quby.ast.FieldVariable( identifier );
+            } else if ( term === terminals.identifiers.global ) {
+                return new quby.ast.GlobalVariable( identifier );
             } else if ( term === terminals.keywords.THIS ) {
                 return new quby.ast.ThisVariable( identifier );
             } else if ( identifier instanceof quby.ast.JSVariable ) {
@@ -872,10 +906,7 @@ module quby.parser {
 
     var arrayAccessExtension = parse.
         name( 'array access' ).
-        a(
-        terminals.symbols.leftSquare,
-        expr
-        ).
+        a( terminals.symbols.leftSquare, expr ).
         optional( terminals.endOfLine ).
         then( terminals.symbols.rightSquare ).
         onMatch( function ( leftSquare, keyExpr, endOfLine, rightSquare ) {
@@ -1580,19 +1611,20 @@ module quby.parser {
      * @param onDebug An optional callback, for sending debug information into.
      */
     export function parseSource(
-        src: string,
-        name: string,
-        onFinish: ( program: quby.ast.ISyntax, errors: parse.ParseError[] ) => void ,
-        onDebug: parse.DebugCallback
-        ) {
-        if ( onDebug !== null ) {
-            console.log( src );
-        }
+            src: string,
+            name: string,
+            onFinish: ( program: quby.ast.ISyntax, errors: parse.ParseError[] ) => void ,
+            onDebug: parse.DebugCallback
+    ) {
+        // print out how long it took to pre-parse the code
+        var start = Date.now();
+        var codeSrc = preParse( src );
+        console.log( '.ast.quby.parser', 'pre parse code time: ' + ( Date.now() - start ) );
 
         statements.parse( {
             name: name,
             src: src,
-            inputSrc: preParse( src ),
+            inputSrc: codeSrc,
 
             onFinish: onFinish,
             onDebug: onDebug || null

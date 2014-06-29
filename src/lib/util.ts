@@ -41,37 +41,6 @@ module util {
         isSafari: browserName === 'safari'
     };
 
-    /**
-     * Creates a new JS object, copies all the properties across from source
-     * to the clone, and then returns the object.
-     *
-     * Note that the type of the object will be different.
-     */
-    export function clone(source: any) {
-        if (source) {
-            if (source instanceof Array) {
-                return source.splice(0);
-            } else {
-                var ClonePrototype = function () { };
-                ClonePrototype.prototype = source;
-
-                var copy = new ClonePrototype();
-
-                // copy all attributes across,
-                // but skip prototype items
-                for (var k in source) {
-                    if (source.hasOwnProperty(k)) {
-                        copy[k] = source[k];
-                    }
-                }
-
-                return copy;
-            }
-        } else {
-            return source;
-        }
-    }
-
     export module url {
         var SLASH_CHAR = '/'.charCodeAt(0);
 

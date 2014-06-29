@@ -43,7 +43,28 @@
  */
 module quby.ast {
     var EMPTY_ARRAY: any[] = [];
+
+    var MAX_SAFE_INT =  9007199254740991,
+        MIN_SAFE_INT = -9007199254740991;
+
+    var ZERO = '0'.charCodeAt( 0 ),
+        ONE = '1'.charCodeAt( 0 ),
+        NINE = '9'.charCodeAt( 0 ),
+        UNDERSCORE = '_'.charCodeAt( 0 ),
+        FULL_STOP = '.'.charCodeAt( 0 ),
+        LOWER_A = 'a'.charCodeAt( 0 ),
+        LOWER_B = 'b'.charCodeAt( 0 ),
+        LOWER_F = 'f'.charCodeAt( 0 ),
+        LOWER_X = 'x'.charCodeAt( 0 );
     
+    function errorIfIntSizeUnsafe( v: quby.core.Validator, numObj:quby.ast.Number, n: number ) {
+        if ( n > MAX_SAFE_INT ) {
+            v.parseError( numObj.getOffset(), "Number value is too large (yes, too large); JS cannot safely represent '" + n + "'" );
+        } else if ( n < MIN_SAFE_INT ) {
+            v.parseError( numObj.getOffset(), "Number value is too small (yes, too small); JS cannot safely represent '" + n + "'" );
+        }
+    }
+
     export interface ISyntax {
         offset: parse.Symbol;
 
@@ -412,6 +433,19 @@ module quby.ast {
                 this.offset = stmt.offset;
             }
         }
+
+        validate(v: quby.core.Validator) {
+            var length = this.length;
+
+            if ( length !== 0 ) {
+                var stmts = this.stmts;
+
+                for ( var i = 0; i < length; i++ ) {
+                    stmts[i].validate( v );
+                }
+            }
+        }
+
         print(p: quby.core.Printer) {
             var length = this.length;
 
@@ -427,18 +461,6 @@ module quby.ast {
                     if ( appendToLast || i < length - 1 ) {
                         p.append( seperator );
                     }
-                }
-            }
-        }
-
-        validate(v: quby.core.Validator) {
-            var length = this.length;
-
-            if ( length !== 0 ) {
-                var stmts = this.stmts;
-
-                for ( var i = 0; i < length; i++ ) {
-                    stmts[i].validate( v );
                 }
             }
         }
@@ -1926,7 +1948,7 @@ module quby.ast {
                     this.parameters.length :
                     0;
 
-            p.appendPre('quby_ensureBlock(', quby.runtime.BLOCK_VARIABLE, ', ', ''+paramsLen, ');');
+            p.appendPre( 'quby_ensureBlock(', quby.runtime.BLOCK_VARIABLE, ', ', paramsLen.toString(), ');' );
             p.append(quby.runtime.BLOCK_VARIABLE, '(');
 
             if (this.parameters !== null) {
@@ -3030,7 +3052,11 @@ module quby.ast {
     /* Literals */
 
     export class Literal extends Expr {
+        /**
+         * If this is a 'truthy' value, or a 'falsy' value.
+         */
         private isTrue:boolean;
+
         private match:string;
 
         constructor(sym:parse.Symbol, isTrue:boolean, altMatch?:string) {
@@ -3041,7 +3067,10 @@ module quby.ast {
             super(sym);
 
             this.isTrue = isTrue;
+        }
 
+        setMatch( newMatch: string ) {
+            this.match = newMatch;
         }
 
         getMatch() {
@@ -3092,20 +3121,122 @@ module quby.ast {
     }
 
     export class Number extends Literal {
-        constructor(sym:parse.Symbol) {
-            var matchStr:string;
+        constructor( sym: parse.Symbol ) {
+            var match:string = sym.getMatch();
 
-            var origNum:string = sym.getMatch();
-            var num:string = origNum.replace( /_+/g, '' );
-            var decimalCount:number = 0;
+            super( sym, true, match );
+        }
 
-            // TODO validate num
+        validate( v: quby.core.Validator ) {
+            // a bunch of flags to describe the number
+            // store the number as a string, and it's replacement
+            var numStr = this.getMatch();
 
-            var matchStr:string = (num.indexOf('.') === -1) ?
-                    "" + ((<number><any>num) | 0) :
-                    "" + (parseFloat(num)) ;
+            // stuff for iteration
+            var numLen = numStr.length;
+            var code: number = numStr.charCodeAt( 0 );
+            var secondCode = numStr.charCodeAt( 1 );
 
-            super( sym, true, matchStr );
+            // skip for well known numbers like 0
+            // currently this is only numbers 0 to 9
+            if ( numLen === 1 && code >= ZERO && code <= NINE ) {
+                return;
+            }
+
+            /*
+             * 0x - Hexadecimal
+             */
+            if ( code === ZERO && secondCode === LOWER_X ) {
+                var hasMore: boolean = false;
+
+                for ( var i = 2; i < numLen; i++ ) {
+                    code = numStr.charCodeAt( i );
+
+                    if ( code === FULL_STOP ) {
+                        v.parseError( this.getOffset(), "Invalid hexadecimal number, cannot include a decimal point '" + numStr + "'" );
+                        return;
+                    } else if ( code !== UNDERSCORE ) {
+                        if (
+                            ( code < ZERO || NINE < code ) &&
+                            ( code < LOWER_A || LOWER_F < code )
+                        ) {
+                            v.parseError( this.getOffset(), "Invalid hexadecimal number, '" + numStr + "'" );
+                            return;
+                        }
+
+                        hasMore = true;
+                    }
+                }
+
+                if ( !hasMore ) {
+                    v.parseError( this.getOffset(), "Invalid hexadecimal number, missing rest of the number '" + numStr + "'" );
+                    return;
+                } else {
+                    errorIfIntSizeUnsafe( v, this, (<any> numStr) | 0 );
+                }
+
+            } else if ( code === ZERO && secondCode === LOWER_B ) {
+                for ( var i = 2; i < numLen; i++ ) {
+                    code = numStr.charCodeAt( i );
+
+                    if ( code === FULL_STOP ) {
+                        v.parseError( this.getOffset(), "Invalid binary number, cannot include a decimal point '" + numStr + "'" );
+                        return;
+                    } else if ( code !== UNDERSCORE ) {
+                        if ( code !== ZERO && code !== ONE ) {
+                            v.parseError( this.getOffset(), "Invalid binary number, '" + numStr + "'" );
+                            return;
+                        }
+
+                        hasMore = true;
+                    }
+                }
+
+                if ( !hasMore ) {
+                    v.parseError( this.getOffset(), "Invalid binary number, missing rest of the number '" + numStr + "'" );
+                    return;
+                } else {
+                    // lose the '0b' section at the start
+                    // then parse as a base 2 (binary) number
+                    // test it's valid
+                    // then set as it's base 10 value, as JS does not support binary numbers
+                    var newNum = parseInt( numStr.substring( 2 ), 2 );
+                    errorIfIntSizeUnsafe( v, this, newNum );
+                    this.setMatch( newNum.toString() );
+                }
+
+            /*
+             * regular base 10 number
+             */
+            } else {
+                var isDecimal = false;
+
+                for ( var i = 0; i < numLen; i++ ) {
+                    code = numStr.charCodeAt( i );
+
+                    // check for a decimal place,
+                    // and a double decimal stop (which should never happen, but just to be safe)
+                    if ( code === FULL_STOP ) {
+                        if ( isDecimal ) {
+                            v.parseError( this.getOffset(), "Number has two decimal places '" + numStr + "'" );
+                            return;
+
+                        } else {
+                            isDecimal = true;
+                        }
+
+                        // look for numbers outside of the 0 to 9 range
+                    } else if ( code < ZERO || NINE < code ) {
+                        v.parseError( this.getOffset(), "Invalid decimal number, '" + numStr + "'" );
+                        return;
+                    }
+                }
+
+                // number size verification
+                if ( ! isDecimal ) {
+                    errorIfIntSizeUnsafe( v, this, (<any> numStr) | 0 );
+                }
+            }
         }
     }
 
@@ -3116,9 +3247,15 @@ module quby.ast {
         }
     }
 
-    export class Bool extends Literal {
-        constructor( sym:parse.Symbol ) {
-            super(sym, (sym.terminal.literal === 'true'));
+    export class BoolTrue extends Literal {
+        constructor( sym: parse.Symbol ) {
+            super( sym, true, 'true' );
+        }
+    }
+
+    export class BoolFalse extends Literal {
+        constructor( sym: parse.Symbol ) {
+            super( sym, false, 'false' );
         }
     }
 

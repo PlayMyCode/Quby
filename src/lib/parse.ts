@@ -264,6 +264,12 @@
  */
 
 module parse {
+    /**
+     * Whilst you can return undefined or false or some other falsy value from this,
+     * for performance reasons it is advised that you *always* return a number.
+     * 
+     * 0 or -1 are options to return as a failure value.
+     */
     export interface TerminalFunction {
         (src: string, i: number, code: number, len: number): number;
     }
@@ -295,33 +301,6 @@ module parse {
         terminals: Term[];
         idToTerms: Term[];
     }
-
-    /**
-     * Creates and returns a new Error object,
-     * containing the message given.
-     * 
-     * It also tacks on it's own information,
-     * making it clear that parse.js has crashed.
-     */
-    function newParseError( msg?:string ) : Error {
-        if (msg) {
-            msg += " (this is a bug in parse.js)";
-        } else {
-            msg = "a bug in parse.js has occurred";
-        }
-
-        return new Error(msg);
-    }
-
-    var tabLog = function (indents: number): void {
-        var str = '';
-        for (var i = 0; i < indents; i++) {
-            str += '    ';
-        }
-
-        arguments[0] = str;
-        console.log.apply( console, arguments );
-    };
 
     /**
      * ASCII codes for characters.
@@ -418,25 +397,25 @@ module parse {
      * @param {number} code
      * @return {boolean}
      */
-    var isHexCode = function (code: number): boolean {
+    var isHexCode = function(code: number): boolean {
         return (code >= ZERO && code <= NINE) || // a number
                (code >= LOWER_A && code <= LOWER_F) || // lower a-z
                (code >= UPPER_A && code <= UPPER_F);   // UPPER A-Z
-    };
+    }
 
-    var isAlphaNumericCode = function (code: number): boolean {
+    var isAlphaNumericCode = function(code: number): boolean {
         return (
                 (code >= LOWER_A && code <= LOWER_Z) || // lower case letter
                 (code >= UPPER_A && code <= UPPER_Z) || // upper case letter
                 (code === UNDERSCORE) ||
                 (code >= ZERO && code <= NINE)     // a number
         );
-    };
+    }
 
-    var isAlphaCode = function (code: number): boolean {
+    var isAlphaCode = function(code: number): boolean {
         return (code >= LOWER_A && code <= LOWER_Z) ||
                (code >= UPPER_A && code <= UPPER_Z);
-    };
+    }
 
     /**
      * @nosideeffects
@@ -444,359 +423,32 @@ module parse {
      * @param {number} code
      * @return {boolean}
      */
-    var isNumericCode = function (code: number): boolean {
+    var isNumericCode = function(code: number): boolean {
         return (code >= ZERO && code <= NINE); // a number
-    };
+    }
+
+    /**
+     * Creates and returns a new Error object,
+     * containing the message given.
+     * 
+     * It also tacks on it's own information,
+     * making it clear that parse.js has crashed.
+     */
+    function newParseError( msg?:string ) : Error {
+        if (msg) {
+            msg += " (this is a bug in parse.js)";
+        } else {
+            msg = "a bug in parse.js has occurred";
+        }
+
+        return new Error(msg);
+    }
 
     /**
      * @return True if f is a function object, and false if not.
      */
-    var isFunction = function (f: any): boolean {
-        return (f instanceof Function) || (typeof f == 'function');
-    };
-
-    /*  **  **  **  **  **  **  **  **  **  **  **  **  **
-     *
-     *          Terminal
-     *
-     * The Terminal prototype, for representing a terminal
-     * symbol to match.
-     *
-     * It also includes helper functions. These should be
-     * left as local functions, so Google Closure will
-     * inline them.
-     *
-     *  **  **  **  **  **  **  **  **  **  **  **  **  */
-
-    /**
-     * Generates a 1 character match function, that does not
-     * take into account of word boundaries.
-     *
-     * So this should only be used on things like '+' or '-',
-     * and not letters or numbers.
-     *
-     * @nosideeffects
-     * @const
-     */
-    var newCharacterMatch = function (match: string): TerminalFunction {
-        var matchCode = match.charCodeAt(0);
-
-        return function (src, i, code, len) {
-            if (code === matchCode) {
-                return i + 1;
-            } else {
-                return undefined;
-            }
-        };
-    }
-
-    /**
-     * Generates a match function for the match given,
-     * that does take into account word boundaries.
-     *
-     * The match only matches if it is followed by not
-     * a letter, number or underscore.
-     *
-     * The end of the program counts as a word boundary.
-     *
-     * @nosideeffects
-     * @const
-     */
-    /*
-     * Yes, it contains lots of hard coded match routines.
-     *
-     * This is because most keywords will be short, not long,
-     * and so this allows those short matches to be as quick
-     * as possible.
-     *
-     * Remember these will be called thousands of times, so
-     * it does matter, especially with FF 9's crappy
-     * interpreter that gets used on first run!
-     *
-     * Plus it's faster to check chars indevidually on short
-     * strings (like 'if', 'while', 'def', 'new', etc),
-     * instead of using indexOf or substrings.
-     *
-     * @see http://jsperf.com/word-match-test
-     */
-    var newWordMatch = function (match: string): TerminalFunction {
-        if (isWordCode(match.charCodeAt(match.length - 1))) {
-            return newWordMatchBoundary(match);
-        } else {
-            return newWordMatchNoBoundary(match);
-        }
-    }
-
-    var newWordMatchBoundary = function (match: string): TerminalFunction {
-        var m0 = match.charCodeAt(0),
-            m1 = match.charCodeAt(1),
-            m2 = match.charCodeAt(2),
-            m3 = match.charCodeAt(3),
-            m4 = match.charCodeAt(4),
-            m5 = match.charCodeAt(5),
-            m6 = match.charCodeAt(6),
-            m7 = match.charCodeAt(7);
-
-        if (match.length === 1) {
-            return function (src, i, code, len) {
-                if (m0 === code && !isWordCharAt(src, i + 1)) {
-                    return i + 1;
-                }
-            };
-        } else if (match.length === 2) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        !isWordCharAt(src, i + 2)
-                ) {
-                    return i + 2;
-                }
-            };
-        } else if (match.length === 3) {
-            return function (src, i, code, len) {
-                if (m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        !isWordCharAt(src, i + 3)
-                ) {
-                    return i + 3;
-                }
-            };
-        } else if (match.length === 4) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        !isWordCharAt(src, i + 4)
-                ) {
-                    return i + 4;
-                }
-            };
-        } else if (match.length === 5) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4) &&
-                        !isWordCharAt(src, i + 5)
-                ) {
-                    return i + 5;
-                }
-            };
-        } else if (match.length === 6) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4) &&
-                        m5 === src.charCodeAt(i + 5) &&
-                        !isWordCharAt(src, i + 6)
-                ) {
-                    return i + 6;
-                }
-            };
-        } else if (match.length === 7) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4) &&
-                        m5 === src.charCodeAt(i + 5) &&
-                        m6 === src.charCodeAt(i + 6) &&
-                        !isWordCharAt(src, i + 7)
-                ) {
-                    return i + 7;
-                }
-            };
-        } else if (match.length === 8) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4) &&
-                        m5 === src.charCodeAt(i + 5) &&
-                        m6 === src.charCodeAt(i + 6) &&
-                        m7 === src.charCodeAt(i + 7) &&
-                        !isWordCharAt(src, i + 8)
-                ) {
-                    return i + 8;
-                }
-            };
-        } else {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4) &&
-                        m5 === src.charCodeAt(i + 5) &&
-                        m6 === src.charCodeAt(i + 6) &&
-                        m7 === src.charCodeAt(i + 7)
-                ) {
-                    var keyLen = src.length;
-
-                    // starts at 7, to avoid the tests above!
-                    for (var j = 7; j < keyLen; j++) {
-                        if (src.charCodeAt(i + j) !== match.charCodeAt(j)) {
-                            return undefined;
-                        }
-                    }
-
-                    /*
-                     * Check for things following the keyword.
-                     * For example if we are matching 'null',
-                     * then it must fail on 'nullify',
-                     * since it's clear not null.
-                     *
-                     * This happens if we are at the end of input,
-                     * or if a non-identifier character follows.
-                     */
-                    if (!isWordCharAt(src, i + keyLen)) {
-                        return i + keyLen;
-                    }
-                }
-
-                return undefined;
-            };
-        }
-    }
-
-    var newWordMatchNoBoundary = function (match: string): TerminalFunction {
-        var m0 = match.charCodeAt(0),
-            m1 = match.charCodeAt(1),
-            m2 = match.charCodeAt(2),
-            m3 = match.charCodeAt(3),
-            m4 = match.charCodeAt(4),
-            m5 = match.charCodeAt(5),
-            m6 = match.charCodeAt(6),
-            m7 = match.charCodeAt(7);
-
-        if (match.length === 1) {
-            return function (src, i, code, len) {
-                if (m0 === code) {
-                    return i + 1;
-                }
-            };
-        } else if (match.length === 2) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1)
-                ) {
-                    return i + 2;
-                }
-            };
-        } else if (match.length === 3) {
-            return function (src, i, code, len) {
-                if (m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2)
-                ) {
-                    return i + 3;
-                }
-            };
-        } else if (match.length === 4) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3)
-                ) {
-                    return i + 4;
-                }
-            };
-        } else if (match.length === 5) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4)
-                ) {
-                    return i + 5;
-                }
-            };
-        } else if (match.length === 6) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4) &&
-                        m5 === src.charCodeAt(i + 5)
-                ) {
-                    return i + 6;
-                }
-            };
-        } else if (match.length === 7) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4) &&
-                        m5 === src.charCodeAt(i + 5) &&
-                        m6 === src.charCodeAt(i + 6)
-                ) {
-                    return i + 7;
-                }
-            };
-        } else if (match.length === 8) {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4) &&
-                        m5 === src.charCodeAt(i + 5) &&
-                        m6 === src.charCodeAt(i + 6) &&
-                        m7 === src.charCodeAt(i + 7)
-                ) {
-                    return i + 8;
-                }
-            };
-        } else {
-            return function (src, i, code, len) {
-                if (
-                        m0 === code &&
-                        m1 === src.charCodeAt(i + 1) &&
-                        m2 === src.charCodeAt(i + 2) &&
-                        m3 === src.charCodeAt(i + 3) &&
-                        m4 === src.charCodeAt(i + 4) &&
-                        m5 === src.charCodeAt(i + 5) &&
-                        m6 === src.charCodeAt(i + 6) &&
-                        m7 === src.charCodeAt(i + 7)
-                ) {
-                    var keyLen = src.length;
-
-                    // starts at 7, to avoid the tests above!
-                    for (var j = 7; j < keyLen; j++) {
-                        if (src.charCodeAt(i + j) !== match.charCodeAt(j)) {
-                            return undefined;
-                        }
-                    }
-                }
-
-                return undefined;
-            };
-        }
+    function isFunction(f: any): boolean {
+        return ( typeof f === 'function' ) || ( f instanceof Function );
     }
 
     /**
@@ -813,7 +465,7 @@ module parse {
      * @param {number} A code for a character.
      * @return {boolean} True if it is a word character, and false if not.
      */
-    var isWordCode = function (code: number): boolean {
+    function isWordCode(code: number): boolean {
         return (
                 (code >= 97 && code <= 122) || // lower case letter
                 (code >= 48 && code <= 57) || // a number
@@ -838,7 +490,7 @@ module parse {
      * @param {number} i The index of the character to check in the string.
      * @return {boolean}
      */
-    var isWordCharAt = function (src: string, i: number): boolean {
+    function isWordCharAt(src: string, i: number): boolean {
         return isWordCode(src.charCodeAt(i));
     }
 
@@ -856,11 +508,41 @@ module parse {
     /**
      * The multiple types for a terminal.
      */
-    var TYPE_FUNCTION = 1,
-        TYPE_WORD_CODE = 2,
+    var
+        /**
+         * For providing a function to test for a match.
+         */
+        TYPE_FUNCTION = 1,
+
+        /**
+         * For indevidual alphanumeric characters, which are also a single word.
+         * 
+         * i.e. matching 'a' on it's own, like 'a' in "@x is a 4"
+         */
+        TYPE_CODE_ALPHANUMERIC = 2,
+
+        /**
+         * For indevidual non-alphanumeric characters,
+         * this does *NOT* check for word boundaries.
+         */
         TYPE_CODE = 3,
+
+        /**
+         * For whole string literals, such as 'if' or 'and' or 'function'.
+         * 
+         * Can included non-alphanumeric values too.
+         */
         TYPE_STRING = 4,
+
+        /**
+         * This one gets optimized out when the terminals are compiled.
+         * 
+         * The tests within it are expanded and brought to the top level,
+         * removing the array.
+         */
         TYPE_ARRAY = 5;
+
+    var BLANK_TERMINAL_FUNCTION: TerminalFunction = ( src: string, i: number, code: number, len: number ) => i;
 
     /**
      * Given a string, this turns it into an array of char codes,
@@ -873,7 +555,7 @@ module parse {
      * @param {string} str The string to convert to an array.
      * @return An array of character codes for the string given.
      */
-    var stringToCodes = function (str: string): number[] {
+    function stringToCodes (str: string): number[] {
         var len = str.length,
         arr: number[] = new Array(len);
 
@@ -889,7 +571,7 @@ module parse {
      *     'ELSE_IF' => 'else if'
      *      'leftBracket' => 'left bracket'
      */
-    var formatTerminalName = function (str: string): string {
+    function formatTerminalName (str: string): string {
         /*
          * - reaplce camelCase in the middle to end of the string,
          * - lowerCase anything left (start of string)
@@ -905,17 +587,21 @@ module parse {
 
     function processResult( arg: any ): any {
         if ( arg === null ) {
-            return arg;
+            return null;
+
         } else if ( arg instanceof Symbol ) {
             return arg.onFinish();
-        } else if ( isFunction( arg ) ) {
+
+        } else if ( typeof arg === 'function' ) {
             return arg();
+
         } else if ( arg instanceof Array ) {
             for ( var i = 0; i < arg.length; i++ ) {
                 arg[i] = processResult( arg[i] );
             }
 
             return arg;
+
         } else if ( arg.apply ) {
             var args = arg.args;
             var argsLen = args.length;
@@ -945,10 +631,21 @@ module parse {
             } else {
                 return arg.onFinish.apply( null, processResult( arg.args ) );
             }
+
         } else {
             return arg.onFinish( processResult(arg.args) );
+
         }
     }
+
+    /*  **  **  **  **  **  **  **  **  **  **  **  **  **
+     *
+     *          Terminal
+     *
+     * The Terminal prototype, for representing a terminal
+     * symbol to match.
+     *
+     *  **  **  **  **  **  **  **  **  **  **  **  **  */
 
     /**
      * If given a string, it will match if it is
@@ -1055,7 +752,10 @@ module parse {
         *
         * When it has no data, it is null.
         */
-        testData = null;
+        typeTestFunction:TerminalFunction = BLANK_TERMINAL_FUNCTION;
+        typeTestArray: Term[] = [];
+        typeTestCode: number = 0;
+        typeTestString: number[] = [];
 
         /**
         * An optional event to run after a symbol has been matched.
@@ -1086,12 +786,18 @@ module parse {
 
             if (match instanceof Term) {
                 return match;
+
             } else if (isFunction(match)) {
-                this.isLiteral = false;
-                this.testData = match;
                 this.type = TYPE_FUNCTION;
+                this.isLiteral = false;
+                this.typeTestFunction = match;
+
             } else {
                 this.isLiteral = true;
+
+                if ( match instanceof String || match instanceof Number ) {
+                    match = match.valueOf();
+                }
 
                 var matchType = typeof match;
 
@@ -1101,11 +807,8 @@ module parse {
                  * - a single character (1 length string)
                  */
                 if (
-                        matchType === 'number' ||
-                        (
-                                (matchType === 'string' || match instanceof String) &&
-                                 match.length === 1
-                        )
+                      matchType === 'number' ||
+                    ( matchType === 'string' && match.length === 1 )
                 ) {
                     if (matchType === 'string') {
                         literal = match;
@@ -1128,28 +831,29 @@ module parse {
                     this.literal = literal;
 
                     this.type = isWordCode(match) ?
-                        TYPE_WORD_CODE :
+                            TYPE_CODE_ALPHANUMERIC  :
                             TYPE_CODE;
 
-                    this.testData = match;
+                    this.typeTestCode = match;
 
-                    /*
-                     * String primative, or string object.
-                     *
-                     * This is a string with a length longer than 1,
-                     * a length of zero will raise an error,
-                     * and 1 length is caught by the clause above.
-                     */
-                } else if (matchType === 'string' || match instanceof String) {
+                /*
+                 * String primative, or string object.
+                 *
+                 * This is a string with a length longer than 1,
+                 * a length of zero will raise an error,
+                 * and 1 length is caught by the clause above.
+                 */
+                } else if ( matchType === 'string' ) {
+                    this.type = TYPE_STRING;
+
                     this.literalLength = match.length;
                     this.isLiteral = true;
                     this.literal = match;
-                    this.type = TYPE_STRING;
 
                     if (match.length === 0) {
                         throw new Error("Empty string given for Terminal");
                     } else {
-                        this.testData = stringToCodes(match);
+                        this.typeTestString = stringToCodes( match );
 
                         if (!nameSupplied) {
                             if (match > 20) {
@@ -1160,12 +864,14 @@ module parse {
                         }
                     }
 
-                    /*
-                     * An array of matches to match against.
-                     * For example, multiple string keywords
-                     * in an array.
-                     */
-                } else if (match instanceof Array) {
+                /*
+                 * An array of matches to match against.
+                 * For example, multiple string keywords
+                 * in an array.
+                 */
+                } else if ( match instanceof Array ) {
+                    this.type = TYPE_ARRAY;
+
                     var mTerminals = [];
                     var isLiteral = true,
                         literalLength = Number.MAX_VALUE;
@@ -1183,11 +889,11 @@ module parse {
                         mTerminals[i] = innerTerm;
                     }
 
-                    this.type = TYPE_ARRAY;
                     this.isLiteral = isLiteral;
                     this.literalLength = literalLength;
-                    this.testData = mTerminals;
-                    // errors!
+                    this.typeTestArray = mTerminals;
+
+                // errors!
                 } else if (match === undefined) {
                     throw new Error("undefined match given");
                 } else if (match === null) {
@@ -1239,9 +945,11 @@ module parse {
              * so pass the id on,
              * otherwise the grammar breaks.
              */
-            if (this.type === TYPE_ARRAY) {
-                for (var i = 0; i < this.testData.length; i++) {
-                    this.testData[i].setID(id);
+            if ( this.type === TYPE_ARRAY ) {
+                var arr = this.typeTestArray;
+
+                for ( var i = 0; i < arr.length; i++ ) {
+                    arr[i].setID( id );
                 }
             }
 
@@ -1260,7 +968,7 @@ module parse {
          *
          * @param callback The callback to run; null for no callback, or a valid function.
          */
-        symbolMatch( callback: TerminalFunction ):Term {
+        symbolMatch( callback: TerminalFunction ): Term {
             if ( callback !== null && !isFunction( callback ) ) {
                 throw new Error("symbolMatch callback is not valid: " + callback);
             }
@@ -1677,20 +1385,27 @@ module parse {
             if (this.maxRule === null) {
                 return [];
             } else {
+                // the point of this is to find _unique_ term items,
+                // which is why the terms are put into an object and then an array
+
                 var rules = this.maxRule.compiledLookups[this.maxRuleI],
                     terms = {},
                     termsArr:string[] = [];
 
-                for ( var k in rules ) {
-                    if (k.search(/^[0-9]+/) !== -1) {
-                        findPossibleTerms(rules[k], terms);
+                var rulesLen = rules.length;
+                for ( var i = 0; i < rulesLen; i++ ) {
+                    var rule = rules[i];
+
+                    if ( rule !== null ) {
+                        findPossibleTerms( rule, terms );
                     }
                 }
 
-                for (var k in terms) {
-                    if (terms.hasOwnProperty(k)) {
-                        termsArr.push(k);
-                    }
+                var keys = Object.keys( terms ), keysLen = keys.length;
+                for ( var i = 0; i < keysLen; i++ ) {
+                    var k = keys[i];
+
+                    termsArr.push(k);
                 }
 
                 return termsArr;
@@ -1718,10 +1433,12 @@ module parse {
         }
 
         getTerminals():Term[] {
-            var symbols: Term[] = [];
+            var length = this.length;
+            var thisSymbols = this.symbols;
+            var symbols: Term[] = new Array( length );
 
-            for (var i = 0; i < this.length; i++) {
-                symbols[i] = this.symbols[i].terminal;
+            for (var i = 0; i < length; i++) {
+                symbols[i] = thisSymbols[i].terminal;
             }
 
             return symbols;
@@ -1870,25 +1587,27 @@ module parse {
 
     var compressTerminalsInner: { (termIDToTerms: Term[], literalTerms: Term[], nonLiteralTerms: Term[], terminals: Term[]): void; } =
         function (termIDToTerms: Term[], literalTerms: Term[], nonLiteralTerms: Term[], terminals: Term[]): void {
-            for (var k in terminals) {
-                if (terminals.hasOwnProperty(k)) {
-                    var term: Term = terminals[k];
+            var keys = Object.keys( terminals ),
+                keysLen = keys.length;
 
-                    if (term.type === TYPE_ARRAY) {
-                        compressTerminalsInner(
-                                termIDToTerms,
-                                literalTerms,
-                                nonLiteralTerms,
-                                term.testData
+            for ( var i = 0; i < keysLen; i++ ) {
+                var k = keys[i];
+                var term: Term = terminals[k];
+
+                if (term.type === TYPE_ARRAY) {
+                    compressTerminalsInner(
+                            termIDToTerms,
+                            literalTerms,
+                            nonLiteralTerms,
+                            term.typeTestArray
                         );
-                    } else {
-                        termIDToTerms[term.id] = term;
+                } else {
+                    termIDToTerms[term.id] = term;
 
-                        if (term.isLiteral) {
-                            literalTerms.push(term)
-                        } else {
-                            nonLiteralTerms.push(term)
-                        }
+                    if ( term.isLiteral ) {
+                        literalTerms.push(term)
+                    } else {
+                        nonLiteralTerms.push(term)
                     }
                 }
             }
@@ -1962,14 +1681,24 @@ module parse {
     };
 
     var addRuleToLookup = function (id: number, ruleLookup: any, term: any) {
-        var arrLookup = ruleLookup[id];
+        var ruleLookupLen = ruleLookup.length;
 
-        if (arrLookup === undefined) {
-            ruleLookup[id] = term;
-        } else if (arrLookup instanceof Array) {
-            arrLookup.push(term);
+        if ( ruleLookupLen <= id ) {
+            for ( var i = ruleLookupLen; i < id; i++ ) {
+                ruleLookup.push( null );
+            }
+
+            ruleLookup.push( term );
         } else {
-            ruleLookup[id] = [arrLookup, term];
+            var arrLookup = ruleLookup[id];
+
+            if ( arrLookup === null ) {
+                ruleLookup[id] = term;
+            } else if ( arrLookup instanceof Array ) {
+                arrLookup.push( term );
+            } else {
+                ruleLookup[id] = [arrLookup, term];
+            }
         }
     }
 
@@ -2077,6 +1806,9 @@ module parse {
      * So to cut down on all this searching, 'compiledLookups' is a version of the
      * 'rules' which maps symbolID to rules. That way a ParserRule can jump straight
      * to the branches which match; or return if none of them match.
+     * 
+     * SymbolID and TerminalID are also interchangeable. SymbolID is the id of the
+     * terminal which that symbol represents.
      *
      * This allows it to cut down on the amount of searching needed.
      */
@@ -2095,10 +1827,6 @@ module parse {
         compiled: CompiledTerminals = null;
         compiledLookups: any[][] = null;
 
-        /**
-        * Records how long the call to 'compile' takes to execute.
-        */
-        compileTime = 0;
         compiledId = NO_COMPILE_ID;
 
         /**
@@ -2235,7 +1963,10 @@ module parse {
          * 'or' options.
          */
         or() {
-            return this.orAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return this.orAll(args);
         }
 
         /**
@@ -2257,7 +1988,10 @@ module parse {
          * See 'or' for usage details.
          */
         either() {
-            return this.orAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return this.orAll(args);
         }
 
         /**
@@ -2275,14 +2009,20 @@ module parse {
          * 'thenOr' is an alias for 'thenEither'.
          */
         thenOr() {
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
             return this.
                     endCurrentOr().
-                    orAll(arguments);
+                    orAll(args);
         }
         thenEither() {
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
             return this.
                     endCurrentOr().
-                    orAll(arguments);
+                    orAll(args);
         }
 
         /**
@@ -2292,6 +2032,10 @@ module parse {
          * a match is found, and skipped if a match fails.
          */
         optional() {
+            var argsLen = arguments.length,
+                args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
             return this.optionalAll(arguments);
         }
 
@@ -2302,21 +2046,30 @@ module parse {
          * @return This ParserRule instance.
          */
         maybe() {
-            return this.optionalAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return this.optionalAll(args);
         }
 
         /**
          * States the next items to parse.
          */
         a() {
-            return this.thenAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return this.thenAll(args);
         }
 
         /**
          * States the next items to parse.
          */
         then() {
-            return this.thenAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return this.thenAll(args);
         }
 
         /**
@@ -2396,8 +2149,12 @@ module parse {
                 callback = null,
                 debugCallback = null;
 
-            if (typeof options === 'string' || (options instanceof String)) {
+            if ( options instanceof String ) {
+                displaySrc = parseSrc = options.valueOf();
+
+            } else if ( typeof options === 'string' ) {
                 displaySrc = parseSrc = options;
+
             } else {
                 displaySrc = options['src'];
                 parseSrc = options['inputSrc'] || displaySrc;
@@ -2431,7 +2188,11 @@ module parse {
         }
 
         orThis() {
-            this.orAll(arguments);
+            var argsLen = arguments.length,
+                args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            this.orAll(args);
 
             this.orThisFlag = true;
 
@@ -2450,7 +2211,7 @@ module parse {
             return this.cyclicDone();
         }
 
-        cyclicOrAll(rules: IArguments) {
+        cyclicOrAll(rules: any[]) {
             this.orAll(rules);
 
             return this.cyclicDone();
@@ -2589,7 +2350,7 @@ module parse {
             return this;
         }
 
-        orAll(obj: IArguments) {
+        orAll(obj: any[]) {
             return this.helperAll('orSingle', obj);
         }
 
@@ -2616,43 +2377,57 @@ module parse {
             return this;
         }
 
-        thenAll(obj: IArguments): ParserRuleImplementation {
+        thenAll(obj: any[]): ParserRuleImplementation {
             return this.
                     endCurrentOr().
                     helperAll('thenSingle', obj);
         }
 
-        private helperAll(singleMethod: string, obj: IArguments): ParserRuleImplementation {
+        private helperAll(singleMethod: string, obj: any[]): ParserRuleImplementation {
             this.errorIfEnded();
 
-            if (!obj) {
-                if (obj === undefined) {
-                    throw new Error("Undefined 'then' rule given.");
+            if ( !obj ) {
+                if ( obj === undefined ) {
+                    throw new Error( "Undefined 'then' rule given." );
                 } else {
-                    throw new Error("Unknown 'then' rule given of type " + typeof (obj));
+                    throw new Error( "Unknown 'then' rule given of type " + typeof ( obj ) );
                 }
             } else if (
                     obj instanceof ParserRuleImplementation ||
                     obj instanceof Term
             ) {
-                this[singleMethod](obj);
-                // something that can be used as a terminal
-            } else if (
-                    typeof obj === 'string' || obj instanceof String ||
-                    typeof obj === 'number' || obj instanceof Number ||
-                    isFunction(obj)
-            ) {
-                this[singleMethod](this.parseParent['terminal'](obj));
-                // arguments or array
-            } else if ((typeof (obj.length)) === 'number') {
-                for (var i = 0; i < obj.length; i++) {
-                    this.helperAll(singleMethod, obj[i]);
-                }
-                // ??? maybe an object of terminals?
+                this[singleMethod]( obj );
+
+            // something that can be used as a terminal
             } else {
-                for (var k in obj) {
-                    if (obj.hasOwnProperty(k)) {
-                        this.helperAll(singleMethod, obj[k]);
+                if ( obj instanceof String || obj instanceof Number ) {
+                    obj = ( <any> obj ).valueOf();
+                }
+
+                var objType = typeof obj;
+
+                if (
+                    objType === 'string'    ||
+                    objType === 'number'    ||
+                    objType === 'function'
+                ) {
+                    this[singleMethod]( this.parseParent['terminal']( obj ) );
+
+                // array
+                } else if ( obj instanceof Array ) {
+                    for ( var i = 0; i < obj.length; i++ ) {
+                        this.helperAll( singleMethod, obj[i] );
+                    }
+
+                // ??? maybe an object of terminals?
+                } else {
+                    var keys = Object.keys( obj ),
+                        keysLen = keys.length;
+
+                    for ( var i = 0; i < keysLen; i++ ) {
+                        var k = keys[i];
+
+                        this.helperAll( singleMethod, obj[k] );
                     }
                 }
             }
@@ -2680,18 +2455,13 @@ module parse {
          * ignored.
          */
         private compile() {
-            if (this.compiled === null) {
-                var start = Date.now();
-
+            if ( this.compiled === null ) {
                 this.compiled = this.optimize();
-                this.compileTime = Date.now() - start;
             }
-
-            return this;
         }
 
         terminalScan() {
-            if (this.compiledLookups === null) {
+            if ( this.compiledLookups === null ) {
                 var rules = this.rules,
                     len = rules.length,
                     lookups = new Array(len);
@@ -2719,9 +2489,11 @@ module parse {
                                 }
                             }
                         }
+
                     // an 'then' rule
                     } else if (rule instanceof Term) {
                         addRuleToLookup(rule.id, ruleLookup, rule);
+
                     // nested parser rule (I think)
                     } else {
                         var ids = [],
@@ -2827,38 +2599,40 @@ module parse {
             }
 
             var self = this,
-                compileTime = this.compileTime,
                 start = Date.now();
 
-            this.parseSymbols( input, parseInput, name, function ( symbols, symbolsTime ) {
-                if (symbols.hasErrors()) {
-                    callback([], symbols.getErrors());
-                    callParseDebug(debugCallback, symbols,
+            this.parseSymbols( input, parseInput, name, function ( symbols, compileTime, symbolsTime ) {
+                if ( symbols.hasErrors() ) {
+                    callParseDebug( debugCallback, symbols,
                             compileTime,
                             symbolsTime,
                             0,
                             Date.now() - start
                     );
+
+                    callback( [], symbols.getErrors() );
                 } else {
                     var rulesStart = Date.now();
                     var result = self.parseRules(symbols, input, parseInput);
                     var rulesTime = Date.now() - rulesStart;
 
-                    util.future.run(function () {
-                        callback(result.result, result.errors);
+                    var preUtil = Date.now();
+                    util.future.run( function () {
                         callParseDebug(debugCallback, symbols,
                                 compileTime,
                                 symbolsTime,
                                 rulesTime,
                                 Date.now() - start
                         );
+
+                        callback( result.result, result.errors );
                     });
                 }
             })
         }
 
         private symbolizeInner(input: string, parseInput: string, callback: SymbolizeCallback): void {
-            this.parseSymbols(input, parseInput, null, function (symbols) {
+            this.parseSymbols(input, parseInput, null, function (symbols, _compileTime, _symbolsTime) {
                 callback(symbols.getTerminals(), symbols.getErrors());
             });
         }
@@ -2870,14 +2644,16 @@ module parse {
          * Callbacks are used internally, so it gets spread across
          * multiple JS executions.
          */
-        private parseSymbols(input: string, parseInput: string, name, callback: { (symbols: SymbolResult, time: number): void; }): void {
+        private parseSymbols(input: string, parseInput: string, name, callback: { (symbols: SymbolResult, compileTime:number, symbolsTime: number): void; }): void {
             if (!isFunction(callback)) {
                 throw new Error("No callback provided for parsing");
             }
 
             this.endCurrentOr();
 
-            this['compile']();
+            var compileTime = Date.now();
+            this.compile();
+            compileTime = Date.now() - compileTime;
 
             if (this.hasBeenUsed) {
                 this.clearRecursionFlag();
@@ -2887,12 +2663,11 @@ module parse {
             var _this = this;
 
             util.future.run(function () {
-                var start = Date.now();
-
+                var symbolsTime = Date.now();
                 var symbols = _this.parseSymbolsInner(input, parseInput, name);
-                var time = Date.now() - start;
+                var symbolsTime = Date.now() - symbolsTime;
 
-                callback(symbols, time);
+                callback(symbols, compileTime, symbolsTime);
             });
         }
 
@@ -2954,7 +2729,7 @@ module parse {
                             errors: errors
                         };
                     } else {
-                        errors.push(new TerminalError(symbols.maxSymbol(), symbols.expected()));
+                        errors.push( new TerminalError( symbols.maxSymbol(), symbols.expected() ) );
                     }
                 } else {
                     errors.push(new TerminalError(symbols.maxSymbol(), symbols.expected()));
@@ -3018,10 +2793,13 @@ module parse {
                 peekID = symbols.peekID(),
                 onFinish = null,
                 rules = lookups[0],
-                rule = rules[peekID];
+                rulesLen = rules.length;
 
-            if (rule === undefined) {
+            var rule = null;
+
+            if (rules.length <= peekID || (rule = rules[peekID]) === null) {
                 return null;
+
             } else {
                 var symbolI = symbols.idIndex(),
                     args = null;
@@ -3080,14 +2858,15 @@ module parse {
                 }
 
                 var separators = lookups[1];
+                var separatorsLen = separators.length;
                 while (symbols.hasMore()) {
                     symbolI = symbols.idIndex();
                     peekID = symbols.peekID();
 
-                    var separator = separators[peekID],
+                    var separator = null,
                         hasSeperator = false;
 
-                    if (separator === undefined) {
+                    if ( separatorsLen <= peekID || (separator = separators[peekID]) === null) {
                         break;
                     } else if (separator instanceof Array) {
                         for (var j = 0; j < separator.length; j++) {
@@ -3119,11 +2898,12 @@ module parse {
 
                     if (hasSeperator) {
                         peekID = symbols.peekID();
-                        rule = rules[peekID];
 
-                        if (rule === undefined) {
+                        // if rule not found
+                        if (rulesLen <= peekID || (rule = rules[peekID]) === null) {
                             symbols.back(symbols.idIndex() - symbolI, this, 0);
                             break;
+
                         } else if (rule instanceof ParserRuleImplementation) {
                             onFinish = rule.ruleTest(symbols, inputSrc);
 
@@ -3159,8 +2939,10 @@ module parse {
                                 symbols.back(symbols.idIndex() - symbolI, this, 0);
                                 break;
                             }
+
                         } else if (rule.id === peekID) {
                             args.push(symbols.next());
+
                         } else {
                             symbols.back(symbols.idIndex() - symbolI, this, 0);
                             break;
@@ -3169,7 +2951,6 @@ module parse {
                         break;
                     }
                 }
-
 
                 if (args === null) {
                     // needs to remember it's recursive position when we leave
@@ -3248,9 +3029,11 @@ module parse {
                  * It also allows us to quit early, if we won't find what we are
                  * after.
                  */
-                var rule = lookups[i][peekID];
+                var lookupRules = lookups[i];
+                var rule = null;
 
-                if (rule === undefined) {
+                // if rule is not found
+                if (lookupRules.length <= peekID || (rule = lookupRules[peekID]) === null) {
                     if (optional[i]) {
                         if ( !returnOnlyFirstArg ) {
                             if ( args === null ) {
@@ -3293,10 +3076,12 @@ module parse {
                                 break;
                             }
                         }
-                        // 'then' rules
+
+                    // 'then' rules
                     } else if (rule instanceof ParserRuleImplementation) {
                         onFinish = rule.ruleTest(symbols, inputSrc);
-                        // terminal rule
+
+                    // terminal rule
                     } else if (peekID === rule.id) {
                         onFinish = symbols.next();
                     }
@@ -3334,6 +3119,7 @@ module parse {
             }
 
             this.internalCount--;
+
             return args;
         }
 
@@ -3345,10 +3131,12 @@ module parse {
 
             while (symbols.hasMore()) {
                 for (var i = 0; i < len; i++) {
-                    var peekID = symbols.peekID(),
-                        rule = lookups[i][peekID];
+                    var peekID = symbols.peekID();
+                    var lookupRules = lookups[i];
+                    var rule = null;
 
-                    if (rule === undefined) {
+                    // if rule not found
+                    if (lookupRules.length <= peekID || (rule = lookupRules[peekID]) === null) {
                         return args;
                     } else {
                         if (rule instanceof ParserRuleImplementation) {
@@ -3416,17 +3204,23 @@ module parse {
          *
          *  strings: a substrings for each symbol, where the terminal stated to return a string
          */
-        private parseSymbolsInner(inputSrc: string, src: string, name: string) {
+        private parseSymbolsInner( inputSrc: string, src: string, name: string ) {
             var sourceLines = new SourceLines(inputSrc, name);
 
-            var symbolI:number = 0,
+            var symbolI: number = 0,
 
-                len:number = src.length,
+                len: number = src.length,
 
                 symbols: Symbol[] = [],
                 symbolIDs: number[] = [],
 
                 ignores: Term[] = getIgnores( this.parseParent ),
+
+                singleIgnore: boolean = ( ignores.length === 1 ),
+                multipleIgnores: boolean = ( ignores.length > 1 ),
+                ignoreTest: TerminalFunction = ( ignores.length === 1 ? ignores[0].typeTestFunction : null ),
+                postIgnoreMatchEvent : TerminalFunction = ( ignores.length === 1 ? ignores[0].postMatch : null ),
+
                 literals: Term[] = this.compiled.literals,
                 terminals: Term[] = this.compiled.terminals,
 
@@ -3445,7 +3239,6 @@ module parse {
 
                 termTests: TerminalFunction[] = [],
                 termIDs: number[] = new Array(termsLen),
-                multipleIgnores: boolean = ( ignores.length > 1 ),
 
                 /**
                  * An invalid index in the string, used to denote
@@ -3471,23 +3264,23 @@ module parse {
              * places to the left when it is set.
              */
             for (var i = 0; i < allTerms.length; i++) {
-                var term = allTerms[i],
-                    test = term.testData;
+                var term = allTerms[i];
 
-                if (i < ignoresLen) {
-                    termTests.push( test );
+                if ( i < ignoresLen ) {
+                    termTests.push( term.typeTestFunction );
                     literalsType.push( 0 );
                     literalsCharArrays.push( null );
                 } else if (i < literalsLen) {
                     termTests.push( null );
                     literalsType.push( term.type );
 
-                    var code:number;
+                    var code: number;
                     if ( term.type === TYPE_STRING ) {
-                        code = term.testData[0];
-                        literalsCharArrays.push( term.testData );
+                        var stringCodes = term.typeTestString;
+                        code = stringCodes[0];
+                        literalsCharArrays.push( stringCodes );
                     } else {
-                        code = term.testData;
+                        code = term.typeTestCode;
                         literalsCharArrays.push( null );
                     }
 
@@ -3498,7 +3291,7 @@ module parse {
                         arr.push( i );
                     }
                 } else {
-                    termTests[i] = test;
+                    termTests[i] = term.typeTestFunction;
                 }
 
                 var mostUpper = term.getParentTerm();
@@ -3540,37 +3333,56 @@ module parse {
                      */
 
                     var j = 0;
-                    var r;
+                    var r = 0;
 
                     /*
                      * Test the 'ignores', i.e. whitespace.
                      */
 
-                    while (j < ignoresLen) {
-                        r = termTests[j](src, i, code, len);
+                    if ( singleIgnore ) {
+                        r = ignoreTest( src, i, code, len );
 
-                        if (r !== undefined && r !== false && r > i) {
-                            code = src.charCodeAt(r);
+                        if ( r > i ) {
+                            code = src.charCodeAt( r );
 
-                            var postMatchEvent = postMatches[j];
-                            if (postMatchEvent !== null) {
-                                var r2 = postMatchEvent(src, r, code, len);
+                            if ( postIgnoreMatchEvent !== null ) {
+                                var r2 = postIgnoreMatchEvent( src, r, code, len );
 
-                                if (r2 !== undefined && r2 > r) {
-                                    i = r2;
-                                    code = src.charCodeAt(r2);
+                                if ( r2 > r ) {
+                                    code = src.charCodeAt( i = r2 );
                                 } else {
                                     i = r;
                                 }
                             } else {
                                 i = r;
                             }
+                        }
 
-                            if (multipleIgnores) {
-                                j = 0;
+                    } else if ( multipleIgnores ) {
+                        while ( j < ignoresLen ) {
+                            r = termTests[j]( src, i, code, len );
+
+                            if ( r > i ) {
+                                code = src.charCodeAt( r );
+
+                                var postMatchEvent = postMatches[j];
+                                if ( postMatchEvent !== null ) {
+                                    var r2 = postMatchEvent( src, r, code, len );
+
+                                    if ( r2 > r ) {
+                                        code = src.charCodeAt( i = r2 );
+                                    } else {
+                                        i = r;
+                                    }
+                                } else {
+                                    i = r;
+                                }
+
+                                j = ( j === 0 ) ? 1 : 0;
+                                continue;
+                            } else {
+                                j++;
                             }
-                        } else {
-                            j++;
                         }
                     }
 
@@ -3581,9 +3393,7 @@ module parse {
                     r = 0;
 
                     var litsLookups = literalsLookup[code];
-                    if ( litsLookups === undefined ) {
-                        j = literalsLen;
-                    } else {
+                    if ( litsLookups !== undefined ) {
                         scan_literals:
                         for ( var k = 0; k < litsLookups.length; k++ ) {
                             var termI = litsLookups[k];
@@ -3594,6 +3404,8 @@ module parse {
                              * but it is actually an array of code characters.
                              */
                             if (type === TYPE_STRING) {
+                                termI = litsLookups[k];
+
                                 var matchArray:number[] = literalsCharArrays[termI];
                                 var testLen = matchArray.length;
 
@@ -3612,7 +3424,7 @@ module parse {
                             /*
                              * Non-alphanumeric codes, such as '+'.
                              */
-                            } else if (type === TYPE_CODE) {
+                            } else if ( type === TYPE_CODE ) {
                                 // no inner check needed here, because the lookup in the array it's self, is enough to confirm
                                 r = i + 1;
 
@@ -3621,7 +3433,7 @@ module parse {
                              *
                              * I expect it is unpopular, which is why it is last.
                              */
-                            } else if (type === TYPE_WORD_CODE) {
+                            } else if ( type === TYPE_CODE_ALPHANUMERIC ) {
                                 if ( ! isWordCode(src.charCodeAt(i + 1)) ) {
                                     r = i + 1;
                                 } else {
@@ -3637,8 +3449,8 @@ module parse {
                                 //
                                 // This is from the last terminal,
                                 // to this one, but ignores whitespace.
-                                if (errorStart !== NO_ERROR) {
-                                    errors.push(new SymbolError(
+                                if ( errorStart !== NO_ERROR ) {
+                                    errors.push( new SymbolError(
                                             sourceLines,
                                             errorStart,
                                             i
@@ -3670,9 +3482,9 @@ module parse {
                                 continue scan;
                             }
                         }
-
-                        j = literalsLen;
                     }
+
+                    j = literalsLen;
 
                     /*
                      * Test 'non-literals', i.e. variable.
@@ -3681,7 +3493,7 @@ module parse {
                     while (j < termsLen) {
                         r = termTests[j](src, i, code, len);
 
-                        if (r !== undefined && r !== false && r > i) {
+                        if ( r > i ) {
                             symbolIDs[symbolI] = termIDs[j];
 
                             // If we were in error mode,
@@ -3703,9 +3515,9 @@ module parse {
                             if (postMatchEvent !== null) {
                                 code = src.charCodeAt(r);
 
-                                var r2 = postMatchEvent(src, r, code, len);
+                                var r2: number = postMatchEvent( src, r, code, len );
 
-                                if (r2 !== undefined && r2 > r) {
+                                if (r2 !== 0 && r2 > r) {
                                     r = r2;
                                 }
                             }
@@ -3781,19 +3593,22 @@ module parse {
     } =
         function (ps: Parse, term: any) {
             if (term instanceof Term) {
-                ingoreInner(ps, term);
+                ingoreInner( ps, term );
             } else {
-                if (term instanceof String || isFunction(term)) {
+                if ( typeof term === 'string' || term instanceof String || isFunction( term ) ) {
                     ignoreSingle(ps, terminal(term));
                 } else if (term instanceof Array) {
                     for (var i = 0; i < term.length; i++) {
                         ignoreSingle(ps, terminalsInner(term[i], null));
                     }
                 } else if (term instanceof Object) {
-                    for (var k in term) {
-                        if (term.hasOwnProperty(k)) {
-                            ignoreSingle(ps, terminalsInner(term[k], k));
-                        }
+                    var keys = Object.keys( term ),
+                        keysLen = keys.length;
+
+                    for ( var i = 0; i < keysLen; i++ ) {
+                        var k = keys[i];
+
+                        ignoreSingle(ps, terminalsInner(term[k], k));
                     }
                 } else {
                     throw new Error("unknown ignore terminal given");
@@ -3821,10 +3636,10 @@ module parse {
         if (t instanceof Object && !isFunction(t) && !(t instanceof Array)) {
             var terminals = {};
 
-            for (var name in t) {
-                if (t.hasOwnProperty(name)) {
-                    terminals[name] = terminalsInner(ps, t[name], name);
-                }
+            var keys = Object.keys( t ), keysLen = keys.length;
+            for ( var i = 0; i < keysLen; i++ ) {
+                var name = keys[i];
+                terminals[name] = terminalsInner(ps, t[name], name);
             }
 
             return terminals;
@@ -3897,25 +3712,40 @@ module parse {
 
         a(...args: any[]): ParserRule;
         a() : ParserRule {
-            return new ParserRuleImplementation(this).thenAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return new ParserRuleImplementation(this).thenAll( args );
         }
 
         or(...args: any[]): ParserRule;
         or(): ParserRule  {
-            return new ParserRuleImplementation(this).orAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return new ParserRuleImplementation(this).orAll(args);
         }
         either(...args: any[]): ParserRule;
         either(): ParserRule  {
-            return new ParserRuleImplementation(this).orAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return new ParserRuleImplementation(this).orAll(args);
         }
 
         optional(...args: any[]): ParserRule;
         optional(): ParserRule  {
-            return new ParserRuleImplementation(this).optionalAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return new ParserRuleImplementation(this).optionalAll(args);
         }
         maybe(...args: any[]): ParserRule;
         maybe(): ParserRule  {
-            return new ParserRuleImplementation(this).optionalAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return new ParserRuleImplementation(this).optionalAll(args);
         }
 
         /**
@@ -3979,13 +3809,19 @@ module parse {
          */
         repeatEither(...args: any[]): ParserRule;
         repeatEither(): ParserRule  {
-            return new ParserRuleImplementation(this).cyclicOrAll(arguments);
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+            return new ParserRuleImplementation(this).cyclicOrAll(args);
         }
 
         repeat(...args: any[]): ParserRule;
         repeat(): ParserRule  {
+            var argsLen = arguments.length, args = new Array( argsLen );
+            while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
             return new ParserRuleImplementation(this).cyclicOrSingle(
-                    new ParserRuleImplementation(this).thenAll(arguments)
+                    new ParserRuleImplementation(this).thenAll(args)
             )
         }
 
@@ -4022,17 +3858,26 @@ module parse {
 
     export function a(...args: any[]): ParserRule;
     export function a(): ParserRule  {
-        return new ParserRuleImplementation(pInstance).thenAll(arguments);
+        var argsLen = arguments.length, args = new Array( argsLen );
+        while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+        return new ParserRuleImplementation(pInstance).thenAll(args);
     }
 
     export function either(...args: any[]): ParserRule;
     export function either(): ParserRule  {
-        return new ParserRuleImplementation(pInstance).orAll(arguments);
+        var argsLen = arguments.length, args = new Array( argsLen );
+        while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+        return new ParserRuleImplementation(pInstance).orAll(args);
     }
 
     export function optional(...args: any[]): ParserRule;
     export function optional(): ParserRule  {
-        return new ParserRuleImplementation(pInstance).optionalAll(arguments);
+        var argsLen = arguments.length, args = new Array( argsLen );
+        while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+        return new ParserRuleImplementation(pInstance).optionalAll(args);
     }
 
     export var maybe = optional;
@@ -4056,13 +3901,19 @@ module parse {
 
     export function repeatEither(...args: any[]): ParserRule;
     export function repeatEither(): ParserRule  {
-        return new ParserRuleImplementation(pInstance).cyclicOrAll(arguments);
+        var argsLen = arguments.length, args = new Array( argsLen );
+        while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
+        return new ParserRuleImplementation(pInstance).cyclicOrAll(args);
     }
 
     export function repeat(...args: any[]): ParserRule;
     export function repeat(): ParserRule {
+        var argsLen = arguments.length, args = new Array( argsLen );
+        while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
+
         return new ParserRuleImplementation(pInstance).cyclicOrSingle(
-                new ParserRuleImplementation(pInstance).thenAll(arguments)
+                new ParserRuleImplementation(pInstance).thenAll(args)
         )
     }
 
@@ -4112,8 +3963,7 @@ module parse {
 
         export var WHITESPACE: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
             while ( code === SPACE || code === TAB ) {
-                i++;
-                code = src.charCodeAt( i );
+                code = src.charCodeAt( ++i );
             }
 
             return i;
@@ -4124,8 +3974,7 @@ module parse {
         */
         export var WHITESPACE_END_OF_LINE:TerminalFunction = function (src:string, i:number, code:number, len:number): number {
             while (code === SPACE || code === TAB || code === SLASH_N || code === SLASH_R) {
-                i++;
-                code = src.charCodeAt(i);
+                code = src.charCodeAt( ++i );
             }
 
             return i;
@@ -4138,26 +3987,20 @@ module parse {
             if ( ZERO <= code && code <= NINE ) {
 
                 // 0x hex number
-                if ( code === ZERO ) {
-                    if ( src.charCodeAt( i + 1 ) === LOWER_X ) {
-                        i += 1;
+                if ( code === ZERO && src.charCodeAt( i + 1 ) === LOWER_X ) {
+                    i++;
 
-                        do {
-                            i++;
-                            code = src.charCodeAt( i );
-                        } while (
-                            code === UNDERSCORE ||
-                            isHexCode( code )
-                        )
-                    }
+                    do {
+                        code = src.charCodeAt( ++i );
+                    } while (
+                        code === UNDERSCORE ||
+                        isHexCode( code )
+                    )
 
                 // normal number
                 } else {
-                    var start: number = i;
-
                     do {
-                        i++;
-                        code = src.charCodeAt( i );
+                        code = src.charCodeAt( ++i );
                     } while (
                         code === UNDERSCORE ||
                         ( code >= ZERO && code <= NINE )
@@ -4167,21 +4010,22 @@ module parse {
                     if (
                         src.charCodeAt( i ) === FULL_STOP &&
                         isNumericCode( src.charCodeAt( i + 1 ) )
-                        ) {
+                    ) {
                         i++;
 
                         do {
-                            i++;
-                            code = src.charCodeAt( i );
+                            code = src.charCodeAt( ++i );
                         } while (
                             code === UNDERSCORE ||
                             ( code >= ZERO && code <= NINE )
                         )
                     }
                 }
+
+                return i;
             }
 
-            return i;
+            return 0;
         }
 
         /**
@@ -4194,53 +4038,50 @@ module parse {
                 i++;
 
                 do {
-                    i++;
-                    code = src.charCodeAt( i );
+                    code = src.charCodeAt( ++i );
                 } while (
                         i < len &&
                         code !== SLASH_N
                 );
+
+                return i;
             }
 
-            return i;
+            return 0;
         }
 
         /**
         * A C-like multi line comment, matches everything from '/ *' to a '* /', (without the spaces).
         */
         export var C_MULTI_LINE_COMMENT: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
-            var start = i;
-
             if ( code === SLASH && src.charCodeAt( i + 1 ) === STAR ) {
-                // this is so we end up skipping two characters,
+                // +1 is so we end up skipping two characters,
                 // the / and the *, before we hit the next char to check
-                i++;
+                i++
 
                 do {
                     i++;
 
                     // error!
                     if ( i >= len ) {
-                        return start;
+                        return 0;
                     }
                 } while ( !(
-                        src.charCodeAt( i ) === STAR &&
-                        src.charCodeAt( i + 1 ) === SLASH
-                ) );
+                    src.charCodeAt( i ) === STAR &&
+                    src.charCodeAt( i + 1 ) === SLASH
+                    ) );
 
                 // plus 2 to include the end of the comment
                 return i + 2;
-            } else {
-                return i;
             }
+
+            return 0;
         }
 
         /**
         * A terminal for a string, double or single quoted.
         */
         export var STRING: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
-            var start = i;
-
             // double quote string
             if ( code === DOUBLE_QUOTE ) {
                 do {
@@ -4248,7 +4089,7 @@ module parse {
 
                     // error!
                     if ( i >= len ) {
-                        return start;
+                        return 0;
                     }
                 } while ( !(
                         src.charCodeAt( i ) === DOUBLE_QUOTE &&
@@ -4263,7 +4104,7 @@ module parse {
 
                     // error!
                     if ( i >= len ) {
-                        return start;
+                        return 0;
                     }
                 } while ( !(
                         src.charCodeAt( i ) === SINGLE_QUOTE &&
@@ -4273,7 +4114,7 @@ module parse {
                 return i + 1;
             }
 
-            return i;
+            return 0;
         }
     }
 }
