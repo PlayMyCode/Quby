@@ -94,9 +94,11 @@
     });
 
     scriptLoad( function() {
-        if ( window.quby ) {
-            window.parseCode();
-        }
+        setTimeout(function() {
+            if ( window.quby ) {
+                window.parseCode();
+            }
+        }, 0);
     } );
 </script>
 

@@ -172,123 +172,141 @@ function getCodePane() {
     return document.getElementById("js-source-code").value;
 }
 
+function numDigitsInInt( num ) {
+    num = num | 0;
+    var n = 1;
+
+    if (num >= 100000000) { num /= 100000000; n += 8; }
+    if (num >= 10000) { num /= 10000; n += 4; }
+    if (num >= 100) { num /= 100; n += 2; }
+    if (num >= 10) { num /= 10; n += 1; }
+
+    return n;
+}
+
+function padStr( time, padLen ) {
+    time = "" + time;
+    var len = time.length;
+
+    while ( padLen -- > len ) {
+        time = "&#x2002;" + time;
+    }
+
+    return time;
+}
+
 function parseCode( callback ) {
     setTimeout(function() {
         try {
-            var outputCode = document.getElementById("js-output-code"),
-                outputError = document.getElementById("js-output-error"),
-                outputSymbols = document.getElementById("js-output-symbols");
-
-            outputSymbols.value = '';
-
-            var parser = new quby.main.Parser();
-            parser.errorHandler( handleError );
-
-            var compileTime = 0,
-                symbolsTime = 0,
-                rulesTime = 0,
-                totalTime = 0,
-                printTime = 0,
-                finalizeTime = 0;
-
-            var updateControlsTime = function() {
-                var timeLen = Math.max(
-                        (compileTime+"").length,
-                        (symbolsTime+"").length,
-                        (rulesTime+"").length,
-                        (totalTime+"").length,
-                        (printTime+"").length,
-                        (finalizeTime+"").length
-                ) + 1;
-
-                var pad = function( time ) {
-                    var padLen = timeLen;
-                    var len = (""+time).length;
-
-                    while ( padLen -- > len ) {
-                        time = "&#x2002;" + time;
-                    }
-
-                    return time;
-                }
-
-                document.getElementsByClassName('controls-time-info')[0].innerHTML =
-                        "compile " + pad(compileTime) + "ms<br/>" +
-                        "symbols " + pad(symbolsTime) + "ms<br/>" +
-                          "rules " + pad(  rulesTime) + "ms<br/>" +
-                          "total " + pad(  totalTime) + "ms<br/>" +
-                                                          "<br/>" +
-                          "print " + pad(  printTime) + "ms<br/>" +
-                       "finalize " + pad(finalizeTime) + "ms" ;
-            };
-
-            if (includeCore) {
-                var core = getSourceFile("./core.qb");
-
-                parser.
-                        parse(core).
-                        adminMode(true).
-                        onDebug(function(symbols, times) {
-                            compileTime += times.compile;
-                            symbolsTime += times.symbols;
-                            rulesTime += times.rules;
-                            totalTime += times.total;
-
-                            updateControlsTime();
-                        });
-            }
-
-            var sourceCode = getCodePane();
-            if (debugMode) {
-                parser.
-                        parse(sourceCode).
-                        adminMode(isAdmin).
-                        onDebug(function(symbols, times) {
-                            var displaySymbols = new Array(symbols.length);
-
-                            for (var i = 0; i < symbols.length; i++) {
-                                displaySymbols[i] = symbols[i].name();
-                            }
-
-                            outputSymbols.value = displaySymbols.join("\n");
-
-                            compileTime += times.compile;
-                            symbolsTime += times.symbols;
-                            rulesTime += times.rules;
-                            totalTime += times.total;
-
-                            updateControlsTime();
-                        });
-            } else {
-                parser.
-                        parse(sourceCode).
-                        adminMode(isAdmin);
-            }
-
-            parser.
-                    finalize(function(result, times) {
-                        outputCode.value = result.getCode();
-                        handleError(
-                                ( outputError.value = result.hasErrors() ?
-                                        result.errors.map(function(e) { return e.message }).join("\r\n") + "\r\n" :
-                                        '' )
-                        );
-
-                        _result = result;
-
-                        printTime = times.print;
-                        finalizeTime = times.finalise;
-
-                        updateControlsTime();
-
-                        if (callback) {
-                            callback();
-                        }
-                    });
+            parseCodeInner( callback );
         } catch ( err ) {
             handleError( err );
         }
     });
+}
+
+function parseCodeInner( callback ) {
+    var outputCode = document.getElementById("js-output-code"),
+        outputError = document.getElementById("js-output-error"),
+        outputSymbols = document.getElementById("js-output-symbols");
+
+    outputSymbols.value = '';
+
+    var parser = new quby.main.Parser();
+    parser.errorHandler( handleError );
+
+    var compileTime = 0,
+        symbolsTime = 0,
+        rulesTime = 0,
+        totalTime = 0,
+        printTime = 0,
+        finalizeTime = 0,
+        pageTime = Date.now();
+
+    var updateControlsTime = function( times ) {
+        compileTime += times.compile || 0;
+        symbolsTime += times.symbols || 0;
+        rulesTime   += times.rules || 0;
+        totalTime   += times.total || 0;
+
+        if (times.print !== undefined) {
+            printTime = times.print;
+        }
+        if (times.finalise !== undefined) {
+            finalizeTime = times.finalise;
+        }
+
+        var timeLen = Math.max(
+                numDigitsInInt(compileTime),
+                numDigitsInInt(symbolsTime),
+                numDigitsInInt(rulesTime),
+                numDigitsInInt(totalTime),
+                numDigitsInInt(printTime),
+                numDigitsInInt(finalizeTime)
+        ) + 1;
+
+        document.getElementsByClassName('controls-time-info')[0].innerHTML =
+                "compile " + padStr(compileTime, timeLen)           + "ms<br/>" +
+                "symbols " + padStr(symbolsTime, timeLen)           + "ms<br/>" +
+                  "rules " + padStr(rulesTime, timeLen)             + "ms<br/>" +
+            "parse total " + padStr(totalTime, timeLen)             + "ms<br/>" +
+                                                                        "<br/>" +
+                  "print " + padStr(printTime, timeLen)             + "ms<br/>" +
+               "finalize " + padStr(finalizeTime, timeLen)          + "ms<br/>" +
+                                                                        "<br/>" +
+             "page total " + padStr(Date.now() - pageTime, timeLen) + "ms"      ;
+    };
+
+    if (includeCore) {
+        var core = getSourceFile("./core.qb");
+
+        parser.
+                parse(core).
+                adminMode(true).
+                onDebug(function(symbols, times) {
+                    updateControlsTime( times );
+                });
+    }
+
+    var sourceCode = getCodePane();
+    if (debugMode) {
+        parser.
+                parse(sourceCode).
+                adminMode(isAdmin).
+                onDebug(function(symbols, times) {
+                    updateControlsTime( times );
+
+                    var displaySymbols = new Array(symbols.length);
+
+                    for (var i = 0; i < symbols.length; i++) {
+                        displaySymbols[i] = symbols[i].name();
+                    }
+
+                    outputSymbols.value = displaySymbols.join("\n");
+                });
+    } else {
+        parser.
+                parse(sourceCode).
+                adminMode(isAdmin);
+    }
+
+    parser.
+            finalize(function(result, times) {
+                updateControlsTime( times );
+
+                outputCode.value = result.getCode();
+                handleError(
+                        result.hasErrors() ?
+                                result.getErrors().map(function(e) { return e.message }).join("\r\n") + "\r\n" :
+                                ''
+                );
+
+                _result = result;
+
+                if (callback) {
+                    callback();
+                }
+            });
 }
 
 function runCode() {

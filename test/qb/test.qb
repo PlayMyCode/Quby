@@ -1,10 +1,16 @@
-class Array
-    def f(&block)
-    end
-end
 
-foo = null
-foo.f do
-    return 4
+class Renderer
+    def method_1_of_4()
+        @field.field_method_call()
+    end
+
+    def method_2_of_4()
+    end
+
+    def method_3_of_4()
+    end
+
+    def method_4_of_4()
+    end
 end
 
