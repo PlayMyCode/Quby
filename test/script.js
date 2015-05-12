@@ -303,8 +303,8 @@ function parseCodeInner( callback ) {
         rulesTime   += ( times.parseRules   !== undefined ) ? times.parseRules   : 0;
         parseTotal  += ( times.parseTotal   !== undefined ) ? times.parseTotal   : 0;
 
-        if (times.validateTime !== undefined) {
-            validateTime = times.validateTime;
+        if (times.validatorTime !== undefined) {
+            validateTime = times.validatorTime;
         }
         if (times.print !== undefined) {
             printTime = times.print;
