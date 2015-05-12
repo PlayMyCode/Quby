@@ -1848,6 +1848,12 @@ module quby.core {
      * it always appeares at the end.
      */
 
+    /*
+     * This is implemented as an object literal so the method calls
+     * are marginally faster. It means the methods are found directly
+     * on the object instead of having to go to the prototype.
+     */
+
     interface IPrinterStatement {
         appendNow( e: string ): void;
         appendPost( e: string ): void;
