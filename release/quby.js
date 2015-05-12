@@ -1,30 +1,32 @@
 "use strict";
-(function (Date) {
+(function () {
     if (Date.now === undefined) {
         Date.now = function () {
             return new Date().getTime();
         };
     }
-})(window['Date']);
+})();
 
 var util;
 (function (util) {
+    "use strict";
+
     var calculateName = function () {
-        if (navigator.appName === 'Opera') {
-            return 'opera';
-        } else if (navigator.appName === 'Microsoft Internet Explorer') {
-            return 'ie';
+        if (navigator.appName === "Opera") {
+            return "opera";
+        } else if (navigator.appName === "Microsoft Internet Explorer") {
+            return "ie";
         } else {
             var agent = navigator.userAgent.toString();
 
-            if (agent.indexOf("Chrome/") != -1) {
-                return 'chrome';
-            } else if (agent.indexOf("Safari/") != -1) {
-                return 'safari';
-            } else if (navigator.appName === 'Netscape') {
-                return 'mozilla';
+            if (agent.indexOf("Chrome/") !== -1) {
+                return "chrome";
+            } else if (agent.indexOf("Safari/") !== -1) {
+                return "safari";
+            } else if (navigator.appName === "Netscape") {
+                return "mozilla";
             } else {
-                return 'unknown';
+                return "unknown";
             }
         }
     };
@@ -34,15 +36,15 @@ var util;
     var anchor = null;
 
     util.browser = {
-        isIE: browserName === 'ie',
-        isMozilla: browserName === 'mozilla',
-        isChrome: browserName === 'chrome',
-        isOpera: browserName === 'opera',
-        isSafari: browserName === 'safari'
+        isIE: browserName === "ie",
+        isMozilla: browserName === "mozilla",
+        isChrome: browserName === "chrome",
+        isOpera: browserName === "opera",
+        isSafari: browserName === "safari"
     };
 
     (function (_url) {
-        var SLASH_CHAR = '/'.charCodeAt(0);
+        var SLASH_CHAR = "//".charCodeAt(0);
 
         /**
         * Given an url, this will turn it into an absolute url.
@@ -189,7 +191,7 @@ var util;
         * and returns the result.
         */
         function trim(s) {
-            s = s.replace(/^\s\s*/, '');
+            s = s.replace(/^\s\s*/, "");
             var ws = /\s/;
             var i = s.length;
 
@@ -205,7 +207,7 @@ var util;
         * Otherwise whatever was given is returned, with no error reported.
         */
         function capitalize(str) {
-            if (typeof (str) == 'string' && str.length > 0) {
+            if (typeof (str) === "string" && str.length > 0) {
                 // capitalize the first letter
                 return str.charAt(0).toUpperCase() + str.slice(1);
             } else {
@@ -230,7 +232,7 @@ var util;
 
         var futureBlockingOffset = 0, blockingCount = 1;
 
-        var requestAnimFrame = window.requestAnimationFrame || window['webkitRequestAnimationFrame'] || window['mozRequestAnimationFrame'] || window['oRequestAnimationFrame'] || window.msRequestAnimationFrame || null;
+        var requestAnimFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame || null;
 
         var intervalFuns = [], intervalFunID = 1;
 
@@ -478,12 +480,12 @@ var util;
         ajax.getFuture = getFuture;
 
         function call(method, url, callback, passData, async, timestamp) {
-            if (typeof passData === "undefined") { passData = ''; }
+            if (typeof passData === "undefined") { passData = ""; }
             if (typeof async === "undefined") { async = true; }
             if (typeof timestamp === "undefined") { timestamp = false; }
             if (passData === undefined || passData === null) {
-                passData = '';
-            } else if (!(typeof passData === 'string' || passData instanceof String)) {
+                passData = "";
+            } else if (!(typeof passData === "string" || passData instanceof String)) {
                 passData = String(passData);
             }
 
@@ -493,17 +495,17 @@ var util;
             var ajaxObj = new XMLHttpRequest();
 
             ajaxObj.onreadystatechange = function () {
-                if (ajaxObj.readyState == 4) {
+                if (ajaxObj.readyState === 4) {
                     callback(ajaxObj.status, ajaxObj.responseText, ajaxObj.responseXML);
                 }
             };
 
-            if (method === 'post') {
+            if (method === "post") {
                 if (timestamp) {
-                    if (url.indexOf('?') === -1) {
-                        url += '?timestamp=' + Date.now();
+                    if (url.indexOf("?") === -1) {
+                        url += "?timestamp=" + Date.now();
                     } else {
-                        url += '&timestamp=' + Date.now();
+                        url += "&timestamp=" + Date.now();
                     }
                 }
 
@@ -511,20 +513,20 @@ var util;
                 ajaxObj.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
                 ajaxObj.setRequestHeader("Content-Length", String(passData.length));
                 ajaxObj.send(passData);
-            } else if (method === 'get') {
+            } else if (method === "get") {
                 if (passData) {
-                    if (url.indexOf('?') === -1) {
-                        url += '?' + passData;
+                    if (url.indexOf("?") === -1) {
+                        url += "?" + passData;
                     } else {
-                        url += '&' + passData;
+                        url += "&" + passData;
                     }
                 }
 
                 if (timestamp) {
-                    if (url.indexOf('?') === -1) {
-                        url += '?timestamp=' + Date.now();
+                    if (url.indexOf("?") === -1) {
+                        url += "?timestamp=" + Date.now();
                     } else {
-                        url += '&timestamp=' + Date.now();
+                        url += "&timestamp=" + Date.now();
                     }
                 }
 
@@ -553,7 +555,7 @@ var __extends = this.__extends || function (d, b) {
 *
 * re-add the symbol id to rule lookup. So...
 *
-* ParserRule.parseRules add:
+* IParserRule.parseRules add:
 *      var rules = this.compiled.rules[ symbol.id ]
 *
 * ... and use that to know which set of rules to jump to, and
@@ -797,7 +799,7 @@ var __extends = this.__extends || function (d, b) {
 *
 * Constructors should also be defined in a way so they can be
 * called with no args, this is needed for Terminal, Terminals
-* and ParserRule constructors.
+* and IParserRule constructors.
 *
 * = Symbol vs Terminal =
 *
@@ -853,27 +855,10 @@ var parse;
     };
 
     /**
-    * Creates and returns a new Error object,
-    * containing the message given.
-    *
-    * It also tacks on it's own information,
-    * making it clear that parse.js has crashed.
-    */
-    function newParseError(msg) {
-        if (msg) {
-            msg += " (this is a bug in parse.js)";
-        } else {
-            msg = "a bug in parse.js has occurred";
-        }
-
-        return new Error(msg);
-    }
-
-    /**
     * @return True if f is a function object, and false if not.
     */
     function isFunction(f) {
-        return (typeof f === 'function') || (f instanceof Function);
+        return (typeof f === "function") || (f instanceof Function);
     }
 
     /**
@@ -1478,7 +1463,7 @@ var parse;
                 while (running) {
                     var index = src.indexOf(searchIndex, lastIndex);
 
-                    if (index != -1) {
+                    if (index !== -1) {
                         lines.push(index);
                         lastIndex = index + 1;
                         // the last line
@@ -1510,7 +1495,7 @@ var parse;
             this.index();
 
             for (var line = 0; line < this.lineOffsets.length; line++) {
-                // lineOffset is from the end of the line.
+                // LineOffset is from the end of the line.
                 // If it's greater then offset, then we return that line.
                 // It's +1 to start lines from 1 rather then 0.
                 if (this.lineOffsets[line] > offset) {
@@ -1679,8 +1664,9 @@ var parse;
                 // which is why the terms are put into an object and then an array
                 var rules = this.maxRule.compiledLookups[this.maxRuleI], terms = {}, termsArr = [];
 
+                var i;
                 var rulesLen = rules.length;
-                for (var i = 0; i < rulesLen; i++) {
+                for (i = 0; i < rulesLen; i++) {
                     var rule = rules[i];
 
                     if (rule !== null) {
@@ -1689,7 +1675,7 @@ var parse;
                 }
 
                 var keys = Object.keys(terms), keysLen = keys.length;
-                for (var i = 0; i < keysLen; i++) {
+                for (i = 0; i < keysLen; i++) {
                     var k = keys[i];
 
                     termsArr.push(k);
@@ -1843,7 +1829,7 @@ var parse;
     *  = terminals - the compressed list of terminals
     *  = idToTerms - a sparse array of terminal ID's to terminals.
     */
-    var compressTerminals = function (terminals) {
+    function compressTerminals(terminals) {
         var termIDToTerms = [];
 
         /*
@@ -1870,9 +1856,9 @@ var parse;
             terminals: nonLiteralTerms,
             idToTerms: termIDToTerms
         };
-    };
+    }
 
-    var compressTerminalsInner = function (termIDToTerms, literalTerms, nonLiteralTerms, terminals) {
+    function compressTerminalsInner(termIDToTerms, literalTerms, nonLiteralTerms, terminals) {
         var keys = Object.keys(terminals), keysLen = keys.length;
 
         for (var i = 0; i < keysLen; i++) {
@@ -1891,9 +1877,9 @@ var parse;
                 }
             }
         }
-    };
+    }
 
-    var bruteScan = function (parserRule, seenRules, idsFound) {
+    function bruteScan(parserRule, seenRules, idsFound) {
         if (seenRules[parserRule.compiledId] !== true) {
             seenRules[parserRule.compiledId] = true;
 
@@ -1935,13 +1921,11 @@ var parse;
         } else {
             return;
         }
-    };
+    }
 
-    /**
-    * Used when searching for terminals to use for parsing,
-    * during the compilation phase.
-    */
-    var addRule = function (rule, terminals, id, allRules) {
+    
+
+    function addRule(rule, terminals, id, allRules) {
         if (rule instanceof Term) {
             var termID = rule.id;
 
@@ -1953,9 +1937,10 @@ var parse;
         } else {
             return rule.optimizeScan(terminals, id, allRules);
         }
-    };
+    }
+    ;
 
-    var addRuleToLookup = function (id, ruleLookup, term) {
+    function addRuleToLookup(id, ruleLookup, term) {
         var ruleLookupLen = ruleLookup.length;
 
         if (ruleLookupLen <= id) {
@@ -1975,20 +1960,16 @@ var parse;
                 ruleLookup[id] = [arrLookup, term];
             }
         }
-    };
+    }
 
-    var callParseDebug = function (debugCallback, symbols, compileTime, symbolTime, rulesTime, totalTime) {
-        if (debugCallback) {
-            var times = {
-                compile: compileTime,
-                symbols: symbolTime,
-                rules: rulesTime,
-                total: totalTime
-            };
-
-            debugCallback(symbols.getTerminals(), times);
-        }
-    };
+    function newTimeResult(compileTime, symbolTime, rulesTime, totalTime) {
+        return {
+            compile: compileTime,
+            symbols: symbolTime,
+            rules: rulesTime,
+            total: totalTime
+        };
+    }
 
     /**
     * @const
@@ -2035,7 +2016,7 @@ var parse;
     * possibly match.
     *
     * So to cut down on all this searching, 'compiledLookups' is a version of the
-    * 'rules' which maps symbolID to rules. That way a ParserRule can jump straight
+    * 'rules' which maps symbolID to rules. That way a IParserRule can jump straight
     * to the branches which match; or return if none of them match.
     *
     * SymbolID and TerminalID are also interchangeable. SymbolID is the id of the
@@ -2086,7 +2067,7 @@ var parse;
             *  = when parsing symbols
             *
             * This to avoid calling it recursively, as we only
-            * need to visit each ParserRule once.
+            * need to visit each IParserRule once.
             */
             this.isRecursive = NO_RECURSION;
             /**
@@ -2251,7 +2232,7 @@ var parse;
         * Same as 'either', except all values given are optional.
         * With this having no-match is acceptable.
         *
-        * @return This ParserRule instance.
+        * @return This IParserRule instance.
         */
         ParserRuleImplementation.prototype.maybe = function () {
             var argsLen = arguments.length, args = new Array(argsLen);
@@ -2340,7 +2321,7 @@ var parse;
         * The errors is an array containing every error that has occurred, and will
         * be an empty array when there are no errors.
         *
-        * The rules of this ParserRule will be applied repeatedly on every symbol
+        * The rules of this IParserRule will be applied repeatedly on every symbol
         * found. The result array given contains the results from each of these
         * runs.
         *
@@ -2351,7 +2332,7 @@ var parse;
         * @param options An object listing the options to parse. Can also be a string.
         */
         ParserRuleImplementation.prototype.parse = function (options) {
-            var displaySrc, parseSrc, name = null, callback = null, debugCallback = null;
+            var displaySrc, parseSrc, name = null, callback = null;
 
             if (options instanceof String) {
                 displaySrc = parseSrc = options.valueOf();
@@ -2363,10 +2344,9 @@ var parse;
 
                 name = options['name'] || null;
                 callback = options['onFinish'] || null;
-                debugCallback = options['onDebug'] || null;
             }
 
-            this.parseInner(displaySrc, parseSrc, callback, debugCallback, name);
+            this.parseInner(displaySrc, parseSrc, callback, name);
         };
 
         ParserRuleImplementation.prototype.symbolize = function (input, callback) {
@@ -2479,7 +2459,7 @@ var parse;
             }
 
             if ((this.isCyclic || this.isSeperator) && !ignoreSpecial) {
-                throw new Error("Cannot add more rules to a special ParserRule");
+                throw new Error("Cannot add more rules to a special IParserRule");
             }
         };
 
@@ -2696,8 +2676,8 @@ var parse;
         /*
         * // TODO Implement this comment.
         *
-        * If the ParserRule only contains one Terminal,
-        * or one ParserRule, then it's moved up.
+        * If the IParserRule only contains one Terminal,
+        * or one IParserRule, then it's moved up.
         *
         * This way when it comes to the actual parsing,
         * have managed to chop out a few functions calls.
@@ -2760,22 +2740,16 @@ var parse;
             return id;
         };
 
-        ParserRuleImplementation.prototype.parseInner = function (input, parseInput, callback, debugCallback, name) {
+        ParserRuleImplementation.prototype.parseInner = function (input, parseInput, callback, name) {
             if (input === undefined || input === null) {
                 throw new Error("no 'input' value provided");
-            }
-
-            if (debugCallback !== undefined && debugCallback !== null && !isFunction(debugCallback)) {
-                throw new Error("Invalid debugCallback object given");
             }
 
             var self = this, start = Date.now();
 
             this.parseSymbols(input, parseInput, name, function (symbols, compileTime, symbolsTime) {
                 if (symbols.hasErrors()) {
-                    callParseDebug(debugCallback, symbols, compileTime, symbolsTime, 0, Date.now() - start);
-
-                    callback([], symbols.getErrors());
+                    callback([], symbols.getErrors(), newTimeResult(compileTime, symbolsTime, 0, Date.now() - start));
                 } else {
                     var rulesStart = Date.now();
                     var result = self.parseRules(symbols, input, parseInput);
@@ -2783,9 +2757,7 @@ var parse;
 
                     var preUtil = Date.now();
                     util.future.run(function () {
-                        callParseDebug(debugCallback, symbols, compileTime, symbolsTime, rulesTime, Date.now() - start);
-
-                        callback(result.result, result.errors);
+                        callback(result.result, result.errors, newTimeResult(compileTime, symbolsTime, rulesTime, Date.now() - start));
                     });
                 }
             });
@@ -2825,7 +2797,7 @@ var parse;
             util.future.run(function () {
                 var symbolsTime = Date.now();
                 var symbols = _this.parseSymbolsInner(input, parseInput, name);
-                var symbolsTime = Date.now() - symbolsTime;
+                symbolsTime = Date.now() - symbolsTime;
 
                 callback(symbols, compileTime, symbolsTime);
             });
@@ -3772,7 +3744,7 @@ var parse;
         };
 
         /**
-        * Used for creating a special ParserRule, which cannot be altered,
+        * Used for creating a special IParserRule, which cannot be altered,
         * that creates a list of rules.
         *
         * These rules are seperated by the seperator given. For example for
@@ -4703,17 +4675,17 @@ var quby;
         * Really it's just a big if-statement underneath, as JS's
         * standard switch-case is much slower than if.
         *
-        Example Code:
-        
-        case n
-        when 1, f(), 3 then doSomething()
-        when abc; doThat()
-        when 5
-        doSomethingElse()
-        else
-        blah()
-        end
-        
+        * Example Code:
+        *
+        *      case n
+        *          when 1, f(), 3 then doSomething()
+        *          when abc; doThat()
+        *          when 5
+        *              doSomethingElse()
+        *          else
+        *              blah()
+        *      end
+        *
         */
         var CaseWhen = (function (_super) {
             __extends(CaseWhen, _super);
@@ -4884,7 +4856,7 @@ var quby;
                     var extendName = this.extendId.getLower();
                     var extendStr = this.extendId.getMatch();
 
-                    if (name == extendName) {
+                    if (name === extendName) {
                         v.parseError(this.offset, "Class '" + this.match + "' is extending itself.");
                     } else if (quby.runtime.isCoreClass(name)) {
                         v.parseError(this.offset, "Core class '" + this.match + "' cannot extend alternate class '" + extendStr + "'.");
@@ -5065,6 +5037,9 @@ var quby;
                 this.header = header;
             };
 
+            /*
+            * This prints out the methods which are added just for this class.
+            */
             ExtensionClassDeclaration.prototype.print = function (p) {
                 p.setCodeMode(false);
 
@@ -5204,6 +5179,10 @@ var quby;
 
             FunctionDeclaration.prototype.validate = function (v) {
                 var isOutFun = true;
+
+                if (this.isFunction() && v.isInsideClassDeclaration()) {
+                    this.setType(FunctionDeclaration.METHOD);
+                }
 
                 if (v.isInsideFun()) {
                     var otherFun = v.getCurrentFun();
@@ -5419,7 +5398,9 @@ var quby;
 
         /**
         * @param offset The source code offset for this Expr.
-        * @param isResultBool An optimization flag. Pass in true if the result of this Expression will always be a 'true' or 'false'. Optional, and defaults to false.
+        * @param isResultBool An optimization flag.
+        * Pass in true if the result of this Expression will always be a 'true' or 'false'.
+        * Optional, and defaults to false.
         */
         var Expr = (function (_super) {
             __extends(Expr, _super);
@@ -5632,8 +5613,8 @@ var quby;
 
             MethodCall.prototype.appendLeft = function (expr) {
                 if (this.expr !== null) {
-                    if (this.expr['appendLeft'] !== undefined) {
-                        this.expr['appendLeft'](expr);
+                    if (this.expr["appendLeft"] !== undefined) {
+                        this.expr["appendLeft"](expr);
                     }
                 } else {
                     this.expr = expr;
@@ -5673,7 +5654,7 @@ var quby;
                         var superCallName = header.getSuperCallName();
                         _this.superKlassVal = v.getClass(superCallName);
 
-                        if (_this.superKlassVal == undefined) {
+                        if (_this.superKlassVal === undefined) {
                             if (!quby.runtime.isCoreClass(header.getSuperName().toLowerCase())) {
                                 v.parseError(_this.offset, "Calling super to a non-existant super class: '" + header.getSuperName() + "'.");
                             }
@@ -6015,6 +5996,9 @@ var quby;
                 _super.call(this, offset, isResultBool);
 
                 this.balanceDone = false;
+
+                // for debugging
+                //this.balanceDone = true;
                 this.precedence = precedence;
                 this.proxy = null;
             }
@@ -6334,8 +6318,8 @@ var quby;
 
             Op.prototype.appendLeft = function (left) {
                 if (this.left !== null) {
-                    if (this.left['appendLeft'] !== undefined) {
-                        this.left['appendLeft'](left);
+                    if (this.left["appendLeft"] !== undefined) {
+                        this.left["appendLeft"](left);
                     }
                 } else if (left) {
                     this.setOffset(left.offset);
@@ -6349,7 +6333,7 @@ var quby;
         ast.Op = Op;
 
         /**
-        *_ Most of the operators just extend quby.syntax.Op,
+        * Most of the operators just extend quby.syntax.Op,
         * without adding anything to it.
         *
         * This is a helper function to make that shorthand.
@@ -6358,11 +6342,11 @@ var quby;
         * @param {number} precedence The precendence for this operator.
         * @param isResultBool Optional, true if the result is a boolean, otherwise it defaults to false.
         */
-        var newShortOp = function (symbol, precedence, isResultBool) {
+        function newShortOp(symbol, precedence, isResultBool) {
             return function (left, right) {
                 return new Op(left, right, symbol, isResultBool, precedence);
             };
-        };
+        }
 
         /*
         * These are in order of precedence,
@@ -6556,7 +6540,7 @@ var quby;
             Assignment.prototype.validateOp = function (v) {
                 var left = this.getLeft();
 
-                if (left['setAssignment'] === undefined) {
+                if (left["setAssignment"] === undefined) {
                     v.parseError(left.getOffset() || this.getOffset(), "Illegal assignment");
                 } else {
                     left.setAssignment(v, this);
@@ -6567,14 +6551,14 @@ var quby;
 
             Assignment.prototype.printOp = function (p) {
                 if (this.isCollectionAssignment) {
-                    p.append('quby_setCollection(');
+                    p.append("quby_setCollection(");
                     this.getLeft().print(p);
-                    p.append(',');
+                    p.append(",");
                     this.getRight().print(p);
-                    p.append(')');
+                    p.append(")");
                 } else {
                     this.getLeft().print(p);
-                    p.append('=');
+                    p.append("=");
                     this.getRight().print(p);
                 }
             };
@@ -7599,6 +7583,17 @@ var quby;
     (function (core) {
         var STATEMENT_END = ';\n';
 
+        function newTimeResult(parseTime, validateTime, totalTime) {
+            return {
+                parseCompile: parseTime.compile,
+                parseSymbols: parseTime.symbols,
+                parseRules: parseTime.rules,
+                parseTotal: parseTime.total,
+                validatorTotal: validateTime,
+                total: totalTime
+            };
+        }
+
         
 
         function handleError(errHandler, err, throwErr) {
@@ -7629,7 +7624,12 @@ var quby;
         function runParser(instance, validator, errHandler) {
             instance.lock();
 
-            quby.parser.parseSource(instance.getSource(), instance.getName(), function (program, errors) {
+            var debugFun = instance.getDebugFun();
+            var start = Date.now();
+
+            quby.parser.parseSource(instance.getSource(), instance.getName(), function (program, errors, parserTime) {
+                var validateStart = Date.now();
+
                 validator.errorHandler(errHandler);
                 validator.adminMode(instance.isAdmin());
                 validator.strictMode(instance.isStrict());
@@ -7641,11 +7641,17 @@ var quby;
                 }
 
                 var callback = instance.getFinishedFun();
+                var validateTime = Date.now() - validateStart;
+                var totalTime = Date.now() - start;
+
+                if (debugFun) {
+                    debugFun(newTimeResult(parserTime, validateTime, totalTime));
+                }
 
                 if (callback) {
                     util.future.runFun(callback);
                 }
-            }, instance.getDebugFun());
+            });
         }
         core.runParser = runParser;
 
@@ -7804,7 +7810,7 @@ var quby;
                     if (!oldKlassHead.hasSuper() && klassHead.hasSuper()) {
                         oldKlass.setHeader(klassHead);
                     } else if (oldKlassHead.hasSuper() && klassHead.hasSuper()) {
-                        if (oldKlassHead.getSuperCallName() != klassHead.getSuperCallName()) {
+                        if (oldKlassHead.getSuperCallName() !== klassHead.getSuperCallName()) {
                             this.parseError(klass.getOffset(), "Super class cannot be redefined for class '" + klass.getName() + "'.");
                         }
                     }
@@ -7953,7 +7959,7 @@ var quby;
                 var stop = this.isInsideFun() ? this.vars.length - this.funCount : 0;
 
                 for (var i = this.vars.length - 1; i >= stop; i--) {
-                    if (this.vars[i][id] != undefined) {
+                    if (this.vars[i][id] !== undefined) {
                         return true;
                     }
                 }
@@ -8227,34 +8233,59 @@ var quby;
             };
 
             Validator.prototype.endValidateInner = function () {
-                for (var usedFunsI in this.usedFunsStack) {
-                    var fun = this.usedFunsStack[usedFunsI];
+                /*
+                * Go through all function calls we have stored, which have not been
+                * confirmed as being defined. Note this can include multiple calls
+                * to the same functions.
+                */
+                var funs = this.funs;
+                var usedFunsStack = this.usedFunsStack;
+                var usedFunsStackKeys = Object.keys(usedFunsStack);
+
+                for (var i = 0; i < usedFunsStackKeys.length; i++) {
+                    var fun = usedFunsStack[usedFunsStackKeys[i]];
                     var callName = fun.getCallName();
 
                     // check if the function is not defined
-                    if (this.funs[callName] === undefined) {
-                        this.searchMissingFunAndError(fun, this.funs, 'function');
+                    if (funs[callName] === undefined) {
+                        this.searchMissingFunAndError(fun, funs, 'function');
                     }
                 }
 
-                for (var strGlobal in this.usedGlobals) {
-                    if (this.globals[strGlobal] === undefined) {
-                        var global = this.usedGlobals[strGlobal];
+                /* Check all used globals were assigned to, at some point. */
+                var globals = this.globals;
+                var usedGlobals = this.usedGlobals;
+                var usedGlobalsKeys = Object.keys(usedGlobals);
+
+                for (var i = 0; i < usedGlobalsKeys.length; i++) {
+                    var strGlobal = usedGlobalsKeys[i];
+
+                    if (globals[strGlobal] === undefined) {
+                        var global = usedGlobals[strGlobal];
 
                         this.parseError(global.getOffset(), "Global used but never assigned to: '" + global.getName() + "'.");
                     }
                 }
 
-                for (var klassI in this.classes) {
-                    this.classes[klassI].endValidate();
+                /* finalise all classes */
+                var classes = this.classes;
+                var classesKeys = Object.keys(classes);
+                var classesKeysLength = classesKeys.length;
+
+                for (var i = 0; i < classesKeysLength; i++) {
+                    classes[classesKeys[i]].endValidate();
                 }
 
-                for (var methodI in this.calledMethods) {
-                    var methodFound = false;
-                    var method = this.calledMethods[methodI];
+                /* Ensure all called methods do exist (somewhere) */
+                var calledMethods = this.calledMethods;
+                var calledMethodKeys = Object.keys(calledMethods);
 
-                    for (var klassI in this.classes) {
-                        if (this.classes[klassI].hasFun(method)) {
+                for (var i = 0; i < calledMethodKeys.length; i++) {
+                    var method = calledMethods[calledMethodKeys[i]];
+                    var methodFound = false;
+
+                    for (var j = 0; j < classesKeysLength; j++) {
+                        if (classes[classesKeys[j]].hasFun(method)) {
                             methodFound = true;
                             break;
                         }
@@ -8361,6 +8392,11 @@ var quby;
                 }
             };
 
+            /*
+            * Of all the things this does, it also prints out the methods which
+            * classes inherit from the QubyObject (as this is the parent of all
+            * objects).
+            */
             Validator.prototype.generatePreCode = function (p) {
                 this.methodNames.print(p);
                 this.symbols.print(p);
@@ -8375,6 +8411,7 @@ var quby;
                 if (stmts !== null) {
                     for (var i = 0; i < classes.length; i++) {
                         var name = classes[i];
+
                         p.appendExtensionClassStmts(name, stmts);
                     }
                 }
@@ -8441,7 +8478,7 @@ var quby;
 
                         if (found !== null) {
                             // wrong number of parameters
-                            if (found.getName().toLowerCase() == methodName) {
+                            if (found.getName().toLowerCase() === methodName) {
                                 return found;
                                 // alternative name
                             } else if (altMethod === null) {
@@ -8486,7 +8523,7 @@ var quby;
                         for (var j = 0; j < altNames.length; j++) {
                             var altName = altNames[j];
 
-                            if (searchName == altName) {
+                            if (searchName === altName) {
                                 altFun = searchFun;
                                 break;
                             }
@@ -8567,22 +8604,30 @@ var quby;
             };
 
             LateFunctionBinder.prototype.endValidate = function (globalFuns) {
-                for (var className in this.classVals) {
-                    var klassV = this.classVals[className];
-                    var funs = this.classFuns[className];
+                var classFuns = this.classFuns;
+                var classVals = this.classVals;
+                var classValsKeys = Object.keys(classVals);
 
-                    for (var funName in funs) {
+                for (var i = 0; i < classValsKeys.length; i++) {
+                    var className = classValsKeys[i];
+                    var klassV = classVals[className];
+                    var funs = classFuns[className];
+                    var funsKeys = Object.keys(funs);
+
+                    for (var j = 0; j < funsKeys.length; j++) {
+                        var funName = funsKeys[j];
                         var innerFuns = funs[funName];
                         var fun = innerFuns[0];
 
                         if (klassV.hasFunInHierarchy(fun)) {
-                            for (var i = 0; i < innerFuns.length; i++) {
-                                innerFuns[i].setIsMethod();
+                            for (var k = 0; k < innerFuns.length; k++) {
+                                innerFuns[k].setIsMethod();
                             }
                         } else if (!globalFuns[funName]) {
-                            for (var i = 0; i < innerFuns.length; i++) {
-                                var f = innerFuns[i];
-                                this.validator.parseError(f.getOffset(), "Function '" + f.getName() + "' called with " + f.getNumParameters() + " parameters, but is not defined in this class or as a function.");
+                            for (var k = 0; k < innerFuns.length; k++) {
+                                var f = innerFuns[k];
+
+                                this.validator.parseError(f.getOffset(), "Undefined function '" + f.getName() + "' called with " + f.getNumParameters() + " parameters," + " but is not defined in this class or as a function.");
                             }
                         }
                     }
@@ -9030,8 +9075,8 @@ var quby;
                 this.stmts = [];
                 this.preOrStmts = this.stmts;
 
-                this.currentPre = new PrinterStatement();
-                this.currentStmt = new PrinterStatement();
+                this.currentPre = newPrinterStatement();
+                this.currentStmt = newPrinterStatement();
                 this.current = this.currentStmt;
 
                 this.isCode = true;
@@ -9075,13 +9120,21 @@ var quby;
             Printer.prototype.appendExtensionClassStmts = function (name, stmts) {
                 var stmtsStart = quby.runtime.translateClassName(name) + '.prototype.';
 
-                for (var key in stmts) {
-                    var fun = stmts[key];
+                for (var i = 0; i < stmts.length; i++) {
+                    var fun = stmts[i];
 
-                    if (fun.isConstructor()) {
+                    // todo this shouldn't need a type check,
+                    // should be more type safe
+                    if (fun['isConstructor'] && fun.isConstructor()) {
                         fun.print(this);
                     } else {
                         this.append(stmtsStart);
+
+                        if (!window['quby_doOnce']) {
+                            console.log(fun);
+
+                            window['quby_doOnce'] = true;
+                        }
                         fun.print(this);
                     }
 
@@ -9103,51 +9156,38 @@ var quby;
             };
 
             Printer.prototype.endStatement = function () {
-                this.append(STATEMENT_END);
+                this.current.appendNow(STATEMENT_END);
 
                 return this.flush();
             };
 
             Printer.prototype.toString = function () {
-                // concat everything into this.pre ...
+                // finish pre and stmts sections and then concat them out together
                 this.currentPre.flush(this.pre);
-                util.array.addAll(this.pre, this.stmts);
-                this.currentStmt.flush(this.pre); // yes, pass in pre!
+                this.currentStmt.flush(this.stmts);
 
-                return this.pre.join('');
+                return this.pre.join('') + this.stmts.join('');
             };
 
             Printer.prototype.appendPre = function (a) {
-                if (arguments.length === 1) {
-                    this.current.appendPre(a);
-                } else {
-                    for (var i = 0; i < arguments.length; i++) {
-                        this.current.appendPre(arguments[i]);
-                    }
+                for (var i = 0; i < arguments.length; i++) {
+                    this.preOrStmts.push(arguments[i]);
                 }
 
                 return this;
             };
 
             Printer.prototype.append = function (a) {
-                if (arguments.length === 1) {
-                    this.current.appendNow(a);
-                } else {
-                    for (var i = 0; i < arguments.length; i++) {
-                        this.current.appendNow(arguments[i]);
-                    }
+                for (var i = 0; i < arguments.length; i++) {
+                    this.current.appendNow(arguments[i]);
                 }
 
                 return this;
             };
 
             Printer.prototype.appendPost = function (a) {
-                if (arguments.length === 1) {
-                    this.current.appendPost(a);
-                } else {
-                    for (var i = 0; i < arguments.length; i++) {
-                        this.current.appendPost(arguments[i]);
-                    }
+                for (var i = 0; i < arguments.length; i++) {
+                    this.current.appendPost(arguments[i]);
                 }
 
                 return this;
@@ -9156,109 +9196,44 @@ var quby;
         })();
         core.Printer = Printer;
 
-        // Chrome is much faster at iterating over the arguments array,
-        // maybe I'm hitting an optimization???
-        // see: http://jsperf.com/skip-arguments-check
-        if (util.browser.isChrome) {
-            Printer.prototype.appendPre = function () {
-                for (var i = 0; i < arguments.length; i++) {
-                    this.current.appendPre(arguments[i]);
-                }
+        
 
-                return this;
-            };
-            Printer.prototype.append = function () {
-                for (var i = 0; i < arguments.length; i++) {
-                    this.current.appendNow(arguments[i]);
-                }
+        function newPrinterStatement() {
+            return {
+                currentLength: 0,
+                currentStatement: [],
+                postLength: 0,
+                postStatement: [],
+                appendNow: function (e) {
+                    this.currentStatement[this.currentLength++] = e;
+                },
+                appendPost: function (e) {
+                    this.postStatement[this.postLength++] = e;
+                },
+                flush: function (dest) {
+                    var currentLength = this.currentLength;
+                    var postLength = this.postLength;
 
-                return this;
-            };
-            Printer.prototype.appendPost = function () {
-                for (var i = 0; i < arguments.length; i++) {
-                    this.current.appendPost(arguments[i]);
-                }
+                    var destI = dest.length;
 
-                return this;
+                    if (currentLength !== 0) {
+                        var currentStatement = this.currentStatement;
+                        for (var i = 0; i < currentLength; i++) {
+                            dest[destI++] = currentStatement[i];
+                        }
+                        this.currentLength = 0;
+                    }
+
+                    if (postLength !== 0) {
+                        var postStatement = this.postStatement;
+                        for (var i = 0; i < postLength; i++) {
+                            dest[destI++] = postStatement[i];
+                        }
+                        this.postLength = 0;
+                    }
+                }
             };
         }
-
-        var PrinterStatement = (function () {
-            function PrinterStatement() {
-                this.preStatement = null;
-                this.currentStatement = null;
-                this.postStatement = null;
-            }
-            PrinterStatement.prototype.appendPre = function (e) {
-                if (this.preStatement === null) {
-                    this.preStatement = [e];
-                } else {
-                    this.preStatement.push(e);
-                }
-            };
-            PrinterStatement.prototype.appendNow = function (e) {
-                if (this.currentStatement === null) {
-                    this.currentStatement = [e];
-                } else {
-                    this.currentStatement.push(e);
-                }
-            };
-            PrinterStatement.prototype.appendPost = function (e) {
-                if (this.postStatement === null) {
-                    this.postStatement = [e];
-                } else {
-                    this.postStatement.push(e);
-                }
-            };
-
-            PrinterStatement.prototype.endAppend = function (dest, src) {
-                for (var i = 0, len = src.length; i < len; i++) {
-                    dest[dest.length] = src[i];
-                }
-            };
-
-            PrinterStatement.prototype.flush = function (stmts) {
-                if (this.preStatement !== null) {
-                    if (this.currentStatement !== null) {
-                        if (this.postStatement !== null) {
-                            this.endAppend(stmts, this.preStatement);
-                            this.endAppend(stmts, this.currentStatement);
-                            this.endAppend(stmts, this.postStatement);
-                        } else {
-                            this.endAppend(stmts, this.preStatement);
-                            this.endAppend(stmts, this.currentStatement);
-                        }
-                    } else if (this.postStatement !== null) {
-                        this.endAppend(stmts, this.preStatement);
-                        this.endAppend(stmts, this.postStatement);
-                    } else {
-                        this.endAppend(stmts, this.preStatement);
-                    }
-
-                    this.clear();
-                } else if (this.currentStatement !== null) {
-                    if (this.postStatement !== null) {
-                        this.endAppend(stmts, this.currentStatement);
-                        this.endAppend(stmts, this.postStatement);
-                    } else {
-                        this.endAppend(stmts, this.currentStatement);
-                    }
-
-                    this.clear();
-                } else if (this.postStatement !== null) {
-                    this.endAppend(stmts, this.postStatement);
-
-                    this.clear();
-                }
-            };
-
-            PrinterStatement.prototype.clear = function () {
-                this.preStatement = null;
-                this.currentStatement = null;
-                this.postStatement = null;
-            };
-            return PrinterStatement;
-        })();
     })(quby.core || (quby.core = {}));
     var core = quby.core;
 })(quby || (quby = {}));
@@ -10437,10 +10412,10 @@ var quby;
 
             if (term === terminals.identifiers.variableName) {
                 return new quby.ast.LocalVariable(identifier);
-            } else if (term === terminals.identifiers.global) {
-                return new quby.ast.GlobalVariable(identifier);
             } else if (term === terminals.identifiers.objectField) {
                 return new quby.ast.FieldVariable(identifier);
+            } else if (term === terminals.identifiers.global) {
+                return new quby.ast.GlobalVariable(identifier);
             } else if (term === terminals.keywords.THIS) {
                 return new quby.ast.ThisVariable(identifier);
             } else if (identifier instanceof quby.ast.JSVariable) {
@@ -10814,11 +10789,16 @@ var quby;
         * Call this, pass in the code, and a callback so your informed
         * about when it's done.
         *
+        * Name is picked by you and is used for error reporting. You
+        * can use any name you like but typically this should be the
+        * name of the file the code comes from. Something else however
+        * is also appropriate.
+        *
         * @param src The source code to parse.
+        * @param name The name of the source code being parsed, i.e. it's file name.
         * @param onFinish The function to call when parsing has finished.
-        * @param onDebug An optional callback, for sending debug information into.
         */
-        function parseSource(src, name, onFinish, onDebug) {
+        function parseSource(src, name, onFinish) {
             // print out how long it took to pre-parse the code
             var start = Date.now();
             var codeSrc = preParse(src);
@@ -10828,8 +10808,7 @@ var quby;
                 name: name,
                 src: src,
                 inputSrc: codeSrc,
-                onFinish: onFinish,
-                onDebug: onDebug || null
+                onFinish: onFinish
             });
         }
         parser.parseSource = parseSource;
@@ -11311,7 +11290,7 @@ var quby;
                 var field = parts[0];
                 var fieldClass = parts[1];
 
-                if (fieldClass.toLowerCase() != thisClass.toLowerCase()) {
+                if (fieldClass.toLowerCase() !== thisClass.toLowerCase()) {
                     msg = "Field '" + field + "' from class '" + fieldClass + "' is illegally accessed from sub or super class '" + thisClass + "'.";
                 } else {
                     msg = "Field '" + field + "' is being accessed before being assigned to in class '" + thisClass + "'.";
@@ -11381,7 +11360,7 @@ var quby;
                     // take into account the noMethodStubs when searching for alternatives
                     // (skip the noMethod's)
                     var funs = window[quby.runtime.FUNCTION_DEFAULT_TABLE_NAME];
-                    if (!funs || (callName != keyCallName && funs[keyCallName] != obj[keyCallName])) {
+                    if (!funs || (callName !== keyCallName && funs[keyCallName] !== obj[keyCallName])) {
                         quby.runtime.runtimeError("Method: '" + methodName + "' called with incorrect number of arguments (" + args.length + ") on object of type '" + quby.runtime.identifyObject(obj) + "'");
                     }
                 }
@@ -11844,7 +11823,7 @@ QubyHash.prototype.contains = function (key) {
     var keyHash = this.hash(key);
     var vals = this.values[keyHash];
 
-    if (vals != undefined) {
+    if (vals !== undefined) {
         for (var i = 0, len = vals.length; i < len; i++) {
             if (key == vals[i].key) {
                 return true;
