@@ -128,7 +128,7 @@ module quby.parser {
 
     var isAlphaCode = function ( code: number ): boolean {
         return ( code >= LOWER_A && code <= LOWER_Z );
-    }
+    };
 
     /**
      * Returns true if the character in src,
@@ -418,7 +418,7 @@ module quby.parser {
          * If it contains a semi-colon however,
          * this will fail.
          */
-        endOfLine: function ( src, origI, code, len ) {
+        endOfLine: function ( src:string, origI:number, code:number, len:number ) {
             var i = origI;
 
             if ( code === SLASH_N ) {
@@ -523,7 +523,7 @@ module quby.parser {
             JSUndefined: '#undefined',
             JSNull: '#null',
 
-            symbol: function ( src, i, code, len ) {
+            symbol: function ( src:string, i:number, code:number, len:number ) {
                 if ( code === COLON ) {
                     code = src.charCodeAt( i + 1 );
 
@@ -598,7 +598,7 @@ module quby.parser {
             subtract: '-',
             modulus: '%',
 
-            colon: function ( src, i, code, len ) {
+            colon: function ( src:string, i:number, code:number, len:number ) {
                 if ( code === COLON ) {
                     code = src.charCodeAt( i + 1 );
 
@@ -642,7 +642,7 @@ module quby.parser {
         },
 
         identifiers: {
-            variableName: function ( src, i, code, len ) {
+            variableName: function ( src:string, i:number, code:number, len:number ) {
                 if (
                         // is a lower case letter, or underscore
                         ( code >= 97 && code <= 122 ) ||
@@ -655,7 +655,7 @@ module quby.parser {
 
                 return 0;
             },
-            global: function ( src, i, code, len ) {
+            global: function ( src:string, i:number, code:number, len:number ) {
                 if ( code === DOLLAR ) {
                     while ( isAlphaNumericCode( src.charCodeAt( ++i ) ) ) { }
                     return i;
@@ -663,7 +663,7 @@ module quby.parser {
 
                 return 0;
             },
-            objectField: function ( src, i, code, len ) {
+            objectField: function ( src:string, i:number, code:number, len:number ) {
                 if ( code === AT ) {
                     while ( isAlphaNumericCode( src.charCodeAt( ++i ) ) ) { }
                     return i;
@@ -722,7 +722,7 @@ module quby.parser {
                 terminals.symbols.leftBrace,
                 terminals.symbols.leftSquare
             ],
-            function ( src, i, code, len ) {
+            function ( src:string, i:number, code:number, len:number ) {
                 while (
                         code === SPACE ||
                         code === SLASH_N ||
@@ -733,9 +733,9 @@ module quby.parser {
 
                 return i;
             }
-    );
+        );
 
-    var inlinePostMatch = function ( src, i, code, len ) {
+    var inlinePostMatch = function ( src:string, i:number, code:number, len:number ) {
         /*
          * Jump in segments of 3, and then check if we hit the
          * closing #># at the beginning, middle or end.
@@ -786,7 +786,7 @@ module quby.parser {
 
     terminals.symbols.comma.onMatch( function () {
         return null;
-    })
+    });
 
     /* The onMatch callbacks for altering the symbols when matched. */
     terminals.literals.TRUE.onMatch( function ( symbol ) {
@@ -881,9 +881,9 @@ module quby.parser {
                     terminals.identifiers.variableName,
                     terminals.identifiers.global
                 ).
-            onMatch( function ( hash, name ) {
-                return new quby.ast.JSVariable( name );
-            })
+                onMatch( function ( hash, name ) {
+                    return new quby.ast.JSVariable( name );
+                })
         ).
         onMatch( function ( identifier ) {
             var term = identifier.terminal;
@@ -916,11 +916,11 @@ module quby.parser {
     var singleOpExpr = parse.
         name( 'operator' ).
         either(
-        terminals.ops.plus,
-        terminals.ops.subtract,
-        terminals.ops.not,
+            terminals.ops.plus,
+            terminals.ops.subtract,
+            terminals.ops.not,
 
-        terminals.admin.jsTypeOf
+            terminals.admin.jsTypeOf
         ).
         then( expr ).
         onMatch( function ( op, expr ) {
@@ -936,6 +936,7 @@ module quby.parser {
                 return new quby.ast.JSTypeOf( expr );
             } else {
                 log( op );
+
                 throw new Error( "Unknown singleOpExpr match" );
             }
         });
@@ -1162,13 +1163,13 @@ module quby.parser {
             } );
 
     var lambda = parse.
-            name('lambda').
+            name( 'lambda' ).
             a( terminals.keywords.DEF, parameterDefinition ).
             optional( statements ).
             then( terminals.keywords.END ).
-            onMatch( (def, params, stmts, end) =>
+            onMatch( ( def, params, stmts, end ) =>
                 new quby.ast.Lambda( params, stmts )
-            )
+            );
 
     var functionCall = parse.
             name('function call').
@@ -1218,31 +1219,31 @@ module quby.parser {
             optional( block ).
             onMatch( function(dot, hash, name, exprs, block):quby.ast.FunctionCall {
                 if (hash === null) {
-                    return new quby.ast.MethodCall(null, name, exprs, block)
+                    return new quby.ast.MethodCall( null, name, exprs, block );
                 } else {
-                    return new quby.ast.JSMethodCall(null, name, exprs, block)
+                    return new quby.ast.JSMethodCall( null, name, exprs, block );
                 }
-            } );
+            });
 
     var newInstance = parse.
             name( 'new object' ).
             a( terminals.keywords.NEW ).
             either(
-                    parse.
-                            a( terminals.identifiers.variableName ).
-                            then( parameterExprs ).
-                            optional( block ).
-                            onMatch( (name, params, block) =>
-                                new quby.ast.NewInstance( name, params, block )
-                            ),
+                parse.
+                    a( terminals.identifiers.variableName ).
+                    then( parameterExprs ).
+                    optional( block ).
+                    onMatch( ( name, params, block ) =>
+                        new quby.ast.NewInstance( name, params, block )
+                    ),
 
-                    parse.
-                            a( expr ).
-                            onMatch( (expr) =>
-                                new quby.ast.JSNewInstance( expr )
-                            )
+                parse.
+                    a( expr ).
+                    onMatch( ( expr ) =>
+                        new quby.ast.JSNewInstance( expr )
+                    )
             ).
-            onMatch( (nw, newInstance) => newInstance )
+            onMatch( ( nw, newInstance ) => newInstance );
 
     var exprInParenthesis = parse.
             a( terminals.symbols.leftBracket ).
@@ -1251,7 +1252,7 @@ module quby.parser {
             then( terminals.symbols.rightBracket ).
             onMatch( function( left, expr, endOfLine, right ) {
                 return new quby.ast.ExprParenthesis( expr );
-            } );
+            });
 
     /**
      * These add operations on to the end of an expr.
@@ -1605,16 +1606,20 @@ module quby.parser {
      *
      * Call this, pass in the code, and a callback so your informed
      * about when it's done.
+     * 
+     * Name is picked by you and is used for error reporting. You 
+     * can use any name you like but typically this should be the 
+     * name of the file the code comes from. Something else however
+     * is also appropriate.
      *
      * @param src The source code to parse.
+     * @param name The name of the source code being parsed, i.e. it's file name.
      * @param onFinish The function to call when parsing has finished.
-     * @param onDebug An optional callback, for sending debug information into.
      */
     export function parseSource(
             src: string,
             name: string,
-            onFinish: ( program: quby.ast.ISyntax, errors: parse.ParseError[] ) => void ,
-            onDebug: parse.DebugCallback
+            onFinish: ( program: quby.ast.ISyntax, errors: parse.ParseError[], time: parse.ITimeResult ) => void
     ) {
         // print out how long it took to pre-parse the code
         var start = Date.now();
@@ -1626,8 +1631,7 @@ module quby.parser {
             src: src,
             inputSrc: codeSrc,
 
-            onFinish: onFinish,
-            onDebug: onDebug || null
+            onFinish: onFinish
         });
     }
 }

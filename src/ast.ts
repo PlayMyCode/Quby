@@ -56,7 +56,7 @@ module quby.ast {
         LOWER_B = 'b'.charCodeAt( 0 ),
         LOWER_F = 'f'.charCodeAt( 0 ),
         LOWER_X = 'x'.charCodeAt( 0 );
-    
+
     function errorIfIntSizeUnsafe( v: quby.core.Validator, numObj:quby.ast.Number, n: number ) {
         if ( n > MAX_SAFE_INT ) {
             v.parseError( numObj.getOffset(), "Number value is too large (yes, too large); JS cannot safely represent '" + n + "'" );
@@ -306,7 +306,7 @@ module quby.ast {
          * an existing offset.
          * 
          * @param offset The Symbol for use for displaying the file offset information.
-         */ 
+         */
         setOffset(offset: parse.Symbol) {
             this.offset = offset;
         }
@@ -742,17 +742,17 @@ module quby.ast {
      * Really it's just a big if-statement underneath, as JS's
      * standard switch-case is much slower than if.
      * 
-       Example Code:
-
-            case n
-                when 1, f(), 3 then doSomething()
-                when abc; doThat()
-                when 5
-                    doSomethingElse()
-                else
-                    blah()
-            end
-
+     * Example Code:
+     *
+     *      case n
+     *          when 1, f(), 3 then doSomething()
+     *          when abc; doThat()
+     *          when 5
+     *              doSomethingElse()
+     *          else
+     *              blah()
+     *      end
+     *
      */
     export class CaseWhen extends Syntax {
         private condition: IExpr;
@@ -804,8 +804,7 @@ module quby.ast {
 
             var whenClauses = this.whenClauses;
             for (var i = 0; i < whenClauses.length; i++) {
-                whenClauses[i].printClause(p, temp, i === 0);
-                
+                whenClauses[i].printClause( p, temp, i === 0 );
             }
 
             if (this.elseClause !== null) {
@@ -925,7 +924,7 @@ module quby.ast {
                 var extendName = this.extendId.getLower();
                 var extendStr = this.extendId.getMatch();
 
-                if (name == extendName) {
+                if ( name === extendName ) {
                     v.parseError(this.offset, "Class '" + this.match + "' is extending itself.");
                 } else if (quby.runtime.isCoreClass(name)) {
                     v.parseError(this.offset, "Core class '" + this.match + "' cannot extend alternate class '" + extendStr + "'.");
@@ -951,7 +950,7 @@ module quby.ast {
      * TODO
      */
     export class ModuleDeclaration extends Syntax {
-        constructor (symName, statements) {
+        constructor( symName, statements ) {
             super(symName);
         }
 
@@ -1007,7 +1006,7 @@ module quby.ast {
                     classHeader.offset,
                     name,
                     quby.runtime.formatClass( name )
-            )
+            );
 
             this.header = classHeader;
             this.statements = statements;
@@ -1113,11 +1112,14 @@ module quby.ast {
             this.header = header;
         }
 
+        /*
+         * This prints out the methods which are added just for this class.
+         */
         print(p: quby.core.Printer) {
             p.setCodeMode(false);
 
-            if (this.statements !== null) {
-                p.appendExtensionClassStmts(this.getName(), this.statements.getStmts());
+            if ( this.statements !== null ) {
+                p.appendExtensionClassStmts( this.getName(), this.statements.getStmts() );
             }
 
             p.setCodeMode(true);
@@ -1270,14 +1272,21 @@ module quby.ast {
             }
         }
 
-        validate(v: quby.core.Validator) {
+        validate( v: quby.core.Validator ) {
             var isOutFun = true;
 
-            if (v.isInsideFun()) {
-                var otherFun = v.getCurrentFun();
-                var strOtherType = (otherFun.isMethod() ? "method" : "function");
+            if ( this.isFunction() && v.isInsideClassDeclaration() ) {
+                this.setType( FunctionDeclaration.METHOD );
+            }
 
-                v.parseError(this.offset, "Function '" + this.getName() + "' is defined within " + strOtherType + " '" + otherFun.getName() + "', this is not allowed.");
+            if ( v.isInsideFun() ) {
+                var otherFun = v.getCurrentFun();
+                var strOtherType = ( otherFun.isMethod() ? "method" : "function" );
+
+                v.parseError( this.offset,
+                    "Function '" + this.getName() + "' is defined within " +
+                    strOtherType + " '" + otherFun.getName() + "', this is not allowed."
+                    );
                 this.isValid = false;
 
                 isOutFun = false;
@@ -1416,7 +1425,11 @@ module quby.ast {
                 this.setClass( v.getCurrentClass().getClass() );
 
                 if ( this.klass.isExtensionClass() ) {
-                    if ( !v.ensureAdminMode( this, "Cannot add constructor to core class: '" + v.getCurrentClass().getClass().getName() + "'" ) ) {
+                    if ( !v.ensureAdminMode( this,
+                            "Cannot add constructor to core class: '" +
+                            v.getCurrentClass().getClass().getName() +
+                            "'"
+                    ) ) {
                         this.setInvalid();
                     }
                 }
@@ -1481,7 +1494,9 @@ module quby.ast {
 
     /**
      * @param offset The source code offset for this Expr.
-     * @param isResultBool An optimization flag. Pass in true if the result of this Expression will always be a 'true' or 'false'. Optional, and defaults to false.
+     * @param isResultBool An optimization flag. 
+     * Pass in true if the result of this Expression will always be a 'true' or 'false'.
+     * Optional, and defaults to false.
      */
     export class Expr extends Syntax implements IExpr {
         private isResultBool: boolean;
@@ -1636,9 +1651,9 @@ module quby.ast {
                 this.functionGenerator = generator = getFunctionGenerator(v, this);
 
                 if (generator === null) {
-                    v.parseError(this.offset, "Function '" + this.getName() + "' called within the declaration of class '" + v.getCurrentClass().getClass().getName() + "', this is not allowed.");
-                } else if (this.block !== null) {
-                    v.parseError(this.offset, "'" + this.getName() + "' modifier of class '" + v.getCurrentClass().getClass().getName() + "', cannot use a block.");
+                    v.parseError( this.offset, "Function '" + this.getName() + "' called within the declaration of class '" + v.getCurrentClass().getClass().getName() + "', this is not allowed." );
+                } else if ( this.block !== null ) {
+                    v.parseError( this.offset, "'" + this.getName() + "' modifier of class '" + v.getCurrentClass().getClass().getName() + "', cannot use a block." );
                 } else {
                     generator.validate(v);
                 }
@@ -1706,8 +1721,8 @@ module quby.ast {
 
         appendLeft(expr: IExpr) {
             if (this.expr !== null) {
-                if (this.expr['appendLeft'] !== undefined) {
-                    this.expr['appendLeft'](expr);
+                if (this.expr["appendLeft"] !== undefined) {
+                    this.expr["appendLeft"](expr);
                 }
             } else {
                 this.expr = expr;
@@ -1728,9 +1743,9 @@ module quby.ast {
             this.superKlassVal = null;
         }
 
-        isConstructor() { return true }
-        isMethod() { return false }
-        isFunction() { return false }
+        isConstructor() { return true; }
+        isMethod() { return false; }
+        isFunction() { return false; }
 
         validate(v: quby.core.Validator) {
             if (v.ensureInConstructor(this, "Super can only be called from within a constructor.")) {
@@ -1741,7 +1756,7 @@ module quby.ast {
                     var superCallName = header.getSuperCallName();
                     this.superKlassVal = v.getClass(superCallName);
 
-                    if (this.superKlassVal == undefined) {
+                    if (this.superKlassVal === undefined) {
                         if (!quby.runtime.isCoreClass(header.getSuperName().toLowerCase())) {
                             v.parseError(this.offset, "Calling super to a non-existant super class: '" + header.getSuperName() + "'.");
                         }
@@ -2093,13 +2108,14 @@ module quby.ast {
          * parent, and the parent references this. So we must break this
          * chain whilst we call into the 'proxy' operator (and then 
          * re-build it after).
-         */ 
+         */
         private proxy: IExpr;
 
         constructor (offset: parse.Symbol, isResultBool:boolean, precedence:number) {
             super(offset, isResultBool);
 
             this.balanceDone = false;
+
             this.precedence = precedence;
             this.proxy = null;
         }
@@ -2419,8 +2435,8 @@ module quby.ast {
 
         appendLeft(left: IExpr) {
             if (this.left !== null) {
-                if (this.left['appendLeft'] !== undefined) {
-                    this.left['appendLeft'](left);
+                if (this.left["appendLeft"] !== undefined) {
+                    this.left["appendLeft"](left);
                 }
             } else if (left) {
                 this.setOffset(left.offset);
@@ -2432,7 +2448,7 @@ module quby.ast {
     }
 
     /**
-     *_ Most of the operators just extend quby.syntax.Op,
+     * Most of the operators just extend quby.syntax.Op,
      * without adding anything to it.
      *
      * This is a helper function to make that shorthand.
@@ -2441,12 +2457,10 @@ module quby.ast {
      * @param {number} precedence The precendence for this operator.
      * @param isResultBool Optional, true if the result is a boolean, otherwise it defaults to false.
      */
-    var newShortOp = function (symbol: string, precedence: number, isResultBool: boolean)
-            : new (left: IExpr, right: IExpr) => Op
-    {
-        return <new (left: IExpr, right: IExpr) => Op> <any> function (left: IExpr, right: IExpr) {
-            return new Op(left, right, symbol, isResultBool, precedence);
-        }
+    function newShortOp( symbol: string, precedence: number, isResultBool: boolean ) {
+        return <new ( left: IExpr, right: IExpr ) => Op> <any> function ( left: IExpr, right: IExpr ) {
+            return new Op( left, right, symbol, isResultBool, precedence );
+        };
     }
 
     /*
@@ -2630,7 +2644,7 @@ module quby.ast {
         validateOp( v:quby.core.Validator ) {
             var left = this.getLeft();
 
-            if ( left['setAssignment'] === undefined ) {
+            if ( left["setAssignment"] === undefined ) {
                 v.parseError( left.getOffset() || this.getOffset(), "Illegal assignment" );
             } else {
                 (<IAssignable>left).setAssignment(v, this);
@@ -2641,14 +2655,14 @@ module quby.ast {
 
         printOp( p:quby.core.Printer ) {
             if ( this.isCollectionAssignment ) {
-                p.append('quby_setCollection(');
+                p.append("quby_setCollection(");
                 this.getLeft().print(p);
-                p.append(',');
+                p.append(",");
                 this.getRight().print(p);
-                p.append(')');
+                p.append(")");
             } else {
                 this.getLeft().print(p);
-                p.append('=');
+                p.append("=");
                 this.getRight().print(p);
             }
         }
@@ -2800,8 +2814,8 @@ module quby.ast {
                 this.klass = klass;
 
                 // set the correct field callName
-                this.setCallName( 
-                        quby.runtime.formatField( klass.getName(), name )
+                this.setCallName(
+                    quby.runtime.formatField( klass.getName(), name )
                 );
 
                 if (name.length === 0) {
@@ -3175,6 +3189,9 @@ module quby.ast {
                     errorIfIntSizeUnsafe( v, this, (<any> numStr) | 0 );
                 }
 
+            /*
+             * 0b - Binary number
+             */
             } else if ( code === ZERO && secondCode === LOWER_B ) {
                 for ( var i = 2; i < numLen; i++ ) {
                     code = numStr.charCodeAt( i );
@@ -3288,7 +3305,7 @@ module quby.ast {
             super(sym, 'null');
         }
     }
-    
+
     /*
      * = Function Generating Stuff =
      */
@@ -3513,14 +3530,14 @@ module quby.ast {
         onEndValidate(v:quby.core.Validator) {
             super.onEndValidate(v);
 
-            this.withField((field:FieldVariable) => {
+            this.withField( ( field: FieldVariable ) => {
                 var klass = this.getClassValidator();
 
-                if (!klass.hasFieldCallName(field.getCallName())) {
-                    v.parseError(this.offset, "field '" + field.getName() + "' never written to in class '" + klass.getClass().getName() + "' for generating method " + this.getName());
+                if ( !klass.hasFieldCallName( field.getCallName() ) ) {
+                    v.parseError( this.offset, "field '" + field.getName() + "' never written to in class '" + klass.getClass().getName() + "' for generating method " + this.getName() );
                     this.setInvalid();
                 }
-            })
+            });
         }
 
         /*
@@ -3531,24 +3548,24 @@ module quby.ast {
                 p.append(this.callName, '=function(){return ');
                 field.print(p);
                 p.append(';}');
-            })
+            });
         }
     }
 
     class FunctionWriteGenerator extends FunctionAttrGenerator {
         constructor (obj:FunctionCall, methodPrefix: string, field:INamedExpr) {
             super(
-                    obj,
-                    methodPrefix,
-                    1,
-                    field,
-                    FieldVariable
-            )
+                obj,
+                methodPrefix,
+                1,
+                field,
+                FieldVariable
+            );
 
             this.withField((field: FieldVariable) => field.setAssignment() );
         }
 
-        onEndValidate(v:quby.core.Validator) {
+        onEndValidate( v: quby.core.Validator ) {
             super.onEndValidate(v);
 
             this.withField((field: FieldVariable) => {

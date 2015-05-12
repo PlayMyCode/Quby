@@ -39,7 +39,7 @@ module quby.compilation {
         export function useInlinedGetField() : boolean {
             return util.browser.isMozilla || util.browser.isSafari;
         }
-        
+
         export function doubleBracketOps() : boolean {
             return util.browser.isIE;
         }

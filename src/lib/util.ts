@@ -1,30 +1,32 @@
 "use strict";
 
-(function(Date) {
+(function() {
     if ( Date.now === undefined ) {
-        Date.now = function():number {
+        Date.now = function (): number {
             return new Date().getTime();
-        }
+        };
     }
-})(window['Date']);
+})();
 
 module util {
+    "use strict";
+
     var calculateName = function () {
-        if (navigator.appName === 'Opera') {
-            return 'opera';
-        } else if (navigator.appName === 'Microsoft Internet Explorer') {
-            return 'ie';
+        if (navigator.appName === "Opera") {
+            return "opera";
+        } else if (navigator.appName === "Microsoft Internet Explorer") {
+            return "ie";
         } else {
             var agent = navigator.userAgent.toString();
 
-            if (agent.indexOf("Chrome/") != -1) {
-                return 'chrome';
-            } else if (agent.indexOf("Safari/") != -1) {
-                return 'safari';
-            } else if (navigator.appName === 'Netscape') {
-                return 'mozilla';
+            if (agent.indexOf("Chrome/") !== -1) {
+                return "chrome";
+            } else if (agent.indexOf("Safari/") !== -1) {
+                return "safari";
+            } else if (navigator.appName === "Netscape") {
+                return "mozilla";
             } else {
-                return 'unknown';
+                return "unknown";
             }
         }
     };
@@ -34,19 +36,19 @@ module util {
     var anchor: HTMLAnchorElement = null;
 
     export var browser = {
-        isIE: browserName === 'ie',
-        isMozilla: browserName === 'mozilla',
-        isChrome: browserName === 'chrome',
-        isOpera: browserName === 'opera',
-        isSafari: browserName === 'safari'
+        isIE: browserName === "ie",
+        isMozilla: browserName === "mozilla",
+        isChrome: browserName === "chrome",
+        isOpera: browserName === "opera",
+        isSafari: browserName === "safari"
     };
 
     export module url {
-        var SLASH_CHAR = '/'.charCodeAt(0);
+        var SLASH_CHAR = "//".charCodeAt( 0 );
 
         /**
-        * Given an url, this will turn it into an absolute url.
-        */
+         * Given an url, this will turn it into an absolute url.
+         */
         export function absolute(url: string): string {
             if (anchor === null) {
                 anchor = new HTMLAnchorElement();
@@ -58,10 +60,10 @@ module util {
         }
 
         /**
-        * @param url The url to test.
-        * @param domain Optional, the domain to test for, defaults to the current domain of the document.
-        * @return True if the url is of the domain given, otherwise false.
-        */
+         * @param url The url to test.
+         * @param domain Optional, the domain to test for, defaults to the current domain of the document.
+         * @return True if the url is of the domain given, otherwise false.
+         */
         export function isDomain(url: string, domain: string): boolean {
             if (domain === undefined) {
                 domain = document.domain;
@@ -71,13 +73,13 @@ module util {
         }
 
         /**
-        * Removes the domain section from the
-        * beginning of the url given.
-        *
-        * If the domain is not found, then it is ignored.
-        *
-        * @param url The url to strip the domain from.
-        */
+         * Removes the domain section from the
+         * beginning of the url given.
+         *
+         * If the domain is not found, then it is ignored.
+         *
+         * @param url The url to strip the domain from.
+         */
         export function stripDomain(url: string): string {
             url = util.url.absolute(url);
 
@@ -101,17 +103,17 @@ module util {
 
     export module array {
         /**
-        * Given the 'arguments' variable, this will convert it to a proper
-        * JavaScript Array and return it.
-        *
-        * @param args An 'arguments' object to convert.
-        * @param offset Optional, defaults to 0. Where in the array to start iteration.
-        * @return An array containing all the values in the given 'arguments'.
-        */
+         * Given the 'arguments' variable, this will convert it to a proper
+         * JavaScript Array and return it.
+         *
+         * @param args An 'arguments' object to convert.
+         * @param offset Optional, defaults to 0. Where in the array to start iteration.
+         * @return An array containing all the values in the given 'arguments'.
+         */
         /* Online blogs advise Array.slice, but most arguments are short (less then
-        * 10 elements) and in those situations a brute force approach is actually
-        * much faster!
-        */
+         * 10 elements) and in those situations a brute force approach is actually
+         * much faster!
+         */
         export function argumentsToArray(args: IArguments, i: number = 0): any[] {
             var len: number,
                 arr: any[];
@@ -140,11 +142,11 @@ module util {
         }
 
         /**
-        * Sorts the array given, randomly.
-        */
+         * Sorts the array given, randomly.
+         */
         /*
-        * Warning! This is used in core.qb
-        */
+         * Warning! This is used in core.qb
+         */
         export function randomSort(arr: any[]): void {
             arr.sort(function () {
                 return (Math.round(Math.random()) - 0.5);
@@ -182,7 +184,7 @@ module util {
          * and returns the result.
          */
         export function trim(s: string): string {
-            s = s.replace(/^\s\s*/, '');
+            s = s.replace(/^\s\s*/, "");
             var ws = /\s/;
             var i = s.length;
 
@@ -191,12 +193,12 @@ module util {
         }
 
         /**
-        * If given a string, then a new string with the first letter capitalized is returned.
-        *
-        * Otherwise whatever was given is returned, with no error reported.
-        */
+         * If given a string, then a new string with the first letter capitalized is returned.
+         *
+         * Otherwise whatever was given is returned, with no error reported.
+         */
         export function capitalize(str: string): string {
-            if (typeof (str) == 'string' && str.length > 0) {
+            if (typeof (str) === "string" && str.length > 0) {
                 // capitalize the first letter
                 return str.charAt(0).toUpperCase() + str.slice(1);
             } else {
@@ -207,10 +209,10 @@ module util {
 
     export module future {
         /**
-        * @const
-        * @private
-        * @type {number}
-        */
+         * @const
+         * @private
+         * @type {number}
+         */
         var DEFAULT_INTERVAL = 10;
 
         var isFutureRunning = false;
@@ -223,9 +225,9 @@ module util {
 
         var requestAnimFrame:( callback:FrameRequestCallback ) => number =
                 window.requestAnimationFrame ||
-                window['webkitRequestAnimationFrame'] ||
-                window['mozRequestAnimationFrame'] ||
-                window['oRequestAnimationFrame'] ||
+                (<any>window).webkitRequestAnimationFrame ||
+                (<any>window).mozRequestAnimationFrame ||
+                (<any>window).oRequestAnimationFrame ||
                 window.msRequestAnimationFrame ||
                 null;
 
@@ -233,11 +235,11 @@ module util {
             intervalFunID = 1;
 
         /**
-        *
-        *
-        * @private
-        * @const
-        */
+         *
+         *
+         * @private
+         * @const
+         */
         var ensureFun = function (f: (..._: any[]) =>any): void {
             if (!(f instanceof Function)) {
                 throw new Error("Function expected.");
@@ -251,13 +253,13 @@ module util {
         }
 
         /**
-        * Used to run the next function,
-        * in the scheduler. It will run right now,
-        * within this frame.
-        *
-        * @private
-        * @const
-        */
+         * Used to run the next function,
+         * in the scheduler. It will run right now,
+         * within this frame.
+         *
+         * @private
+         * @const
+         */
         function runNextFuture(args?:any[] ): void {
             if (futureFuns.length > 0) {
                 util.future.once(function () {
@@ -368,7 +370,7 @@ module util {
             for (var i = 0; i < values.length; i++) {
                 var value = values[i];
 
-                util.future.runFun((function (value) {
+                util.future.runFun((function (value:any) {
                     return () => f(value);
                 })(value));
             }
@@ -381,11 +383,11 @@ module util {
                 var isRunningHolder = { isRunning: true };
 
                 var recursiveCallback: () => void = function () {
-                    if (isRunningHolder.isRunning) {
+                    if ( isRunningHolder.isRunning ) {
                         callback();
-                        requestAnimFrame(recursiveCallback);
+                        requestAnimFrame( recursiveCallback );
                     }
-                }
+                };
 
                 requestAnimFrame(recursiveCallback);
 
@@ -398,7 +400,7 @@ module util {
             }
         }
 
-        export function clear(tag) {
+        export function clear(tag:number) {
             if (requestAnimFrame === null) {
                 var f = intervalFuns[tag];
 
@@ -411,7 +413,7 @@ module util {
             }
         }
 
-        export function once(f: () =>any): void {
+        export function once( f: () => any ): void {
             var request = util.future.getRequestAnimationFrame();
 
             if (request !== null) {
@@ -423,11 +425,11 @@ module util {
     }
 
     export module ajax {
-        export interface AjaxCallback {
-            (status: number, text: string, xml: Object): void;
+        export interface IAjaxCallback {
+            ( status: number, text: string, xml: Object ): void;
         }
 
-        export function post(url: string, callback: AjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
+        export function post( url: string, callback: IAjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean ) {
             return ajax.call(
                     'POST',
                     url,
@@ -438,14 +440,14 @@ module util {
             );
         }
 
-        export function postFuture(url: string, callback: AjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
-            var tag = util.future.block(function (status, text, xml) {
+        export function postFuture(url: string, callback: IAjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
+            var tag = util.future.block(function (status:number, text:string, xml:Object) {
                 callback(status, text, xml);
             });
 
             return ajax.post(
                     url,
-                    function (status, text, xml) {
+                    function (status:number, text:string, xml:Object) {
                         util.future.unblock(tag, status, text, xml);
                     },
                     data,
@@ -454,7 +456,7 @@ module util {
             );
         }
 
-        export function get(url: string, callback: AjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
+        export function get(url: string, callback: IAjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
             return ajax.call(
                     'GET',
                     url,
@@ -465,14 +467,14 @@ module util {
             );
         }
 
-        export function getFuture(url: string, callback: AjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
-            var tag = util.future.block(function (status, text, xml) {
+        export function getFuture(url: string, callback: IAjaxCallback, data?: any, isBlocking?: boolean, timestamp?: boolean) {
+            var tag = util.future.block(function (status:number, text:string, xml:Object) {
                 callback(status, text, xml);
             });
 
             return ajax.get(
                     url,
-                    function (status, text, xml) {
+                    function (status:number, text:string, xml:Object) {
                         util.future.unblock(tag, status, text, xml);
                     },
                     data,
@@ -481,10 +483,17 @@ module util {
             );
         }
 
-        export function call(method: string, url: string, callback: AjaxCallback, passData: any = '', async: boolean = true, timestamp: boolean = false) {
+        export function call(
+                method: string,
+                url: string,
+                callback: IAjaxCallback,
+                passData: any = "",
+                async: boolean = true,
+                timestamp: boolean = false
+        ) {
             if (passData === undefined || passData === null) {
-                passData = '';
-            } else if (!(typeof passData === 'string' || passData instanceof String)) {
+                passData = "";
+            } else if (!(typeof passData === "string" || passData instanceof String)) {
                 passData = String(passData);
             }
 
@@ -494,21 +503,21 @@ module util {
             var ajaxObj = new XMLHttpRequest();
 
             ajaxObj.onreadystatechange = function () {
-                if (ajaxObj.readyState == 4) {
+                if ( ajaxObj.readyState === 4 ) {
                     callback(
-                            ajaxObj.status,
-                            ajaxObj.responseText,
-                            ajaxObj.responseXML
-                    );
+                        ajaxObj.status,
+                        ajaxObj.responseText,
+                        ajaxObj.responseXML
+                        );
                 }
-            }
+            };
 
-            if (method === 'post') {
+            if (method === "post") {
                 if (timestamp) {
-                    if (url.indexOf('?') === -1) {
-                        url += '?timestamp=' + Date.now();
+                    if ( url.indexOf( "?" ) === -1 ) {
+                        url += "?timestamp=" + Date.now();
                     } else {
-                        url += '&timestamp=' + Date.now();
+                        url += "&timestamp=" + Date.now();
                     }
                 }
 
@@ -516,20 +525,20 @@ module util {
                 ajaxObj.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
                 ajaxObj.setRequestHeader("Content-Length", String(passData.length));
                 ajaxObj.send(passData);
-            } else if (method === 'get') {
+            } else if (method === "get") {
                 if (passData) {
-                    if (url.indexOf('?') === -1) {
-                        url += '?' + passData;
+                    if (url.indexOf("?") === -1) {
+                        url += "?" + passData;
                     } else {
-                        url += '&' + passData;
+                        url += "&" + passData;
                     }
                 }
 
                 if (timestamp) {
-                    if (url.indexOf('?') === -1) {
-                        url += '?timestamp=' + Date.now();
+                    if (url.indexOf("?") === -1) {
+                        url += "?timestamp=" + Date.now();
                     } else {
-                        url += '&timestamp=' + Date.now();
+                        url += "&timestamp=" + Date.now();
                     }
                 }
 
