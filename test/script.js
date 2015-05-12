@@ -1,8 +1,11 @@
 "use strict";
 
-var includeCore = false;
-var isAdmin = true;
-var debugMode = true;
+var cookie = getSaveSettings();
+console.log( document.cookie );
+console.log( cookie );
+var includeCore = ( cookie.includeCore !== undefined ? cookie.includeCore : false );
+var isAdmin     = ( cookie.isAdmin     !== undefined ? cookie.isAdmin     : true  );
+var debugMode   = ( cookie.debugMode   !== undefined ? cookie.debugMode   : true  );
 
 var scriptsLoading = 0,
     scriptsLoadFuns = [],
@@ -108,19 +111,83 @@ function addScripts( prefix, libs, type ) {
 
 function switchDebugMode() {
     debugMode = !debugMode;
+
+    updateSaveSettings(function(info) {
+        info.debugMode = debugMode;
+    });
 }
 
 function switchIncludeCore() {
     includeCore = !includeCore;
+
+    updateSaveSettings(function(info) {
+        info.includeCore = includeCore;
+    });
 }
 
 function switchIsAdmin() {
     isAdmin = !isAdmin;
+
+    updateSaveSettings(function(info) {
+        info.isAdmin = isAdmin;
+    });
 }
     
 function setCheckbox( id, checked ) {
-    document.getElementById( id ).checked = checked;
+    console.log( 'set id ' + id, checked );
+    document.getElementById( id ).checked = !! checked ;
 }
+
+/// 
+///     Save Settings
+/// 
+/// Settings and options are saved to a cookie as a JSON object.
+/// 
+
+function getSaveSettings() {
+    var cookie = document.cookie;
+
+    if ( cookie ) {
+        if ( cookie.indexOf('settings=') !== 0 ) {
+            document.cookie = 'settings=;expires=' + +new Date() ;
+        } else {
+            cookie = cookie.replace('settings=', '');
+            cookie = cookie.replace(/;.*/, '');
+
+            try {
+                return JSON.parse( cookie ) || {};
+            } catch ( ex ) {
+                // Something has gone wrong with parsing so wipe the settings.
+                // We can't parse them so whatever they are they must be corrupt.
+                documeent.cookie = 'settings=;expires=' + +new Date() ;
+                console.log(document.cookie);
+            }
+        }
+    }
+
+    return {};
+}
+
+function setSaveSettings( obj ) {
+    var date = new Date();
+    date.setYear( date.getFullYear() + 1 );
+
+    document.cookie = 'settings=' + JSON.stringify( obj ) + ';expires=' + +date ;
+}
+
+function setSaveSetting( key, value ) {
+    var obj = getSaveSettings();
+    obj[key + ''] = value;
+    setSaveSettings(obj);
+}
+
+function updateSaveSettings( callback ) {
+    var obj = getSaveSettings();
+    callback(obj);
+    setSaveSettings(obj);
+}
+
+
 
 /**
  * WARNING! This is a blocking function. It does not take a callback, instead
@@ -173,15 +240,19 @@ function getCodePane() {
 }
 
 function numDigitsInInt( num ) {
-    num = num | 0;
-    var n = 1;
+    if (typeof num === 'string') {
+        return num.length;
+    } else {
+        num = num | 0;
+        var n = 1;
 
-    if (num >= 100000000) { num /= 100000000; n += 8; }
-    if (num >= 10000) { num /= 10000; n += 4; }
-    if (num >= 100) { num /= 100; n += 2; }
-    if (num >= 10) { num /= 10; n += 1; }
+        if (num >= 100000000) { num /= 100000000; n += 8; }
+        if (num >= 10000) { num /= 10000; n += 4; }
+        if (num >= 100) { num /= 100; n += 2; }
+        if (num >= 10) { num /= 10; n += 1; }
 
-    return n;
+        return n;
+    }
 }
 
 function padStr( time, padLen ) {
@@ -218,17 +289,21 @@ function parseCodeInner( callback ) {
     var compileTime = 0,
         symbolsTime = 0,
         rulesTime = 0,
-        totalTime = 0,
+        parseTotal = 0,
+        validateTime = 0,
         printTime = 0,
         finalizeTime = 0,
         pageTime = Date.now();
 
     var updateControlsTime = function( times ) {
-        compileTime += times.compile || 0;
-        symbolsTime += times.symbols || 0;
-        rulesTime   += times.rules || 0;
-        totalTime   += times.total || 0;
+        compileTime += times.parseCompile || '?';
+        symbolsTime += times.parseSymbols || '?';
+        rulesTime   += times.parseRules   || '?';
+        parseTotal  += times.parseTotal   || '?';
 
+        if (times.validateTime !== undefined) {
+            validateTime = times.validateTime;
+        }
         if (times.print !== undefined) {
             printTime = times.print;
         }
@@ -240,7 +315,8 @@ function parseCodeInner( callback ) {
                 numDigitsInInt(compileTime),
                 numDigitsInInt(symbolsTime),
                 numDigitsInInt(rulesTime),
-                numDigitsInInt(totalTime),
+                numDigitsInInt(parseTotal),
+                numDigitsInInt(validateTime),
                 numDigitsInInt(printTime),
                 numDigitsInInt(finalizeTime)
         ) + 1;
@@ -249,8 +325,9 @@ function parseCodeInner( callback ) {
                 "compile " + padStr(compileTime, timeLen)           + "ms<br/>" +
                 "symbols " + padStr(symbolsTime, timeLen)           + "ms<br/>" +
                   "rules " + padStr(rulesTime, timeLen)             + "ms<br/>" +
-            "parse total " + padStr(totalTime, timeLen)             + "ms<br/>" +
+            "parse total " + padStr(parseTotal, timeLen)            + "ms<br/>" +
                                                                         "<br/>" +
+             "validation " + padStr(validateTime, timeLen)          + "ms<br/>" +
                   "print " + padStr(printTime, timeLen)             + "ms<br/>" +
                "finalize " + padStr(finalizeTime, timeLen)          + "ms<br/>" +
                                                                         "<br/>" +
@@ -263,9 +340,7 @@ function parseCodeInner( callback ) {
         parser.
                 parse(core).
                 adminMode(true).
-                onDebug(function(symbols, times) {
-                    updateControlsTime( times );
-                });
+                onDebug( updateControlsTime );
     }
 
     var sourceCode = getCodePane();
@@ -273,17 +348,7 @@ function parseCodeInner( callback ) {
         parser.
                 parse(sourceCode).
                 adminMode(isAdmin).
-                onDebug(function(symbols, times) {
-                    updateControlsTime( times );
-
-                    var displaySymbols = new Array(symbols.length);
-
-                    for (var i = 0; i < symbols.length; i++) {
-                        displaySymbols[i] = symbols[i].name();
-                    }
-
-                    outputSymbols.value = displaySymbols.join("\n");
-                });
+                onDebug( updateControlsTime );
     } else {
         parser.
                 parse(sourceCode).
@@ -344,51 +409,6 @@ function addQubyFiles( name, src ) {
     }
 }
 
-var DocumentCookies = (function() {
-    var cookies = {};
-
-    var strCookies = document.cookie;
-    if ( strCookies ) {
-        strCookies = strCookies.split(';');
-
-        for ( var i = 0; i < strCookies.length; i++ ) {
-            var strCookie = strCookies[i];
-
-            if ( strCookies !== '' ) {
-                var equal = strCookie.indexOf('=');
-
-                if ( equal !== -1 ) {
-                    cookies[ strCookie.substring(0, equal) ] =
-                            strCookie.substring( equal+1 );
-                }
-            }
-        }
-    }
-
-    return {
-        setCookie: function( cookie, value ) {
-            cookies[ cookie ] = value;
-
-            var strCookies = '';
-            for ( var k in cookies ) {
-                if ( cookies.hasOwnProperty(k) ) {
-                    strCookies += k + '=' + cookies[k] + ';' ;
-                }
-            }
-
-            document.cookie = strCookies;
-        },
-
-        getCookie: function( cookie ) {
-            if ( cookies.hasOwnProperty(cookie) ) {
-                return cookies[ cookie ];
-            } else {
-                return null;
-            }
-        }
-    };
-})();
-
 window.addEventListener( 'load', function() {
     setCheckbox( 'checkbox_include' , includeCore );
     setCheckbox( 'checkbox_debug'   , debugMode   );
@@ -419,12 +439,12 @@ window.addEventListener( 'load', function() {
             }
 
             currentOption = nextOption;
-            DocumentCookies.setCookie( 'qb-file', nextOption );
+            setSaveSetting( 'qb-file', nextOption );
         }
     };
 
-    var qbCookieFile = DocumentCookies.getCookie( 'qb-file' );
-    if ( qbCookieFile !== null ) {
+    var qbCookieFile = getSaveSettings().qbFile;
+    if ( qbCookieFile ) {
         setQbSrc( qbCookieFile );
     }
 

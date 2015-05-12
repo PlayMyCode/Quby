@@ -1,7 +1,7 @@
 
 class Renderer
     def method_1_of_4()
-        @field.field_method_call()
+//        @field.field_method_call()
     end
 
     def method_2_of_4()
