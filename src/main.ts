@@ -128,7 +128,7 @@ module quby.main {
         private isAdminFlag:boolean;
 
         private whenFinished:() => void;
-        private debugCallback:parse.DebugCallback;
+        private debugCallback:quby.core.IDebugCallback;
 
         private strName:string;
 
@@ -241,7 +241,7 @@ module quby.main {
          *
          * If no debugCallback is provided, then it is run normally.
          */
-        onDebug(fun:parse.DebugCallback) {
+        onDebug(fun:quby.core.IDebugCallback) {
             this.ensureCanParse();
 
             this.debugCallback = fun;
@@ -366,12 +366,12 @@ module quby.main {
             return this;
         }
 
-        parseArgs(source: string, adminMode: boolean, callback:() => void, debugCallback: parse.DebugCallback) : ParserInstance {
+        parseArgs( source: string, adminMode: boolean, callback: () => void, debugCallback: quby.core.IDebugCallback ): ParserInstance {
             return this.
                     parse(source).
                     adminMode(adminMode).
-                    onFinish(callback).
-                    onDebug(debugCallback);
+                onFinish( callback ).
+                onDebug( debugCallback );
         }
 
         parseSources(sources: string[], adminMode: boolean, callback?: (result: Result) => void ) {
@@ -428,10 +428,10 @@ module quby.main {
      */
     export class Result {
         private program: string;
-        private errors: quby.core.ErrorInfo[];
+        private errors: quby.core.IErrorInfo[];
         private onErrorFun: (ex:Error) => void;
 
-        constructor(program: string, errors: quby.core.ErrorInfo[]) {
+        constructor( program: string, errors: quby.core.IErrorInfo[] ) {
             this.program = program;
             this.errors = errors;
 
@@ -477,7 +477,7 @@ module quby.main {
             return this.errors.length > 0;
         }
 
-        getErrors() : quby.core.ErrorInfo[] {
+        getErrors(): quby.core.IErrorInfo[] {
             return this.errors;
         }
 

@@ -7,7 +7,7 @@
  *
  * re-add the symbol id to rule lookup. So...
  *
- * ParserRule.parseRules add:
+ * IParserRule.parseRules add:
  *      var rules = this.compiled.rules[ symbol.id ]
  *
  * ... and use that to know which set of rules to jump to, and
@@ -20,6 +20,16 @@
  * by Joseph Lenton
  */
 /**
+ *
+ *  == Parse.ts ==
+ * 
+ * I came up with the algorithm for this parser indepedently of
+ * any other research. However I believe the approahc is that
+ * of a 'Parsing Expression Grammar', or 'PEG'.
+ * 
+ * @see http://en.wikipedia.org/wiki/Parsing_expression_grammar
+ * 
+ * 
  *
  * All of Parse lives under the 'parse' variable.
  * It's a bit like jQuery, parse can be used as a function or
@@ -251,7 +261,7 @@
  *
  * Constructors should also be defined in a way so they can be
  * called with no args, this is needed for Terminal, Terminals
- * and ParserRule constructors.
+ * and IParserRule constructors.
  *
  * = Symbol vs Terminal =
  *
@@ -270,33 +280,38 @@ module parse {
      * 
      * 0 or -1 are options to return as a failure value.
      */
-    export interface TerminalFunction {
+    export interface ITerminalFunction {
         (src: string, i: number, code: number, len: number): number;
     }
 
-    export interface MatchFoundFunction {
+    export interface IMatchFoundFunction {
         (...args: any[]): any;
     }
 
-    export interface TimeResult {
+    export interface ITimeResult {
         compile: number;
         symbols: number;
         rules: number;
+
+        /**
+         * This is the total time the parser took.
+         * 
+         * Note this is *not* the other values added up, as the amount taken in total
+         * can be much greater than the other values due to sleeps.
+         */
         total: number;
     }
 
-    export interface NamedItem {
-        name(name: string): NamedItem;
+    export interface INamedItem {
+        name( name: string ): INamedItem;
         name(): string;
     }
 
-    export interface DebugCallback { (terms: Term[], times: TimeResult): void; }
+    export interface ISymbolizeCallback { ( terminals: Term[], errors: SymbolError[] ): void; };
 
-    export interface SymbolizeCallback { (terminals: Term[], errors: SymbolError[]): void; };
+    export interface IFinishCallback { ( result: any, errors: ParseError[], time: ITimeResult ): void; };
 
-    export interface FinishCallback { (result: any, errors: ParseError[]): void; };
-
-    interface CompiledTerminals {
+    interface ICompiledTerminals {
         literals: Term[];
         terminals: Term[];
         idToTerms: Term[];
@@ -397,25 +412,25 @@ module parse {
      * @param {number} code
      * @return {boolean}
      */
-    var isHexCode = function(code: number): boolean {
-        return (code >= ZERO && code <= NINE) || // a number
-               (code >= LOWER_A && code <= LOWER_F) || // lower a-z
-               (code >= UPPER_A && code <= UPPER_F);   // UPPER A-Z
-    }
+    var isHexCode = function ( code: number ): boolean {
+        return ( code >= ZERO && code <= NINE ) || // a number
+            ( code >= LOWER_A && code <= LOWER_F ) || // lower a-z
+            ( code >= UPPER_A && code <= UPPER_F );   // upper A-Z
+    };
 
-    var isAlphaNumericCode = function(code: number): boolean {
+    var isAlphaNumericCode = function ( code: number ): boolean {
         return (
-                (code >= LOWER_A && code <= LOWER_Z) || // lower case letter
-                (code >= UPPER_A && code <= UPPER_Z) || // upper case letter
-                (code === UNDERSCORE) ||
-                (code >= ZERO && code <= NINE)     // a number
-        );
-    }
+            ( code >= LOWER_A && code <= LOWER_Z ) || // lower case letter
+            ( code >= UPPER_A && code <= UPPER_Z ) || // upper case letter
+            ( code === UNDERSCORE ) ||
+            ( code >= ZERO && code <= NINE )     // a number
+            );
+    };
 
     var isAlphaCode = function(code: number): boolean {
         return (code >= LOWER_A && code <= LOWER_Z) ||
                (code >= UPPER_A && code <= UPPER_Z);
-    }
+    };
 
     /**
      * @nosideeffects
@@ -423,32 +438,15 @@ module parse {
      * @param {number} code
      * @return {boolean}
      */
-    var isNumericCode = function(code: number): boolean {
-        return (code >= ZERO && code <= NINE); // a number
-    }
-
-    /**
-     * Creates and returns a new Error object,
-     * containing the message given.
-     * 
-     * It also tacks on it's own information,
-     * making it clear that parse.js has crashed.
-     */
-    function newParseError( msg?:string ) : Error {
-        if (msg) {
-            msg += " (this is a bug in parse.js)";
-        } else {
-            msg = "a bug in parse.js has occurred";
-        }
-
-        return new Error(msg);
-    }
+    var isNumericCode = function ( code: number ): boolean {
+        return ( code >= ZERO && code <= NINE ); // a number
+    };
 
     /**
      * @return True if f is a function object, and false if not.
      */
-    function isFunction(f: any): boolean {
-        return ( typeof f === 'function' ) || ( f instanceof Function );
+    function isFunction( f: any ): boolean {
+        return ( typeof f === "function" ) || ( f instanceof Function );
     }
 
     /**
@@ -542,7 +540,7 @@ module parse {
          */
         TYPE_ARRAY = 5;
 
-    var BLANK_TERMINAL_FUNCTION: TerminalFunction = ( src: string, i: number, code: number, len: number ) => i;
+    var BLANK_TERMINAL_FUNCTION: ITerminalFunction = ( src: string, i: number, code: number, len: number ) => i;
 
     /**
      * Given a string, this turns it into an array of char codes,
@@ -582,7 +580,7 @@ module parse {
                 replace(/([^A-Z])([A-Z]+)/g, function (t, a, b) { return a + ' ' + b; }).
                 replace('_', ' ').
                 toLowerCase().
-                replace(/\b([a-z])/g, function (t, letter) { return letter.toUpperCase(); });
+                replace( /\b([a-z])/g, function ( t: string, letter: string ) { return letter.toUpperCase(); });
     }
 
     function processResult( arg: any ): any {
@@ -680,47 +678,47 @@ module parse {
         id: number = INVALID_TERMINAL;
 
         /**
-        * A name for this terminal.
-        *
-        * Used for error reporting, so you can have something readable,
-        * rather then things like 'E_SOMETHING_END_BLAH_TERMINAL'.
-        */
+         * A name for this terminal.
+         *
+         * Used for error reporting, so you can have something readable,
+         * rather then things like 'E_SOMETHING_END_BLAH_TERMINAL'.
+         */
         termName: string = "<Anonymous Terminal>";
 
         /**
-        * When true, this has been explicitely named.
-        * 
-        * When false, this has been named as a result
-        * of this constructor.
-        *
-        * It's a flag that exists so other code knows
-        * if it should, or shouldn't, override the name
-        * automatically.
-        */
+         * When true, this has been explicitely named.
+         * 
+         * When false, this has been named as a result
+         * of this constructor.
+         *
+         * It's a flag that exists so other code knows
+         * if it should, or shouldn't, override the name
+         * automatically.
+         */
         isExplicitelyNamed: boolean = false;
 
         /**
-        * The type of this terminal.
-        *
-        * Default is zero, which is invalid.
-        */
+         * The type of this terminal.
+         *
+         * Default is zero, which is invalid.
+         */
         type: number = 0;
 
         /**
-        * A post match callback that can be run,
-        * when a match has been found.
-        *
-        * Optional.
-        */
-        onMatchFun: MatchFoundFunction = null;
+         * A post match callback that can be run,
+         * when a match has been found.
+         *
+         * Optional.
+         */
+        onMatchFun: IMatchFoundFunction = null;
 
         /**
-        * The type of this terminal.
-        *
-        * This determines the algorithm used to match,
-        * or not match, bits against the source code
-        * when parsing symbols.
-        */
+         * The type of this terminal.
+         *
+         * This determines the algorithm used to match,
+         * or not match, bits against the source code
+         * when parsing symbols.
+         */
         isLiteral: boolean = false;
 
         /**
@@ -730,52 +728,52 @@ module parse {
         literal: string = null;
 
         /**
-        * If this is a literal, then this will give the length
-        * of that literal being searched for.
-        *
-        * For a string, this is the length of that string.
-        * For a number, this is 1.
-        *
-        * For non-literals, this is 0, but should not be used.
-        */
+         * If this is a literal, then this will give the length
+         * of that literal being searched for.
+         *
+         * For a string, this is the length of that string.
+         * For a number, this is 1.
+         *
+         * For non-literals, this is 0, but should not be used.
+         */
         literalLength: number = 0;
 
         /**
-        * There are two ways to work out if a terminal matches
-        * or not.
-        *
-        * The first is by overriding the 'test' with it's own
-        * function.
-        *
-        * The other is to apply a special type, such as TYPE_CODE,
-        * and then place the data for it here.
-        *
-        * When it has no data, it is null.
-        */
-        typeTestFunction:TerminalFunction = BLANK_TERMINAL_FUNCTION;
+         * There are two ways to work out if a terminal matches
+         * or not.
+         *
+         * The first is by overriding the 'test' with it's own
+         * function.
+         *
+         * The other is to apply a special type, such as TYPE_CODE,
+         * and then place the data for it here.
+         *
+         * When it has no data, it is null.
+         */
+        typeTestFunction:ITerminalFunction = BLANK_TERMINAL_FUNCTION;
         typeTestArray: Term[] = [];
         typeTestCode: number = 0;
         typeTestString: number[] = [];
 
         /**
-        * An optional event to run after a symbol has been matched.
-        *
-        * Gives the option to move the offset on further, whilst ignoring
-        * symbols.
-        */
-        postMatch: TerminalFunction = null;
+         * An optional event to run after a symbol has been matched.
+         *
+         * Gives the option to move the offset on further, whilst ignoring
+         * symbols.
+         */
+        postMatch: ITerminalFunction = null;
 
         /**
-        * Some terminals are silently hidden away,
-        * this is so they can still see their parents.
-        */
+         * Some terminals are silently hidden away,
+         * this is so they can still see their parents.
+         */
         terminalParent: Term = null;
 
         constructor (match: string, name?: string);
         constructor (match: number, name?: string);
         constructor (match: Term, name?: string);
         constructor (match: any[], name?: string);
-        constructor (match: TerminalFunction, name?: string);
+        constructor (match: ITerminalFunction, name?: string);
         constructor (match, name?: string) {
             var nameSupplied = (name !== undefined);
             if (name) {
@@ -968,7 +966,7 @@ module parse {
          *
          * @param callback The callback to run; null for no callback, or a valid function.
          */
-        symbolMatch( callback: TerminalFunction ): Term {
+        symbolMatch( callback: ITerminalFunction ): Term {
             if ( callback !== null && !isFunction( callback ) ) {
                 throw new Error("symbolMatch callback is not valid: " + callback);
             }
@@ -997,7 +995,7 @@ module parse {
          * @param callback The function to call (or null to clear a previous one).
          * @return This object to allow chaining.
          */
-        onMatch( callback: MatchFoundFunction ): Term {
+        onMatch( callback: IMatchFoundFunction ): Term {
             if ( !callback ) {
                 this.onMatchFun = null;
             } else {
@@ -1142,7 +1140,7 @@ module parse {
                 while (running) {
                     var index = src.indexOf(searchIndex, lastIndex);
 
-                    if (index != -1) {
+                    if (index !== -1) {
                         lines.push(index);
                         lastIndex = index + 1;
                         // the last line
@@ -1174,7 +1172,7 @@ module parse {
             this.index();
 
             for (var line = 0; line < this.lineOffsets.length; line++) {
-                // lineOffset is from the end of the line.
+                // LineOffset is from the end of the line.
                 // If it's greater then offset, then we return that line.
                 // It's +1 to start lines from 1 rather then 0.
                 if ( this.lineOffsets[line] > offset ) {
@@ -1252,11 +1250,11 @@ module parse {
         }
 
         /**
-        * Converts this to what it should be for the 'onMatch' callbacks.
-        *
-        * If there is no callback set on the inner symbol, then this is returned.
-        * If there is a callback, then it is run, and the result is returned.
-        */
+         * Converts this to what it should be for the 'onMatch' callbacks.
+         *
+         * If there is no callback set on the inner symbol, then this is returned.
+         * If there is a callback, then it is run, and the result is returned.
+         */
         onFinish(): Symbol;
         onFinish(): any {
             var onMatch = this.terminal.onMatchFun;
@@ -1277,8 +1275,8 @@ module parse {
         }
     }
 
-    function findPossibleTerms(arr: NamedItem[], terms: Object);
-    function findPossibleTerms(t: NamedItem, terms: Object);
+    function findPossibleTerms( arr: INamedItem[], terms: Object );
+    function findPossibleTerms(t: INamedItem, terms: Object);
     function findPossibleTerms(e:any, terms: Object) {
         if (e instanceof Array) {
             for (var i = 0; i < e.length; i++) {
@@ -1392,8 +1390,9 @@ module parse {
                     terms = {},
                     termsArr:string[] = [];
 
+                var i;
                 var rulesLen = rules.length;
-                for ( var i = 0; i < rulesLen; i++ ) {
+                for ( i = 0; i < rulesLen; i++ ) {
                     var rule = rules[i];
 
                     if ( rule !== null ) {
@@ -1402,7 +1401,7 @@ module parse {
                 }
 
                 var keys = Object.keys( terms ), keysLen = keys.length;
-                for ( var i = 0; i < keysLen; i++ ) {
+                for ( i = 0; i < keysLen; i++ ) {
                     var k = keys[i];
 
                     termsArr.push(k);
@@ -1555,7 +1554,7 @@ module parse {
      *  = terminals - the compressed list of terminals
      *  = idToTerms - a sparse array of terminal ID's to terminals.
      */
-    var compressTerminals = function (terminals: Term[]): CompiledTerminals {
+    function compressTerminals( terminals: Term[] ): ICompiledTerminals {
         var termIDToTerms: Term[] = [];
 
         /*
@@ -1574,7 +1573,7 @@ module parse {
 
         compressTerminalsInner(termIDToTerms, literalTerms, nonLiteralTerms, terminals);
 
-        literalTerms.sort(function (a, b) {
+        literalTerms.sort(function (a:Term, b:Term) {
             return b.literalLength - a.literalLength;
         });
 
@@ -1583,90 +1582,88 @@ module parse {
             terminals: nonLiteralTerms,
             idToTerms: termIDToTerms
         };
-    };
+    }
 
-    var compressTerminalsInner: { (termIDToTerms: Term[], literalTerms: Term[], nonLiteralTerms: Term[], terminals: Term[]): void; } =
-        function (termIDToTerms: Term[], literalTerms: Term[], nonLiteralTerms: Term[], terminals: Term[]): void {
-            var keys = Object.keys( terminals ),
-                keysLen = keys.length;
+    function compressTerminalsInner(termIDToTerms: Term[], literalTerms: Term[], nonLiteralTerms: Term[], terminals: Term[]): void {
+        var keys = Object.keys( terminals ),
+            keysLen = keys.length;
 
-            for ( var i = 0; i < keysLen; i++ ) {
-                var k = keys[i];
-                var term: Term = terminals[k];
+        for ( var i = 0; i < keysLen; i++ ) {
+            var k = keys[i];
+            var term: Term = terminals[k];
 
-                if (term.type === TYPE_ARRAY) {
-                    compressTerminalsInner(
-                            termIDToTerms,
-                            literalTerms,
-                            nonLiteralTerms,
-                            term.typeTestArray
-                        );
+            if (term.type === TYPE_ARRAY) {
+                compressTerminalsInner(
+                        termIDToTerms,
+                        literalTerms,
+                        nonLiteralTerms,
+                        term.typeTestArray
+                    );
+            } else {
+                termIDToTerms[term.id] = term;
+
+                if ( term.isLiteral ) {
+                    literalTerms.push(term)
                 } else {
-                    termIDToTerms[term.id] = term;
-
-                    if ( term.isLiteral ) {
-                        literalTerms.push(term)
-                    } else {
-                        nonLiteralTerms.push(term)
-                    }
+                    nonLiteralTerms.push(term)
                 }
             }
         }
+    }
 
-    var bruteScan: { (parserRule: ParserRuleImplementation, seenRules: boolean[], idsFound: boolean[]): void; } =
-        function (parserRule: ParserRuleImplementation, seenRules: boolean[], idsFound: boolean[]) {
-            if (seenRules[parserRule.compiledId] !== true) {
-                seenRules[parserRule.compiledId] = true;
+    function bruteScan(parserRule: ParserRuleImplementation, seenRules: boolean[], idsFound: boolean[]) {
+        if (seenRules[parserRule.compiledId] !== true) {
+            seenRules[parserRule.compiledId] = true;
 
-                var rules = parserRule.rules,
-                    isOptional = parserRule.isOptional;
+            var rules = parserRule.rules,
+                isOptional = parserRule.isOptional;
 
-                /*
-                 * We are interested in all branches on the left side, up to and
-                 * including, the first non-optional branch.
-                 *
-                 * This is because we might have to come down here for an optional
-                 * term, or skip it.
-                 */
-                var i = 0;
-                do {
-                    var rule = rules[i];
+            /*
+             * We are interested in all branches on the left side, up to and
+             * including, the first non-optional branch.
+             *
+             * This is because we might have to come down here for an optional
+             * term, or skip it.
+             */
+            var i = 0;
+            do {
+                var rule = rules[i];
 
-                    if (rule instanceof Term) {
-                        if (rule.id !== INVALID_TERMINAL) {
-                            idsFound[rule.id] = true;
-                        }
-                    } else if (rule instanceof Array) {
-                        for (var j = 0; j < rule.length; j++) {
-                            var r = rule[j];
-
-                            if (r instanceof Term) {
-                                if (r.id !== INVALID_TERMINAL) {
-                                    idsFound[r.id] = true;
-                                }
-                            } else {
-                                bruteScan(r, seenRules, idsFound);
-                            }
-                        }
-                    } else {
-                        bruteScan(rule, seenRules, idsFound);
+                if (rule instanceof Term) {
+                    if (rule.id !== INVALID_TERMINAL) {
+                        idsFound[rule.id] = true;
                     }
+                } else if (rule instanceof Array) {
+                    for (var j = 0; j < rule.length; j++) {
+                        var r = rule[j];
 
-                    i++;
-                } while (i < rules.length && isOptional[i-1]);
-            } else {
-                return;
-            }
-        };
+                        if (r instanceof Term) {
+                            if (r.id !== INVALID_TERMINAL) {
+                                idsFound[r.id] = true;
+                            }
+                        } else {
+                            bruteScan(r, seenRules, idsFound);
+                        }
+                    }
+                } else {
+                    bruteScan(rule, seenRules, idsFound);
+                }
+
+                i++;
+            } while (i < rules.length && isOptional[i-1]);
+        } else {
+            return;
+        }
+    }
 
     /**
-    * Used when searching for terminals to use for parsing,
-    * during the compilation phase.
-    */
-    var addRule: {
-        (rule: ParserRule, terminals: Term[], id: number, allRules: ParserRule[]): number;
-        (rule: Term, terminals: Term[], id: number, allRules: ParserRule[]): number;
-    } = function (rule, terminals: Term[], id: number, allRules: ParserRule[]) {
+     * Used when searching for terminals to use for parsing,
+     * during the compilation phase.
+     */
+
+    function addRule( rule: IParserRule, terminals: Term[], id: number, allRules: IParserRule[] ): number;
+    function addRule( rule: Term, terminals: Term[], id: number, allRules: IParserRule[] ): number;
+    function addRule( rule, terminals: Term[], id: number, allRules: IParserRule[] ) {
         if (rule instanceof Term) {
             var termID = rule.id;
 
@@ -1680,7 +1677,7 @@ module parse {
         }
     };
 
-    var addRuleToLookup = function (id: number, ruleLookup: any, term: any) {
+    function addRuleToLookup( id: number, ruleLookup: any, term: any ) {
         var ruleLookupLen = ruleLookup.length;
 
         if ( ruleLookupLen <= id ) {
@@ -1702,24 +1699,13 @@ module parse {
         }
     }
 
-    var callParseDebug = function (
-        debugCallback: DebugCallback,
-        symbols: SymbolResult,
-        compileTime: number,
-        symbolTime: number,
-        rulesTime: number,
-        totalTime: number
-    ) {
-        if (debugCallback) {
-            var times = {
-                compile: compileTime,
-                symbols: symbolTime,
-                rules: rulesTime,
-                total: totalTime
-            };
-
-            debugCallback(symbols.getTerminals(), times);
-        }
+    function newTimeResult( compileTime: number, symbolTime: number, rulesTime: number, totalTime: number ): parse.ITimeResult {
+        return {
+            compile: compileTime,
+            symbols: symbolTime,
+            rules: rulesTime,
+            total: totalTime
+        };
     }
 
     /**
@@ -1748,41 +1734,40 @@ module parse {
      */
     var NO_COMPILE_ID = -1;
 
-    export interface ParserRule extends NamedItem {
-        repeatSeperator(match, seperator): ParserRule;
-        optionalSeperator(match, seperator): ParserRule;
-        seperatingRule(match, seperator): ParserRule;
+    export interface IParserRule extends INamedItem {
+        repeatSeperator( match: any, seperator: any ): IParserRule;
+        optionalSeperator( match: any, seperator: any ): IParserRule;
+        seperatingRule( match: any, seperator: any ): IParserRule;
 
-        or(...args: any[]): ParserRule;
-        either(...args: any[]): ParserRule;
-        thenOr(...args: any[]): ParserRule;
-        thenEither(...args: any[]): ParserRule;
-        optional(...args: any[]): ParserRule;
-        maybe(...args: any[]): ParserRule;
-        a(...args: any[]): ParserRule;
-        then(...args: any[]): ParserRule;
-        onMatch(callback: (...args: any[]) => any): ParserRule;
+        or(...args: any[]): IParserRule;
+        either(...args: any[]): IParserRule;
+        thenOr(...args: any[]): IParserRule;
+        thenEither(...args: any[]): IParserRule;
+        optional(...args: any[]): IParserRule;
+        maybe(...args: any[]): IParserRule;
+        a(...args: any[]): IParserRule;
+        then(...args: any[]): IParserRule;
+        onMatch(callback: (...args: any[]) => any): IParserRule;
 
-        optionalThis(...args: any[]): ParserRule;
-        maybeThis(...args: any[]): ParserRule;
-        orThis(...args: any[]): ParserRule;
+        optionalThis(...args: any[]): IParserRule;
+        maybeThis(...args: any[]): IParserRule;
+        orThis(...args: any[]): IParserRule;
 
-        name(name: string): ParserRule;
+        name(name: string): IParserRule;
         name(): string;
 
         parse(options: {
             src: string;
             inputSrc?: string;
             name?: string;
-            onFinish: FinishCallback;
-            debugCallback?: DebugCallback;
+            onFinish: IFinishCallback;
         }): void;
 
-        parseLowerCase(input: string, callback: FinishCallback);
-        parseUpperCase(input: string, callback: FinishCallback);
-        symbolize(input: string, callback: SymbolizeCallback): void;
-        symbolizeLowerCase(input: string, callback: SymbolizeCallback): void;
-        symbolizeUpperCase(input: string, callback: SymbolizeCallback): void;
+        parseLowerCase(input: string, callback: IFinishCallback);
+        parseUpperCase(input: string, callback: IFinishCallback);
+        symbolize(input: string, callback: ISymbolizeCallback): void;
+        symbolizeLowerCase(input: string, callback: ISymbolizeCallback): void;
+        symbolizeUpperCase(input: string, callback: ISymbolizeCallback): void;
     }
 
     /**
@@ -1804,7 +1789,7 @@ module parse {
      * possibly match.
      *
      * So to cut down on all this searching, 'compiledLookups' is a version of the
-     * 'rules' which maps symbolID to rules. That way a ParserRule can jump straight
+     * 'rules' which maps symbolID to rules. That way a IParserRule can jump straight
      * to the branches which match; or return if none of them match.
      * 
      * SymbolID and TerminalID are also interchangeable. SymbolID is the id of the
@@ -1812,90 +1797,90 @@ module parse {
      *
      * This allows it to cut down on the amount of searching needed.
      */
-    class ParserRuleImplementation implements ParserRule {
+    class ParserRuleImplementation implements IParserRule {
         /**
-        * A callback to call when this is done.
-        */
+         * A callback to call when this is done.
+         */
         finallyFun: (...args: any[]) => any = null;
 
         /**
-        * States if this is compiled yet, or not.
-        *
-        * When null, no compilation has taken place. When not
-        * null, it has.
-        */
-        compiled: CompiledTerminals = null;
+         * States if this is compiled yet, or not.
+         *
+         * When null, no compilation has taken place. When not
+         * null, it has.
+         */
+        compiled: ICompiledTerminals = null;
         compiledLookups: any[][] = null;
 
         compiledId = NO_COMPILE_ID;
 
         /**
-        * The global parse instance this is working with.
-        *
-        * @const
-        */
+         * The global parse instance this is working with.
+         *
+         * @const
+         */
         parseParent: Parse;
 
         /**
-        * The parser rules, includes terminals.
-        *
-        * @const
-        */
+         * The parser rules, includes terminals.
+         *
+         * @const
+         */
         rules: any[] = [];
 
         isOptional: boolean[] = [];
 
         /**
-        * Choice parser rules can be built from multiple 'or' calls,
-        * so we store them, and then push them onto 'rules' when they are done.
-        *
-        * They are stored here.
-        */
+         * Choice parser rules can be built from multiple 'or' calls,
+         * so we store them, and then push them onto 'rules' when they are done.
+         *
+         * They are stored here.
+         */
         currentOr: any[] = null;
 
         /**
-        * A flag to say 'or this expression' in the or list.
-        * This expression is always added at the end.
-        *
-        * @type {boolean}
-        */
+         * A flag to say 'or this expression' in the or list.
+         * This expression is always added at the end.
+         *
+         * @type {boolean}
+         */
         orThisFlag = false;
 
         /**
-        * A flag used to denote if this is being called recursively.
-        * This is used in two places:
-        *  = grabbingTerminals
-        *  = when parsing symbols
-        *
-        * This to avoid calling it recursively, as we only
-        * need to visit each ParserRule once.
-        */
+         * A flag used to denote if this is being called recursively.
+         * This is used in two places:
+         *  = grabbingTerminals
+         *  = when parsing symbols
+         *
+         * This to avoid calling it recursively, as we only
+         * need to visit each IParserRule once.
+         */
         isRecursive = NO_RECURSION;
 
         /**
-        * This flag is for when we recursively clear the recursion flag, but we
-        * can't use 'isRecursive' to track cyclic routes, becasue we are
-        * clearing it. So we use this one instead.
-        */
+         * This flag is for when we recursively clear the recursion flag, but we
+         * can't use 'isRecursive' to track cyclic routes, becasue we are
+         * clearing it. So we use this one instead.
+         */
         isClearingRecursion = false;
 
         /**
-        * Used to count how many times we have re-entered the parseInner whilst
-        * parsing.
-        * 
-        * However this is cleared when the number of symbol position is changed.
-        * This way recursion is allowed, as we chomp symbols.
-        */
+         * Used to count how many times we have re-entered the parseInner whilst
+         * parsing.
+         * 
+         * However this is cleared when the number of symbol position is changed.
+         * This way recursion is allowed, as we chomp symbols.
+         */
         recursiveCount = 0;
 
         /**
-        * A true recursive counter.
-        *
-        * This states how many times we are currently inside of this parser.
-        * Unlike 'recursiveCount', this never lies.
-        *
-        * It exists so we can clear some items when we _first_ enter a rule.
-        */
+         * A true recursive counter.
+         *
+         * This states how many times we are currently inside of this parser.
+         * Unlike 'recursiveCount', this never lies.
+         *
+         * It exists so we can clear some items when we _first_ enter a rule.
+         */
         internalCount = 0;
 
         isCyclic = false;
@@ -1911,7 +1896,7 @@ module parse {
             this.strName = '';
         }
 
-        name(name: string): ParserRule;
+        name(name: string): IParserRule;
         name(): string;
         name(name?: string) : any {
             if (name !== undefined) {
@@ -1932,7 +1917,7 @@ module parse {
          * @param seperator The seperator between each match.
          * @return This parser rule.
          */
-        repeatSeperator(match, seperator): ParserRule {
+        repeatSeperator(match, seperator): IParserRule {
             return this.seperatingRule(match, seperator);
         }
 
@@ -1943,7 +1928,7 @@ module parse {
          * @param seperator The seperator between each match.
          * @return This parser rule.
          */
-        optionalSeperator(match, seperator) {
+        optionalSeperator( match, seperator ) {
             return this.seperatingRule(match, seperator).
                     markOptional(true);
         }
@@ -2043,7 +2028,7 @@ module parse {
          * Same as 'either', except all values given are optional.
          * With this having no-match is acceptable.
          *
-         * @return This ParserRule instance.
+         * @return This IParserRule instance.
          */
         maybe() {
             var argsLen = arguments.length, args = new Array( argsLen );
@@ -2075,7 +2060,7 @@ module parse {
         /**
          *
          */
-        onMatch(callback: (...args: any[]) => any): ParserRule {
+        onMatch(callback: (...args: any[]) => any): IParserRule {
             this.endCurrentOr();
 
             this.finallyFun = callback;
@@ -2126,7 +2111,7 @@ module parse {
          * The errors is an array containing every error that has occurred, and will
          * be an empty array when there are no errors.
          *
-         * The rules of this ParserRule will be applied repeatedly on every symbol
+         * The rules of this IParserRule will be applied repeatedly on every symbol
          * found. The result array given contains the results from each of these
          * runs.
          *
@@ -2140,14 +2125,12 @@ module parse {
             src: string;
             inputSrc?: string;
             name?: string;
-            onFinish: FinishCallback;
-            debugCallback?: DebugCallback;
+            onFinish: IFinishCallback;
         }) {
             var displaySrc,
                 parseSrc,
                 name = null,
-                callback = null,
-                debugCallback = null;
+                callback = null;
 
             if ( options instanceof String ) {
                 displaySrc = parseSrc = options.valueOf();
@@ -2161,10 +2144,9 @@ module parse {
 
                 name = options['name'] || null;
                 callback = options['onFinish'] || null;
-                debugCallback = options['onDebug'] || null;
             }
 
-            this.parseInner(displaySrc, parseSrc, callback, debugCallback, name);
+            this.parseInner(displaySrc, parseSrc, callback, name);
         }
 
         symbolize(input, callback) {
@@ -2205,7 +2187,7 @@ module parse {
          * 
          */
 
-        cyclicOrSingle(rule: ParserRule) {
+        cyclicOrSingle(rule: IParserRule) {
             this.orSingle(rule);
 
             return this.cyclicDone();
@@ -2278,8 +2260,8 @@ module parse {
                 throw new Error("New rule added, but 'finally' has already been called");
             }
 
-            if ((this.isCyclic || this.isSeperator) && !ignoreSpecial) {
-                throw new Error("Cannot add more rules to a special ParserRule");
+            if ( ( this.isCyclic || this.isSeperator ) && !ignoreSpecial ) {
+                throw new Error( "Cannot add more rules to a special IParserRule" );
             }
         }
 
@@ -2520,13 +2502,13 @@ module parse {
         /*
          * // TODO Implement this comment.
          *
-         * If the ParserRule only contains one Terminal,
-         * or one ParserRule, then it's moved up.
+         * If the IParserRule only contains one Terminal,
+         * or one IParserRule, then it's moved up.
          *
          * This way when it comes to the actual parsing,
          * have managed to chop out a few functions calls.
          */
-        private optimize(): CompiledTerminals {
+        private optimize(): ICompiledTerminals {
             var terminals: Term[] = new Array(this.parseParent.getNumTerminals());
 
             var allRules: ParserRuleImplementation[] = [];
@@ -2543,7 +2525,7 @@ module parse {
          * Converts the rules stored in this parser into a trie
          * of rules.
          */
-        optimizeScan(terminals: Term[], id: number, allRules: ParserRule[]): number {
+        optimizeScan(terminals: Term[], id: number, allRules: IParserRule[]): number {
             if (this.isRecursive === NO_RECURSION) {
                 if (this.compiledId === NO_COMPILE_ID) {
                     this.compiledId = id;
@@ -2585,54 +2567,48 @@ module parse {
             return id;
         }
 
-        private parseInner(input: string, parseInput: string, callback: FinishCallback, debugCallback?: DebugCallback, name?: string): void {
+        private parseInner(input: string, parseInput: string, callback: IFinishCallback, name?: string): void {
             if (input === undefined || input === null) {
                 throw new Error("no 'input' value provided");
-            }
-
-            if (
-                    debugCallback !== undefined &&
-                    debugCallback !== null &&
-                    !isFunction(debugCallback)
-            ) {
-                throw new Error("Invalid debugCallback object given");
             }
 
             var self = this,
                 start = Date.now();
 
-            this.parseSymbols( input, parseInput, name, function ( symbols, compileTime, symbolsTime ) {
+            this.parseSymbols( input, parseInput, name, function ( symbols, compileTime: number, symbolsTime: number ) {
                 if ( symbols.hasErrors() ) {
-                    callParseDebug( debugCallback, symbols,
+                    callback( [], symbols.getErrors(),
+                        newTimeResult(
                             compileTime,
                             symbolsTime,
                             0,
                             Date.now() - start
+                        )
                     );
-
-                    callback( [], symbols.getErrors() );
                 } else {
                     var rulesStart = Date.now();
-                    var result = self.parseRules(symbols, input, parseInput);
+                    var result = self.parseRules( symbols, input, parseInput );
                     var rulesTime = Date.now() - rulesStart;
 
                     var preUtil = Date.now();
                     util.future.run( function () {
-                        callParseDebug(debugCallback, symbols,
+                        callback(
+                            result.result,
+                            result.errors,
+                            newTimeResult(
                                 compileTime,
                                 symbolsTime,
                                 rulesTime,
                                 Date.now() - start
+                            )
                         );
-
-                        callback( result.result, result.errors );
                     });
                 }
-            })
+            });
         }
 
-        private symbolizeInner(input: string, parseInput: string, callback: SymbolizeCallback): void {
-            this.parseSymbols(input, parseInput, null, function (symbols, _compileTime, _symbolsTime) {
+        private symbolizeInner(input: string, parseInput: string, callback: ISymbolizeCallback): void {
+            this.parseSymbols(input, parseInput, null, function (symbols, _compileTime:number, _symbolsTime:number) {
                 callback(symbols.getTerminals(), symbols.getErrors());
             });
         }
@@ -2665,7 +2641,7 @@ module parse {
             util.future.run(function () {
                 var symbolsTime = Date.now();
                 var symbols = _this.parseSymbolsInner(input, parseInput, name);
-                var symbolsTime = Date.now() - symbolsTime;
+                symbolsTime = Date.now() - symbolsTime;
 
                 callback(symbols, compileTime, symbolsTime);
             });
@@ -3218,8 +3194,8 @@ module parse {
 
                 singleIgnore: boolean = ( ignores.length === 1 ),
                 multipleIgnores: boolean = ( ignores.length > 1 ),
-                ignoreTest: TerminalFunction = ( ignores.length === 1 ? ignores[0].typeTestFunction : null ),
-                postIgnoreMatchEvent : TerminalFunction = ( ignores.length === 1 ? ignores[0].postMatch : null ),
+                ignoreTest: ITerminalFunction = ( ignores.length === 1 ? ignores[0].typeTestFunction : null ),
+                postIgnoreMatchEvent : ITerminalFunction = ( ignores.length === 1 ? ignores[0].postMatch : null ),
 
                 literals: Term[] = this.compiled.literals,
                 terminals: Term[] = this.compiled.terminals,
@@ -3235,9 +3211,9 @@ module parse {
 
                 symbolIDToTerms = this.compiled.idToTerms,
 
-                postMatches: TerminalFunction[] = new Array(termsLen),
+                postMatches: ITerminalFunction[] = new Array(termsLen),
 
-                termTests: TerminalFunction[] = [],
+                termTests: ITerminalFunction[] = [],
                 termIDs: number[] = new Array(termsLen),
 
                 /**
@@ -3561,7 +3537,7 @@ module parse {
 
                         symbolI,
 
-                        symbolIDToTerms 
+                        symbolIDToTerms
                 );
             }
         }
@@ -3630,7 +3606,7 @@ module parse {
     function terminalsInner(ps: Parse, t: Term, termName?: string): Term;
     function terminalsInner(ps: Parse, t: string, termName?: string): Term;
     function terminalsInner(ps: Parse, t: any[], termName?: string): Term;
-    function terminalsInner(ps: Parse, t: TerminalFunction, termName?: string): Term;
+    function terminalsInner(ps: Parse, t: ITerminalFunction, termName?: string): Term;
     function terminalsInner(ps: Parse, t: Object, termName?: string): Object;
     function terminalsInner(ps: Parse, t: any, termName?: string):any {
         if (t instanceof Object && !isFunction(t) && !(t instanceof Array)) {
@@ -3702,46 +3678,46 @@ module parse {
             return this.terminalID - (INVALID_TERMINAL + 1);
         }
 
-        rule(): ParserRule {
+        rule(): IParserRule {
             return new ParserRuleImplementation(this);
         }
 
-        name(name: string): ParserRule {
+        name(name: string): IParserRule {
             return new ParserRuleImplementation(this).name(name);
         }
 
-        a(...args: any[]): ParserRule;
-        a() : ParserRule {
+        a(...args: any[]): IParserRule;
+        a() : IParserRule {
             var argsLen = arguments.length, args = new Array( argsLen );
             while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
             return new ParserRuleImplementation(this).thenAll( args );
         }
 
-        or(...args: any[]): ParserRule;
-        or(): ParserRule  {
+        or(...args: any[]): IParserRule;
+        or(): IParserRule  {
             var argsLen = arguments.length, args = new Array( argsLen );
             while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
             return new ParserRuleImplementation(this).orAll(args);
         }
-        either(...args: any[]): ParserRule;
-        either(): ParserRule  {
+        either(...args: any[]): IParserRule;
+        either(): IParserRule  {
             var argsLen = arguments.length, args = new Array( argsLen );
             while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
             return new ParserRuleImplementation(this).orAll(args);
         }
 
-        optional(...args: any[]): ParserRule;
-        optional(): ParserRule  {
+        optional(...args: any[]): IParserRule;
+        optional(): IParserRule  {
             var argsLen = arguments.length, args = new Array( argsLen );
             while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
             return new ParserRuleImplementation(this).optionalAll(args);
         }
-        maybe(...args: any[]): ParserRule;
-        maybe(): ParserRule  {
+        maybe(...args: any[]): IParserRule;
+        maybe(): IParserRule  {
             var argsLen = arguments.length, args = new Array( argsLen );
             while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
@@ -3776,7 +3752,7 @@ module parse {
         }
 
         /**
-         * Used for creating a special ParserRule, which cannot be altered,
+         * Used for creating a special IParserRule, which cannot be altered,
          * that creates a list of rules.
          *
          * These rules are seperated by the seperator given. For example for
@@ -3791,32 +3767,32 @@ module parse {
          * Note how the comma is always between each variable. It won't match
          * commas on the outside.
          */
-        repeatSeperator(match, seperator): ParserRule  {
+        repeatSeperator(match, seperator): IParserRule  {
             return new ParserRuleImplementation(this).repeatSeperator(match, seperator);
         }
 
-        optionalSeperator(match, seperator): ParserRule  {
+        optionalSeperator(match, seperator): IParserRule  {
             return new ParserRuleImplementation(this).optionalSeperator(match, seperator);
         }
 
         /**
-         * A special, one-off ParserRule. This will run the statements given
+         * A special, one-off IParserRule. This will run the statements given
          * repeatedly, until none of them match.
          *
          * This allows certain recursive rules to be built trivially.
          *
          * It's onMatch is called multiple times, allowing you to build up
          */
-        repeatEither(...args: any[]): ParserRule;
-        repeatEither(): ParserRule  {
+        repeatEither(...args: any[]): IParserRule;
+        repeatEither(): IParserRule  {
             var argsLen = arguments.length, args = new Array( argsLen );
             while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
             return new ParserRuleImplementation(this).cyclicOrAll(args);
         }
 
-        repeat(...args: any[]): ParserRule;
-        repeat(): ParserRule  {
+        repeat(...args: any[]): IParserRule;
+        repeat(): IParserRule  {
             var argsLen = arguments.length, args = new Array( argsLen );
             while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
@@ -3839,7 +3815,7 @@ module parse {
         terminals(t: Term): Term;
         terminals(t: string): Term;
         terminals(t: any[]): Term;
-        terminals(t: TerminalFunction): Term;
+        terminals(t: ITerminalFunction): Term;
         terminals(t: Object): any;
         terminals(obj:any): any {
             return terminalsInner(this, obj, null);
@@ -3848,32 +3824,32 @@ module parse {
 
     var pInstance = new Parse();
 
-    export function rule(): ParserRule {
+    export function rule(): IParserRule {
         return new ParserRuleImplementation(pInstance);
     }
 
-    export function name(name: string): ParserRule {
+    export function name(name: string): IParserRule {
         return new ParserRuleImplementation(pInstance).name(name);
     }
 
-    export function a(...args: any[]): ParserRule;
-    export function a(): ParserRule  {
+    export function a(...args: any[]): IParserRule;
+    export function a(): IParserRule  {
         var argsLen = arguments.length, args = new Array( argsLen );
         while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
         return new ParserRuleImplementation(pInstance).thenAll(args);
     }
 
-    export function either(...args: any[]): ParserRule;
-    export function either(): ParserRule  {
+    export function either(...args: any[]): IParserRule;
+    export function either(): IParserRule  {
         var argsLen = arguments.length, args = new Array( argsLen );
         while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
         return new ParserRuleImplementation(pInstance).orAll(args);
     }
 
-    export function optional(...args: any[]): ParserRule;
-    export function optional(): ParserRule  {
+    export function optional(...args: any[]): IParserRule;
+    export function optional(): IParserRule  {
         var argsLen = arguments.length, args = new Array( argsLen );
         while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
@@ -3891,24 +3867,24 @@ module parse {
         return pInstance;
     }
 
-    export function repeatSeperator(match, seperator): ParserRule  {
+    export function repeatSeperator(match, seperator): IParserRule  {
         return new ParserRuleImplementation(pInstance).repeatSeperator(match, seperator);
     }
 
-    export function optionalSeperator(match, seperator): ParserRule  {
+    export function optionalSeperator(match, seperator): IParserRule  {
         return new ParserRuleImplementation(pInstance).optionalSeperator(match, seperator);
     }
 
-    export function repeatEither(...args: any[]): ParserRule;
-    export function repeatEither(): ParserRule  {
+    export function repeatEither(...args: any[]): IParserRule;
+    export function repeatEither(): IParserRule  {
         var argsLen = arguments.length, args = new Array( argsLen );
         while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
         return new ParserRuleImplementation(pInstance).cyclicOrAll(args);
     }
 
-    export function repeat(...args: any[]): ParserRule;
-    export function repeat(): ParserRule {
+    export function repeat(...args: any[]): IParserRule;
+    export function repeat(): IParserRule {
         var argsLen = arguments.length, args = new Array( argsLen );
         while ( argsLen-- > 0 ) { args[argsLen] = arguments[argsLen]; }
 
@@ -3933,7 +3909,7 @@ module parse {
     export function terminals(t: Term): Term;
     export function terminals(t: string): Term;
     export function terminals(t: any[]): Term;
-    export function terminals(t: TerminalFunction): Term;
+    export function terminals(t: ITerminalFunction): Term;
     export function terminals( t:Object ) : any {
         return terminalsInner( pInstance, t, null );
     }
@@ -3948,7 +3924,7 @@ module parse {
     export function terminal( match:Term, termName?:string ): Term;
     export function terminal( match:string, termName?:string ): Term;
     export function terminal( match:number, termName?:string ): Term;
-    export function terminal( match:TerminalFunction, termName?:string ): Term;
+    export function terminal( match:ITerminalFunction, termName?:string ): Term;
     export function terminal( match:any[], termName?:string ): Term;
     export function terminal( match: Object, termName?:string ): Object;
     export function terminal( match:any, termName?:string ) : any {
@@ -3957,11 +3933,10 @@ module parse {
 
     export module terminal {
         /*
-        * These are the terminals provided by Parse,
-        * which people can use to quickly build a language.
-        */
-
-        export var WHITESPACE: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
+         * These are the terminals provided by Parse,
+         * which people can use to quickly build a language.
+         */
+        export var WHITESPACE: ITerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
             while ( code === SPACE || code === TAB ) {
                 code = src.charCodeAt( ++i );
             }
@@ -3970,9 +3945,9 @@ module parse {
         }
 
         /**
-        * A terminal that matches: tabs, spaces, \n and \r characters.
-        */
-        export var WHITESPACE_END_OF_LINE:TerminalFunction = function (src:string, i:number, code:number, len:number): number {
+         * A terminal that matches: tabs, spaces, \n and \r characters.
+         */
+        export var WHITESPACE_END_OF_LINE:ITerminalFunction = function (src:string, i:number, code:number, len:number): number {
             while (code === SPACE || code === TAB || code === SLASH_N || code === SLASH_R) {
                 code = src.charCodeAt( ++i );
             }
@@ -3981,9 +3956,9 @@ module parse {
         }
 
         /**
-        * A number terminal.
-        */
-        export var NUMBER: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
+         * A number terminal.
+         */
+        export var NUMBER: ITerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
             if ( ZERO <= code && code <= NINE ) {
 
                 // 0x hex number
@@ -4029,11 +4004,11 @@ module parse {
         }
 
         /**
-        * A C-style single line comment terminal.
-        * 
-        * Matches everything from a // onwards.
-        */
-        export var C_SINGLE_LINE_COMMENT: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
+         * A C-style single line comment terminal.
+         * 
+         * Matches everything from a // onwards.
+         */
+        export var C_SINGLE_LINE_COMMENT: ITerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
             if ( code === SLASH && src.charCodeAt( i + 1 ) === SLASH ) {
                 i++;
 
@@ -4051,9 +4026,9 @@ module parse {
         }
 
         /**
-        * A C-like multi line comment, matches everything from '/ *' to a '* /', (without the spaces).
-        */
-        export var C_MULTI_LINE_COMMENT: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
+         * A C-like multi line comment, matches everything from '/ *' to a '* /', (without the spaces).
+         */
+        export var C_MULTI_LINE_COMMENT: ITerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
             if ( code === SLASH && src.charCodeAt( i + 1 ) === STAR ) {
                 // +1 is so we end up skipping two characters,
                 // the / and the *, before we hit the next char to check
@@ -4079,9 +4054,9 @@ module parse {
         }
 
         /**
-        * A terminal for a string, double or single quoted.
-        */
-        export var STRING: TerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
+         * A terminal for a string, double or single quoted.
+         */
+        export var STRING: ITerminalFunction = function ( src: string, i: number, code: number, len: number ): number {
             // double quote string
             if ( code === DOUBLE_QUOTE ) {
                 do {

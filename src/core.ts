@@ -19,10 +19,37 @@
 module quby.core {
     var STATEMENT_END = ';\n';
 
+    export interface ITimeResult {
+        parseCompile: number;
+        parseSymbols: number;
+        parseRules: number;
+        parseTotal: number;
+
+        validatorTotal: number;
+        total: number;
+    }
+
+    function newTimeResult( parseTime: parse.ITimeResult, validateTime: number, totalTime: number ): ITimeResult {
+        return {
+            parseCompile: parseTime.compile,
+            parseSymbols: parseTime.symbols,
+            parseRules: parseTime.rules,
+            parseTotal: parseTime.total,
+
+            validatorTotal: validateTime,
+
+            total: totalTime
+        };
+    }
+
+    export interface IDebugCallback {
+        ( t: ITimeResult ): void;
+    }
+
     /**
      * An interface for objects, so we can use them as maps.
      */
-    export interface MapObj<T> {
+    export interface IMapObj<T> {
         [key: string]: T;
     }
 
@@ -53,11 +80,16 @@ module quby.core {
     export function runParser(instance:quby.main.ParserInstance, validator: Validator, errHandler:(err:Error) => void) {
         instance.lock();
 
+        var debugFun = instance.getDebugFun();
+        var start = Date.now();
+
         quby.parser.parseSource(
                 instance.getSource(),
                 instance.getName(),
 
-                function(program:quby.ast.ISyntax, errors:parse.ParseError[]) {
+            function ( program: quby.ast.ISyntax, errors: parse.ParseError[], parserTime: parse.ITimeResult ) {
+                    var validateStart = Date.now();
+
                     validator.errorHandler( errHandler );
                     validator.adminMode( instance.isAdmin() );
                     validator.strictMode( instance.isStrict() );
@@ -69,13 +101,17 @@ module quby.core {
                     }
 
                     var callback = instance.getFinishedFun();
+                    var validateTime = Date.now() - validateStart;
+                    var totalTime = Date.now() - start;
+
+                    if ( debugFun ) {
+                        debugFun( newTimeResult( parserTime, validateTime, totalTime ) );
+                    }
 
                     if ( callback ) {
                         util.future.runFun( callback );
                     }
-                },
-
-                instance.getDebugFun()
+                }
         );
     }
 
@@ -126,7 +162,7 @@ module quby.core {
         };
     }
 
-    export interface ErrorInfo {
+    export interface IErrorInfo {
         name: string;
         line: number;
         message: string;
@@ -134,7 +170,7 @@ module quby.core {
     }
 
     export class Validator {
-        private errors: ErrorInfo[];
+        private errors: IErrorInfo[];
 
         /*
          * Used for the script name, for when reporting errors.
@@ -161,7 +197,7 @@ module quby.core {
         private rootClass: RootClassProxy;
         private symbols: SymbolTable;
 
-        private classes: MapObj<quby.core.ClassValidator>;
+        private classes: IMapObj<quby.core.ClassValidator>;
 
         private endValidateCallbacks: { (v: Validator): void; }[];
 
@@ -170,19 +206,19 @@ module quby.core {
         /**
          * Stores scope of variables in general.
          */
-        private vars: MapObj<quby.ast.LocalVariable>[];
+        private vars: IMapObj<quby.ast.LocalVariable>[];
 
         /**
          * Stores scope levels specifically within current function.
          */
-        private funVars: MapObj<quby.ast.LocalVariable>[];
+        private funVars: IMapObj<quby.ast.LocalVariable>[];
 
         /**
          * These all bind in the form:
          *  { callname -> Function }
          */
-        private funs: MapObj<quby.ast.IFunctionDeclarationMeta>;
-        private calledMethods: MapObj<quby.ast.IFunctionMeta>;
+        private funs: IMapObj<quby.ast.IFunctionDeclarationMeta>;
+        private calledMethods: IMapObj<quby.ast.IFunctionMeta>;
         private methodNames: FunctionTable;
 
         private usedFunsStack: quby.ast.FunctionCall[];
@@ -193,8 +229,8 @@ module quby.core {
          * These both hold:
          *  { callName -> GlobalVariable }
          */
-        private globals: MapObj<boolean>;
-        private usedGlobals: MapObj<quby.ast.GlobalVariable>;
+        private globals: IMapObj<boolean>;
+        private usedGlobals: IMapObj<quby.ast.GlobalVariable>;
 
         private errHandler: (err: Error) => void;
 
@@ -307,8 +343,8 @@ module quby.core {
                 // if super relationship is set later in the app
                 if (!oldKlassHead.hasSuper() && klassHead.hasSuper()) {
                     oldKlass.setHeader(klassHead);
-                } else if (oldKlassHead.hasSuper() && klassHead.hasSuper()) {
-                    if (oldKlassHead.getSuperCallName() != klassHead.getSuperCallName()) {
+                } else if ( oldKlassHead.hasSuper() && klassHead.hasSuper() ) {
+                    if ( oldKlassHead.getSuperCallName() !== klassHead.getSuperCallName() ) {
                         this.parseError(klass.getOffset(), "Super class cannot be redefined for class '" + klass.getName() + "'.");
                     }
                 }
@@ -459,7 +495,7 @@ module quby.core {
                     0;
 
             for (var i = this.vars.length - 1; i >= stop; i--) {
-                if (this.vars[i][id] != undefined) {
+                if (this.vars[i][id] !== undefined) {
                     return true;
                 }
             }
@@ -594,11 +630,11 @@ module quby.core {
             });
         }
 
-        getErrors() : ErrorInfo[] {
+        getErrors() : IErrorInfo[] {
             var errors = this.errors;
 
-            if (errors.length > 0) {
-                errors.sort( (a:ErrorInfo, b:ErrorInfo) => {
+            if ( errors.length > 0 ) {
+                errors.sort( ( a: IErrorInfo, b: IErrorInfo ) => {
                     if (a.name === b.name) {
                         var aLine = a.line;
                         if ( aLine === null ) {
@@ -739,43 +775,60 @@ module quby.core {
              * confirmed as being defined. Note this can include multiple calls
              * to the same functions. 
              */
-            for (var usedFunsI in this.usedFunsStack) {
-                var fun:quby.ast.FunctionCall = this.usedFunsStack[usedFunsI];
+            var funs = this.funs;
+            var usedFunsStack = this.usedFunsStack;
+            var usedFunsStackKeys = Object.keys( usedFunsStack );
+
+            for ( var i = 0; i < usedFunsStackKeys.length; i++ ) {
+                var fun:quby.ast.FunctionCall = usedFunsStack[usedFunsStackKeys[i]];
                 var callName = fun.getCallName();
 
                 // check if the function is not defined
-                if ( this.funs[callName] === undefined ) {
-                    this.searchMissingFunAndError(fun, this.funs, 'function');
+                if ( funs[callName] === undefined ) {
+                    this.searchMissingFunAndError(fun, funs, 'function');
                 }
             }
 
             /* Check all used globals were assigned to, at some point. */
-            for (var strGlobal in this.usedGlobals) {
-                if ( this.globals[strGlobal] === undefined ) {
-                    var global = this.usedGlobals[strGlobal];
+            var globals = this.globals;
+            var usedGlobals = this.usedGlobals;
+            var usedGlobalsKeys = Object.keys( usedGlobals );
+
+            for ( var i = 0; i < usedGlobalsKeys.length; i++ ) {
+                var strGlobal = usedGlobalsKeys[i];
+
+                if ( globals[strGlobal] === undefined ) {
+                    var global = usedGlobals[strGlobal];
 
                     this.parseError(global.getOffset(), "Global used but never assigned to: '" + global.getName() + "'.");
                 }
             }
 
             /* finalise all classes */
-            for (var klassI in this.classes) {
-                this.classes[klassI].endValidate();
+            var classes = this.classes;
+            var classesKeys = Object.keys( classes );
+            var classesKeysLength = classesKeys.length;
+
+            for ( var i = 0; i < classesKeysLength; i++ ) {
+                classes[classesKeys[i]].endValidate();
             }
 
             /* Ensure all called methods do exist (somewhere) */
-            for (var methodI in this.calledMethods) {
-                var methodFound = false;
-                var method:quby.ast.IFunctionMeta = this.calledMethods[methodI];
+            var calledMethods = this.calledMethods;
+            var calledMethodKeys = Object.keys( calledMethods );
 
-                for (var klassI in this.classes) {
-                    if (this.classes[klassI].hasFun(method)) {
+            for ( var i = 0; i < calledMethodKeys.length; i++ ) {
+                var method:quby.ast.IFunctionMeta = calledMethods[calledMethodKeys[i]];
+                var methodFound = false;
+
+                for ( var j = 0; j < classesKeysLength; j++ ) {
+                    if (classes[classesKeys[j]].hasFun(method)) {
                         methodFound = true;
                         break;
                     }
                 }
 
-                if (!methodFound) {
+                if ( ! methodFound ) {
                     var found:quby.ast.IFunctionDeclarationMeta = this.searchForMethodLike(method),
                         name = method.getName().toLowerCase(),
                         errMsg:string = null;
@@ -813,8 +866,8 @@ module quby.core {
             try {
                 var printer = new Printer();
 
-                printer.setCodeMode(false);
-                this.generatePreCode(printer);
+            printer.setCodeMode( false );
+            this.generatePreCode( printer );
                 printer.setCodeMode(true);
 
                 for (var i = 0; i < this.programs.length; i++) {
@@ -885,6 +938,11 @@ module quby.core {
             }
         }
 
+        /*
+         * Of all the things this does, it also prints out the methods which
+         * classes inherit from the QubyObject (as this is the parent of all
+         * objects).
+         */
         generatePreCode(p:Printer) {
             this.methodNames.print(p);
             this.symbols.print(p);
@@ -899,6 +957,7 @@ module quby.core {
             if ( stmts !== null ) {
                 for ( var i = 0; i < classes.length; i++ ) {
                     var name = classes[i];
+
                     p.appendExtensionClassStmts( name, stmts );
                 }
             }
@@ -969,7 +1028,7 @@ module quby.core {
 
                     if (found !== null) {
                         // wrong number of parameters
-                        if (found.getName().toLowerCase() == methodName) {
+                        if (found.getName().toLowerCase() === methodName) {
                             return found;
                             // alternative name
                         } else if (altMethod === null) {
@@ -989,7 +1048,7 @@ module quby.core {
          * 'alternative name' is returned, only if 'incorrect parameters' does not come first.
          * Otherwise null is returned.
          */
-        searchMissingFunWithName(name:string, searchFuns:MapObj<quby.ast.IFunctionDeclarationMeta>):quby.ast.IFunctionDeclarationMeta {
+        searchMissingFunWithName(name:string, searchFuns:IMapObj<quby.ast.IFunctionDeclarationMeta>):quby.ast.IFunctionDeclarationMeta {
             var altNames:string[] = [],
                 altFun:quby.ast.IFunctionDeclarationMeta = null;
             var nameLen = name.length;
@@ -1019,7 +1078,7 @@ module quby.core {
                     for (var j = 0; j < altNames.length; j++) {
                         var altName = altNames[j];
 
-                        if (searchName == altName) {
+                        if (searchName === altName) {
                             altFun = searchFun;
                             break;
                         }
@@ -1030,14 +1089,14 @@ module quby.core {
             return altFun;
         }
 
-        searchMissingFun(fun:quby.ast.IFunctionMeta, searchFuns:MapObj<quby.ast.IFunctionDeclarationMeta>) : quby.ast.IFunctionDeclarationMeta {
+        searchMissingFun(fun:quby.ast.IFunctionMeta, searchFuns:IMapObj<quby.ast.IFunctionDeclarationMeta>) : quby.ast.IFunctionDeclarationMeta {
             return this.searchMissingFunWithName(fun.getName().toLowerCase(), searchFuns);
         }
 
         /**
          *
          */
-        searchMissingFunAndError(fun:quby.ast.IFunctionMeta, searchFuns:MapObj<quby.ast.IFunctionDeclarationMeta>, strFunctionType:string) {
+        searchMissingFunAndError(fun:quby.ast.IFunctionMeta, searchFuns:IMapObj<quby.ast.IFunctionDeclarationMeta>, strFunctionType:string) {
             var name = fun.getName(),
                 lower = name.toLowerCase(),
                 found = this.searchMissingFunWithName(name, searchFuns),
@@ -1071,8 +1130,8 @@ module quby.core {
     class LateFunctionBinder {
         private validator: Validator;
 
-        private classVals: MapObj<quby.core.ClassValidator>;
-        private classFuns: MapObj<MapObj<quby.ast.FunctionCall[]>>;
+        private classVals: IMapObj<quby.core.ClassValidator>;
+        private classFuns: IMapObj<IMapObj<quby.ast.FunctionCall[]>>;
 
         private currentClassV: ClassValidator = null;
 
@@ -1108,23 +1167,35 @@ module quby.core {
             innerFuns.push(fun);
         }
 
-        endValidate(globalFuns:MapObj<quby.ast.IFunctionMeta>) {
-            for (var className in this.classVals) {
-                var klassV = this.classVals[className];
-                var funs = this.classFuns[className];
+        endValidate(globalFuns:IMapObj<quby.ast.IFunctionMeta>) {
+            var classFuns = this.classFuns;
+            var classVals = this.classVals;
+            var classValsKeys = Object.keys( classVals );
 
-                for (var funName in funs) {
+            for ( var i = 0; i < classValsKeys.length; i++ ) {
+                var className = classValsKeys[i];
+                var klassV    = classVals[className];
+                var funs      = classFuns[className];
+                var funsKeys  = Object.keys( funs );
+
+                for ( var j = 0; j < funsKeys.length; j++ ) {
+                    var funName = funsKeys[j];
                     var innerFuns:quby.ast.FunctionCall[] = funs[funName];
                     var fun = innerFuns[0];
 
                     if (klassV.hasFunInHierarchy(fun)) {
-                        for (var i = 0; i < innerFuns.length; i++) {
-                            innerFuns[i].setIsMethod();
+                        for (var k = 0; k < innerFuns.length; k++) {
+                            innerFuns[k].setIsMethod();
                         }
                     } else if (!globalFuns[funName]) {
-                        for (var i = 0; i < innerFuns.length; i++) {
-                            var f = innerFuns[i];
-                            this.validator.parseError(f.getOffset(), "Function '" + f.getName() + "' called with " + f.getNumParameters() + " parameters, but is not defined in this class or as a function.");
+                        for (var k = 0; k < innerFuns.length; k++) {
+                            var f = innerFuns[k];
+
+                            this.validator.parseError( f.getOffset(),
+                                    "Undefined function '" + f.getName() +
+                                    "' called with " + f.getNumParameters() + " parameters," +
+                                    " but is not defined in this class or as a function."
+                            );
                         }
                     }
                 }
@@ -1140,7 +1211,7 @@ module quby.core {
      * have been called but don't exist on the object.
      */
     class FunctionTable {
-        private funs: MapObj<string>;
+        private funs: IMapObj<string>;
         private size: number;
 
         constructor() {
@@ -1155,7 +1226,7 @@ module quby.core {
 
         callNames( callback : (callName:string) => void ) {
             for ( var callName in this.funs ) {
-                callback(callName)
+                callback( callName );
             }
         }
 
@@ -1195,7 +1266,7 @@ module quby.core {
      * This is printed into the resulting code for use at runtime.
      */
     class SymbolTable {
-        private symbols: MapObj<string>;
+        private symbols: IMapObj<string>;
 
         constructor() {
             this.symbols = {};
@@ -1235,7 +1306,7 @@ module quby.core {
             }
         }
 
-        getClass() {
+        getClass():quby.core.ClassValidator {
             return this.rootClass;
         }
 
@@ -1265,12 +1336,12 @@ module quby.core {
         private validator: Validator;
         private klass:quby.ast.IClassDeclaration;
 
-        private funs: MapObj<quby.ast.IFunctionDeclarationMeta>;
-        private usedFuns: MapObj<quby.ast.IFunctionMeta>;
+        private funs: IMapObj<quby.ast.IFunctionDeclarationMeta>;
+        private usedFuns: IMapObj<quby.ast.IFunctionMeta>;
         private news : quby.ast.IFunctionMeta[];
 
-        private usedFields: MapObj<quby.ast.FieldVariable>;
-        private assignedFields: MapObj<quby.ast.FieldVariable>;
+        private usedFields: IMapObj<quby.ast.FieldVariable>;
+        private assignedFields: IMapObj<quby.ast.FieldVariable>;
 
         private noMethPrintFuns: string[];
 
@@ -1626,17 +1697,17 @@ module quby.core {
         private stmts: string[];
         private preOrStmts: string[];
 
-        private currentPre: PrinterStatement;
-        private currentStmt: PrinterStatement;
-        private current: PrinterStatement;
+        private currentPre: IPrinterStatement;
+        private currentStmt: IPrinterStatement;
+        private current: IPrinterStatement;
 
         constructor() {
             this.pre = [];
             this.stmts = [];
             this.preOrStmts = this.stmts;
 
-            this.currentPre = new PrinterStatement();
-            this.currentStmt = new PrinterStatement();
+            this.currentPre = newPrinterStatement();
+            this.currentStmt = newPrinterStatement();
             this.current = this.currentStmt;
 
             this.isCode = true;
@@ -1678,17 +1749,26 @@ module quby.core {
             }
         }
 
-        appendExtensionClassStmts(name: string, stmts) {
-            var stmtsStart = quby.runtime.translateClassName(name) + '.prototype.';
+        appendExtensionClassStmts( name: string, stmts: quby.ast.ISyntax[] ) {
+            var stmtsStart = quby.runtime.translateClassName( name ) + '.prototype.';
 
-            for (var key in stmts) {
-                var fun = stmts[key];
 
-                if (fun.isConstructor()) {
-                    fun.print(this);
+            for ( var i = 0; i < stmts.length; i++ ) {
+                var fun = stmts[i];
+
+                // todo this shouldn't need a type check,
+                // should be more type safe
+                if ( fun['isConstructor'] && ( <any> fun ).isConstructor() ) {
+                    fun.print( this );
                 } else {
-                    this.append(stmtsStart);
-                    fun.print(this);
+                    this.append( stmtsStart );
+
+                if ( !window['quby_doOnce'] ) {
+                    console.log( fun );
+
+                    window['quby_doOnce'] = true;
+                }
+                    fun.print( this );
                 }
 
                 this.endStatement();
@@ -1699,7 +1779,7 @@ module quby.core {
             for (
                     var i = 0, len = arr.length;
                     i < len;
-                    i++
+                i++
             ) {
                 arr[i].print(this);
                 this.endStatement();
@@ -1707,34 +1787,35 @@ module quby.core {
         }
 
         flush() {
-            this.current.flush(this.preOrStmts);
+            this.current.flush( this.preOrStmts );
 
             return this;
         }
 
         endStatement() {
-            this.append(STATEMENT_END);
+            this.current.appendNow( STATEMENT_END );
 
             return this.flush();
         }
 
         toString() {
-            // concat everything into this.pre ...
-            this.currentPre.flush(this.pre);
-            util.array.addAll(this.pre, this.stmts);
-            this.currentStmt.flush(this.pre); // yes, pass in pre!
+            // finish pre and stmts sections and then concat them out together
+            this.currentPre.flush( this.pre );
+            this.currentStmt.flush( this.stmts );
 
-            return this.pre.join('');
+            return this.pre.join( '' ) + this.stmts.join( '' );
         }
 
-        appendPre(...strs: string[]);
+        /*
+         * As a small optimization, no intermediate buffer is needed when
+         * appending 'pre'. When 'append' or 'appendPost' they will always
+         * show up after 'pre'. So we can just push 'pre' on directly 
+         * instead bufferring and flushing it on later.
+         */
+        appendPre( ...strs: string[] );
         appendPre(a: string) {
-            if (arguments.length === 1) {
-                this.current.appendPre(a);
-            } else {
-                for (var i = 0; i < arguments.length; i++) {
-                    this.current.appendPre(arguments[i]);
-                }
+            for (var i = 0; i < arguments.length; i++) {
+                this.preOrStmts.push( arguments[i] );
             }
 
             return this;
@@ -1742,137 +1823,71 @@ module quby.core {
 
         append(...strs: string[]);
         append(a: string) {
-            if (arguments.length === 1) {
-                this.current.appendNow(a);
-            } else {
-                for (var i = 0; i < arguments.length; i++) {
-                    this.current.appendNow(arguments[i]);
-                }
+            for (var i = 0; i < arguments.length; i++) {
+                this.current.appendNow(arguments[i]);
             }
 
             return this;
         }
 
         appendPost(...strs: string[]);
-        appendPost(a: string) {
-            if (arguments.length === 1) {
-                this.current.appendPost(a);
-            } else {
-                for (var i = 0; i < arguments.length; i++) {
-                    this.current.appendPost(arguments[i]);
-                }
-            }
-
-            return this;
-        }
-    }
-
-    // Chrome is much faster at iterating over the arguments array,
-    // maybe I'm hitting an optimization???
-    // see: http://jsperf.com/skip-arguments-check
-    if (util.browser.isChrome) {
-        Printer.prototype.appendPre = function() {
-            for (var i = 0; i < arguments.length; i++) {
-                this.current.appendPre(arguments[i]);
-            }
-
-            return this;
-        };
-        Printer.prototype.append = function() {
-            for (var i = 0; i < arguments.length; i++) {
-                this.current.appendNow(arguments[i]);
-            }
-
-            return this;
-        };
-        Printer.prototype.appendPost = function() {
-            for (var i = 0; i < arguments.length; i++) {
+        appendPost( a: string ) {
+            for ( var i = 0; i < arguments.length; i++ ) {
                 this.current.appendPost(arguments[i]);
             }
 
             return this;
-        };
+        }
     }
 
-    class PrinterStatement {
-        private preStatement: string[] = null;
-        private currentStatement: string[] = null;
-        private postStatement: string[] = null;
+    /**
+     * This is for working on a single statement at a time.
+     * 
+     * It allows you to place strings onto the current statement,
+     * at the start before the current statement, and append so
+     * it always appeares at the end.
+     */
 
-        constructor() {
-        }
+    interface IPrinterStatement {
+        appendNow( e: string ): void;
+        appendPost( e: string ): void;
+        flush( dest: string[] ): void;
+    }
 
-        appendPre(e: string) {
-            if (this.preStatement === null) {
-                this.preStatement = [e];
-            } else {
-                this.preStatement.push(e);
-            }
-        }
-        appendNow(e: string) {
-            if (this.currentStatement === null) {
-                this.currentStatement = [e];
-            } else {
-                this.currentStatement.push(e);
-            }
-        }
-        appendPost(e: string) {
-            if (this.postStatement === null) {
-                this.postStatement = [e];
-            } else {
-                this.postStatement.push(e);
-            }
-        }
+    function newPrinterStatement(): IPrinterStatement {
+        return {
+            currentLength: 0,
+            currentStatement: <string[]>[],
 
-        endAppend(dest: string[], src: string[]) {
-            for (
-                    var i = 0, len = src.length;
-                    i < len;
-                    i++
-            ) {
-                dest[dest.length] = src[i];
-            }
-        }
+            postLength: 0,
+            postStatement: <string[]>[],
 
-        flush(stmts) {
-            if (this.preStatement !== null) {
-                if (this.currentStatement !== null) {
-                    if (this.postStatement !== null) {
-                        this.endAppend(stmts, this.preStatement);
-                        this.endAppend(stmts, this.currentStatement);
-                        this.endAppend(stmts, this.postStatement);
-                    } else {
-                        this.endAppend(stmts, this.preStatement);
-                        this.endAppend(stmts, this.currentStatement);
-                    }
-                } else if (this.postStatement !== null) {
-                    this.endAppend(stmts, this.preStatement);
-                    this.endAppend(stmts, this.postStatement);
-                } else {
-                    this.endAppend(stmts, this.preStatement);
+            appendNow( e: string ): void {
+                this.currentStatement[this.currentLength++] = e;
+            },
+
+            appendPost( e: string ): void {
+                this.postStatement[this.postLength++] = e;
+            },
+
+            flush( dest: string[] ): void {
+                var currentLength = this.currentLength;
+                var postLength = this.postLength;
+
+                var destI = dest.length;
+
+                if ( currentLength !== 0 ) {
+                    var currentStatement = this.currentStatement;
+                    for ( var i = 0; i < currentLength; i++ ) { dest[destI++] = currentStatement[i]; }
+                    this.currentLength = 0;
                 }
 
-                this.clear();
-            } else if (this.currentStatement !== null) {
-                if (this.postStatement !== null) {
-                    this.endAppend(stmts, this.currentStatement);
-                    this.endAppend(stmts, this.postStatement);
-                } else {
-                    this.endAppend(stmts, this.currentStatement);
+                if ( postLength !== 0 ) {
+                    var postStatement = this.postStatement;
+                    for ( var i = 0; i < postLength; i++ ) { dest[destI++] = postStatement[i]; }
+                    this.postLength = 0;
                 }
-
-                this.clear();
-            } else if (this.postStatement !== null) {
-                this.endAppend(stmts, this.postStatement);
-
-                this.clear();
             }
-        }
-
-        clear() {
-            this.preStatement = null;
-            this.currentStatement = null;
-            this.postStatement = null;
         }
     }
 }
