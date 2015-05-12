@@ -75,17 +75,22 @@ rockServer.route({
             var tsTime = getNewestFileTime('../../src', '.ts');
 
             if ( qubytime === 0 || qubytime < tsTime ) {
-                var compile = spawn( 'cmd',
-                        [
-                                '/c',
-                                dir + '../../build/build.bat'
-                        ]
-                );
+                console.log(' ... recompile!');
+                var buildFile = dir + '../../build/build.bat'
+                console.log( 'run ' + buildFile );
+
+                var compile = spawn( 'cmd', [ '/c', buildFile ]);
 
                 var err = '';
                 compile.stderr.on( 'data', function(data) {
                     err += data;
                 } );
+
+                if ( err !== '' ) {
+                    console.log(' -- ERRORZ! --');
+                    console.log( err );
+                    console.log('');
+                }
 
                 compile.on( 'exit', function(code) {
                     if ( code === 0 ) {
@@ -102,6 +107,7 @@ rockServer.route({
                     }
                 } );
             } else {
+                console.log(' ... skip compile');
                 rockServer.serveFile( './../release/quby.js', req, res );
             }
         }

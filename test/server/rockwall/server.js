@@ -400,8 +400,11 @@ exports.Server = (function() {
                 }
             }).listen( port );
 
-            console.log( 'server listening on port, ' + port );
-            console.log( 'public folder, ' + this.realPublicFolder );
+            // print out a load of random useful info
+            console.log();
+            console.log( 'Server listening on port ' + port );
+            console.log( 'Public folder ' + this.realPublicFolder );
+            console.log( 'Current working directory ' + process.cwd() );
         }
     }
 
