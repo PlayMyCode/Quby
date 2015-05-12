@@ -1,11 +1,17 @@
 "use strict";
 
+console.log( '-- cookies ' + document.cookie );
+
 var cookie = getSaveSettings();
-console.log( document.cookie );
-console.log( cookie );
 var includeCore = ( cookie.includeCore !== undefined ? cookie.includeCore : false );
 var isAdmin     = ( cookie.isAdmin     !== undefined ? cookie.isAdmin     : true  );
 var debugMode   = ( cookie.debugMode   !== undefined ? cookie.debugMode   : true  );
+
+updateSaveSettings(function(obj) {
+    obj.includeCore = includeCore;
+    obj.isAdmin     = isAdmin;
+    obj.debugMode   = debugMode;
+});
 
 var scriptsLoading = 0,
     scriptsLoadFuns = [],
@@ -110,31 +116,21 @@ function addScripts( prefix, libs, type ) {
 }
 
 function switchDebugMode() {
-    debugMode = !debugMode;
-
-    updateSaveSettings(function(info) {
-        info.debugMode = debugMode;
-    });
+    debugMode = ! debugMode;
+    setSaveSetting( 'debugMode', debugMode );
 }
 
 function switchIncludeCore() {
     includeCore = !includeCore;
-
-    updateSaveSettings(function(info) {
-        info.includeCore = includeCore;
-    });
+    setSaveSetting( 'includeCore', includeCore );
 }
 
 function switchIsAdmin() {
     isAdmin = !isAdmin;
-
-    updateSaveSettings(function(info) {
-        info.isAdmin = isAdmin;
-    });
+    setSaveSetting( 'isAdmin', isAdmin );
 }
     
 function setCheckbox( id, checked ) {
-    console.log( 'set id ' + id, checked );
     document.getElementById( id ).checked = !! checked ;
 }
 
@@ -160,7 +156,6 @@ function getSaveSettings() {
                 // Something has gone wrong with parsing so wipe the settings.
                 // We can't parse them so whatever they are they must be corrupt.
                 documeent.cookie = 'settings=;expires=' + +new Date() ;
-                console.log(document.cookie);
             }
         }
     }
@@ -183,15 +178,18 @@ function setSaveSetting( key, value ) {
 
 function updateSaveSettings( callback ) {
     var obj = getSaveSettings();
-    callback(obj);
-    setSaveSettings(obj);
+    callback( obj );
+    setSaveSettings( obj );
 }
 
 
-
 /**
- * WARNING! This is a blocking function. It does not take a callback, instead
- * it blocks processing of the script until the request has finished.
+ * WARNING! This is a BLOCKING function!
+ *
+ * This is a blocking function. It does not take a callback, instead it blocks
+ * processing of the script until the request has finished.
+ *
+ * This is done for ease of programming.
  */
 function getSourceFile(url) {
     var xmlhttp = new XMLHttpRequest();
@@ -286,20 +284,24 @@ function parseCodeInner( callback ) {
     var parser = new quby.main.Parser();
     parser.errorHandler( handleError );
 
-    var compileTime = 0,
-        symbolsTime = 0,
-        rulesTime = 0,
-        parseTotal = 0,
-        validateTime = 0,
-        printTime = 0,
-        finalizeTime = 0,
+    var compileTime     = -1,
+        symbolsTime     = -1,
+        rulesTime       = -1,
+        parseTotal      = -1,
+        validateTime    = -1,
+        printTime       = -1,
+        finalizeTime    = -1,
         pageTime = Date.now();
 
     var updateControlsTime = function( times ) {
-        compileTime += times.parseCompile || '?';
-        symbolsTime += times.parseSymbols || '?';
-        rulesTime   += times.parseRules   || '?';
-        parseTotal  += times.parseTotal   || '?';
+        console.log(' -- times');
+        console.log( times );
+        console.log('');
+
+        compileTime += ( times.parseCompile !== undefined ) ? times.parseCompile : 0;
+        symbolsTime += ( times.parseSymbols !== undefined ) ? times.parseSymbols : 0;
+        rulesTime   += ( times.parseRules   !== undefined ) ? times.parseRules   : 0;
+        parseTotal  += ( times.parseTotal   !== undefined ) ? times.parseTotal   : 0;
 
         if (times.validateTime !== undefined) {
             validateTime = times.validateTime;
@@ -311,31 +313,39 @@ function parseCodeInner( callback ) {
             finalizeTime = times.finalise;
         }
 
+        var strCompileTime     = compileTime    !== -1 ? compileTime  : '?',
+            strSymbolsTime     = symbolsTime    !== -1 ? symbolsTime  : '?',
+            strRulesTime       = rulesTime      !== -1 ? rulesTime    : '?',
+            strParseTotal      = parseTotal     !== -1 ? parseTotal   : '?',
+            strValidateTime    = validateTime   !== -1 ? validateTime : '?',
+            strPrintTime       = printTime      !== -1 ? printTime    : '?',
+            strFinalizeTime    = finalizeTime   !== -1 ? finalizeTime : '?'
+
         var timeLen = Math.max(
-                numDigitsInInt(compileTime),
-                numDigitsInInt(symbolsTime),
-                numDigitsInInt(rulesTime),
-                numDigitsInInt(parseTotal),
-                numDigitsInInt(validateTime),
-                numDigitsInInt(printTime),
-                numDigitsInInt(finalizeTime)
+                numDigitsInInt( strCompileTime  ),
+                numDigitsInInt( strSymbolsTime  ),
+                numDigitsInInt( strRulesTime    ),
+                numDigitsInInt( strParseTotal   ),
+                numDigitsInInt( strValidateTime ),
+                numDigitsInInt( strPrintTime    ),
+                numDigitsInInt( strFinalizeTime )
         ) + 1;
 
         document.getElementsByClassName('controls-time-info')[0].innerHTML =
-                "compile " + padStr(compileTime, timeLen)           + "ms<br/>" +
-                "symbols " + padStr(symbolsTime, timeLen)           + "ms<br/>" +
-                  "rules " + padStr(rulesTime, timeLen)             + "ms<br/>" +
-            "parse total " + padStr(parseTotal, timeLen)            + "ms<br/>" +
+                "compile " + padStr(strCompileTime  , timeLen)      + "ms<br/>" +
+                "symbols " + padStr(strSymbolsTime  , timeLen)      + "ms<br/>" +
+                  "rules " + padStr(strRulesTime    , timeLen)      + "ms<br/>" +
+            "parse total " + padStr(strParseTotal   , timeLen)      + "ms<br/>" +
                                                                         "<br/>" +
-             "validation " + padStr(validateTime, timeLen)          + "ms<br/>" +
-                  "print " + padStr(printTime, timeLen)             + "ms<br/>" +
-               "finalize " + padStr(finalizeTime, timeLen)          + "ms<br/>" +
+             "validation " + padStr(strValidateTime , timeLen)      + "ms<br/>" +
+                  "print " + padStr(strPrintTime    , timeLen)      + "ms<br/>" +
+               "finalize " + padStr(strFinalizeTime , timeLen)      + "ms<br/>" +
                                                                         "<br/>" +
              "page total " + padStr(Date.now() - pageTime, timeLen) + "ms"      ;
     };
 
-    if (includeCore) {
-        var core = getSourceFile("./core.qb");
+    if ( includeCore ) {
+        var core = getSourceFile( "./core.qb" );
 
         parser.
                 parse(core).
@@ -425,6 +435,7 @@ window.addEventListener( 'load', function() {
 
     var qbFileCache = {};
     var currentOption = null;
+    var filesDom = document.querySelector( '.js-code-files' );
 
     var setQbSrc = function( nextOption ) {
         if ( currentOption !== nextOption ) {
@@ -439,27 +450,38 @@ window.addEventListener( 'load', function() {
             }
 
             currentOption = nextOption;
-            setSaveSetting( 'qb-file', nextOption );
+            setSaveSetting( 'qbFile', nextOption );
+
+            var options = filesDom.querySelectorAll( 'option' );
+            for ( var i = 0; i < options.length; i++ ) {
+                var option = options[i];
+
+                if ( option.value === nextOption ) {
+                    option.selected = true;
+                } else if ( option.selected ) {
+                    option.selected = false;
+                }
+            }
         }
     };
 
-    var qbCookieFile = getSaveSettings().qbFile;
-    if ( qbCookieFile ) {
-        setQbSrc( qbCookieFile );
-    }
-
-    var filesDom = document.querySelector( '.js-code-files' );
     for ( var i = 0; i < qubyFiles.length; i++ ) {
         var qbFile = qubyFiles[i];
         var optionDom = document.createElement( 'option' );
 
         optionDom.textContent = qbFile.name;
         optionDom.value = qbFile.src;
-        if ( qbFile.src === qbCookieFile ) {
-            optionDom.selected = true;
-        }
 
         filesDom.appendChild( optionDom );
+    }
+
+    // if a selected file is saved then select it
+    // or select the first item
+    var qbCookieFile = getSaveSettings().qbFile;
+    if ( qbCookieFile ) {
+        setQbSrc( qbCookieFile );
+    } else if ( qubyFiles.length > 0 ) {
+        setQbSrc( qubyFiles[0].src );
     }
 
     filesDom.addEventListener( 'change', function(ev) {
