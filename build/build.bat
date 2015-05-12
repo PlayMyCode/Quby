@@ -14,6 +14,10 @@ if not defined TSC_COMPILER (
         if exist "C:\Program Files (x86)\Microsoft SDKs\TypeScript\tsc.exe" (
             set TSC_COMPILER="C:\Program Files (x86)\Microsoft SDKs\TypeScript\tsc.exe"
         )
+
+        if exist "C:\Program Files (x86)\Microsoft SDKs\TypeScript\1.5\tsc.exe" (
+            set TSC_COMPILER="C:\Program Files (x86)\Microsoft SDKs\TypeScript\1.5\tsc.exe"
+        )
     )
 ) else (
     set TSC_COMPILER="%TSC_COMPILER%"
