@@ -1,0 +1,13 @@
+
+def f( a )
+    return a*2
+end
+
+f( 2 )
+f 2 
+
+def sin( min, max )
+    halfDiff = (max - min) / 2
+    return min + halfDiff + halfDiff*#<# Math.sin( this ) #># 
+end
+
