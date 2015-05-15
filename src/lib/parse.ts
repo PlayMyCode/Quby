@@ -274,6 +274,10 @@
  */
 
 module parse {
+    export interface ILogErrorFunction {
+        ( msg: string, i: number ): void;
+    }
+
     /**
      * Whilst you can return undefined or false or some other falsy value from this,
      * for performance reasons it is advised that you *always* return a number.
@@ -282,6 +286,7 @@ module parse {
      */
     export interface ITerminalFunction {
         (src: string, i: number, code: number, len: number): number;
+        (src: string, i: number, code: number, len: number, logError:ILogErrorFunction ): number;
     }
 
     export interface IMatchFoundFunction {
@@ -296,8 +301,8 @@ module parse {
         /**
          * This is the total time the parser took.
          * 
-         * Note this is *not* the other values added up, as the amount taken in total
-         * can be much greater than the other values due to sleeps.
+         * Note this is will probably be *more* than the other values added up
+         * as they do not take into account sleeps.
          */
         total: number;
     }
@@ -307,9 +312,9 @@ module parse {
         name(): string;
     }
 
-    export interface ISymbolizeCallback { ( terminals: Term[], errors: SymbolError[] ): void; };
+    export interface ISymbolizeCallback { ( terminals: Term[], errors: IParseError[] ): void; };
 
-    export interface IFinishCallback { ( result: any, errors: ParseError[], time: ITimeResult ): void; };
+    export interface IFinishCallback { ( result: any, errors: IParseError[], time: ITimeResult ): void; };
 
     interface ICompiledTerminals {
         literals: Term[];
@@ -540,7 +545,7 @@ module parse {
          */
         TYPE_ARRAY = 5;
 
-    var BLANK_TERMINAL_FUNCTION: ITerminalFunction = ( src: string, i: number, code: number, len: number ) => i;
+    var BLANK_TERMINAL_FUNCTION: ITerminalFunction = ( src: string, i: number, code: number, len: number ) => 0;
 
     /**
      * Given a string, this turns it into an array of char codes,
@@ -902,6 +907,10 @@ module parse {
             }
         }
 
+        toString(): string {
+            return this.termName;
+        }
+
         getParentTerm():Term {
             if ( this.terminalParent !== null ) {
                 return this.terminalParent.getParentTerm();
@@ -1015,72 +1024,72 @@ module parse {
      *
      *  **  **  **  **  **  **  **  **  **  **  **  **  */
 
-    export class ParseError {
-        public isSymbol: boolean = false;
-        public isTerminal: boolean = false;
-
-        public source: SourceLines;
-
-        public offset: number;
-        public endOffset: number;
-
-        constructor( source:SourceLines, offset:number, endI:number ) {
-            this.source = source;
-            this.offset = offset;
-            this.endOffset = endI;
-        }
-
-        getMatch(): string {
-            return this.source.substring( this.offset, this.endOffset );
-        }
-
-        getLine(): number {
-            return this.source.getLine(this.offset);
-        }
-    }
-
     /**
-     * This is a type of error generated when parsing the
-     * source code, into a list of symbols.
+     * The basic struct which makes up an error.
      * 
-     * That is during the symbolization stage, before the
-     * grammar rules are checked.
+     * It holds the line where the error is found, what
+     * source code matches against it, and a provided
+     * default message.
      */
-    export class SymbolError extends ParseError {
-        public isSymbol = true;
+    export class IParseError {
+        public match   : string;
+        public line    : number;
+        public message : string;
+    }
 
-        constructor( sourceLines: SourceLines, i: number, endI: number ) {
-            super( sourceLines, i, endI );
+    function newParseError(sourceLines:SourceLines, startI:number, endI:number):IParseError {
+        var match = this.source.substring( startI, endI );
 
-            this.isSymbol = true;
+        return {
+            match   : match,
+            line    : this.source.getLine( startI ),
+            message :  "error parsing '" + match + "'"
         }
     }
 
     /**
-     * This is a type of error generated whilst the grammar
-     * rules are worked on.
+     * This is a type of error generated whilst the grammar rules are 
+     * worked on.
      */
-    export class TerminalError extends ParseError {
-        public isTerminal = true;
+    function newRuleError( symbol:Symbol, expected: string[] ):IParseError {
+        var source = symbol.source;
+        var startI = symbol.offset;
+        var endI   = symbol.endOffset;
 
-        public terminal: Term;
-        public terminalName: string;
+        var match  = source.substring( startI, endI );
+        var line   = source.getLine( startI );
+        var term   = symbol.terminal;
+        var errMsg = '';
 
-        public isLiteral: boolean;
+        if (term.isLiteral || util.str.trim(match) === '') {
+            errMsg = "syntax error near '" + term.getName() + "'";
+        } else {
+            var errorMatch = match;
+            if ( errorMatch.indexOf( "\n" ) !== -1 ) {
+                errorMatch = "\n    '" + errorMatch.split( "\n" ).join( "\n    " ) + "'";
+            } else {
+                errorMatch = "'" + errorMatch + "'";
+            }
 
-        public expected: string[];
-
-        constructor (symbol: Symbol, expected: string[]) {
-            super( symbol.source, symbol.offset, symbol.endOffset );
-
-            var term = symbol.terminal;
-
-            this.terminal = term;
-            this.terminalName = term.getName();
-            this.isLiteral = term.isLiteral;
-            this.expected = expected;
+            errMsg = "syntax error near " + term.getName() + " " + errorMatch;
         }
-    };
+
+        if (expected.length > 0) {
+            errMsg += ', expected ';
+
+            if (expected.length > 1) {
+                errMsg += expected.slice(0, expected.length - 1).join(', ') + ' or ' + expected[expected.length - 1];
+            } else {
+                errMsg += expected.join(' or ');
+            }
+        }
+
+        return {
+            match   : match,
+            line    : line,
+            message : errMsg
+        }
+    }
 
     /**
      * SourceLines deals with translations made to an original source code file.
@@ -1164,7 +1173,7 @@ module parse {
             return this.source.substring( i, end );
         }
 
-        getSourceName():string {
+        getName():string {
             return this.name;
         }
 
@@ -1208,8 +1217,8 @@ module parse {
             this.endOffset = endOffset;
             this.source = sourceLines;
 
-            this.match = undefined;
-            this.lower = undefined;
+            this.match = null;
+            this.lower = null;
         }
 
         clone( newMatch: string ): Symbol {
@@ -1234,15 +1243,15 @@ module parse {
         }
 
         getMatch() : string {
-            if ( this.match === undefined ) {
-                this.match = this.source.substring( this.offset, this.endOffset );
+            if ( this.match === null ) {
+                return ( this.match = this.source.substring( this.offset, this.endOffset ) );
+            } else {
+                return this.match;
             }
-
-            return this.match;
         }
 
         getLower() : string {
-            if (this.lower === undefined) {
+            if (this.lower === null) {
                 return (this.lower = this.getMatch().toLowerCase());
             } else {
                 return this.lower;
@@ -1270,8 +1279,12 @@ module parse {
             return this.source.getLine(this.offset);
         }
 
-        getSourceName(): string {
-            return this.source.getSourceName();
+        getSource(): SourceLines {
+            return this.source;
+        }
+
+        toString(): string {
+            return this.getMatch();
         }
     }
 
@@ -1322,31 +1335,30 @@ module parse {
      * need to know if a string is to be skipped or not.
      */
     class SymbolResult {
-        errors: SymbolError[];
+        private errors: IParseError[];
 
-        symbols: Symbol[];
-        symbolIDs: number[];
+        private symbols: Symbol[];
+        private symbolIDs: number[];
 
-        length: number;
-        symbolIndex: number;
-        i: number;
-        maxI: number;
-
+        private length: number;
+        private symbolIndex: number;
+        private i: number;
+        private maxI: number;
 
         /**
          * The last rule reached, when parsing, before an error has occurred.
          */
-        maxRule: ParserRuleImplementation;
-        maxRuleI: number;
+        private maxRule: ParserRuleImplementation;
+        private maxRuleI: number;
 
-        currentString: string;
-        currentID: number;
-        stringI: number;
+        private currentString: string;
+        private currentID: number;
+        private stringI: number;
 
-        symbolIDToTerms: Term[];
+        private symbolIDToTerms: Term[];
 
         constructor (
-                errors:SymbolError[],
+                errors:IParseError[],
 
                 symbols: Symbol[],
                 symbolIDs: number[],
@@ -1443,7 +1455,7 @@ module parse {
             return symbols;
         }
 
-        getErrors():ParseError[] {
+        getErrors():IParseError[] {
             return this.errors;
         }
 
@@ -1699,15 +1711,6 @@ module parse {
         }
     }
 
-    function newTimeResult( compileTime: number, symbolTime: number, rulesTime: number, totalTime: number ): parse.ITimeResult {
-        return {
-            compile: compileTime,
-            symbols: symbolTime,
-            rules: rulesTime,
-            total: totalTime
-        };
-    }
-
     /**
      * @const
      * @private
@@ -1763,11 +1766,7 @@ module parse {
             onFinish: IFinishCallback;
         }): void;
 
-        parseLowerCase(input: string, callback: IFinishCallback);
-        parseUpperCase(input: string, callback: IFinishCallback);
         symbolize(input: string, callback: ISymbolizeCallback): void;
-        symbolizeLowerCase(input: string, callback: ISymbolizeCallback): void;
-        symbolizeUpperCase(input: string, callback: ISymbolizeCallback): void;
     }
 
     /**
@@ -2069,37 +2068,6 @@ module parse {
         }
 
         /**
-         * The same as 'parse', but the string used internally is in
-         * lowercase. This is useful for simplifying your parser,
-         * if the syntax is case insensetive.
-         *
-         * The matches returned are not lower-cased, they will be taken
-         * from the input given.
-         *
-         * The lowercase only affects the terminals, and nothing else.
-         *
-         * @param {string} input The text to parse.
-         * @param callback A function to call when parsing is complete.
-         */
-        parseLowerCase(input, callback) {
-            this.parseInner(input, input.toLowerCase(), callback);
-        }
-
-        /**
-         * The same as 'parseLowerCase', only this hands your terminals
-         * upper case source instead of lower case.
-         *
-         * Like 'parseLowerCase', this only affects what the terminals
-         * see, and doesn't not affect the values that get matched.
-         *
-         * @param {string} input The text to parse.
-         * @param callback A function to call when parsing is complete.
-         */
-        parseUpperCase(input, callback) {
-            this.parseInner(input, input.toUpperCase(), callback);
-        }
-
-        /**
          * Compiles this rule and then parses the given input.
          *
          * This rule, or any children, should not be altered once
@@ -2151,14 +2119,6 @@ module parse {
 
         symbolize(input, callback) {
             this.symbolizeInner(input, input, callback);
-        }
-
-        symbolizeLowerCase(input, callback) {
-            this.symbolizeInner(input, input.toLowerCase(), callback);
-        }
-
-        symbolizeUpperCase(input, callback) {
-            this.symbolizeInner(input, input.toUpperCase(), callback);
         }
 
         optionalThis() {
@@ -2578,29 +2538,26 @@ module parse {
             this.parseSymbols( input, parseInput, name, function ( symbols, compileTime: number, symbolsTime: number ) {
                 if ( symbols.hasErrors() ) {
                     callback( [], symbols.getErrors(),
-                        newTimeResult(
-                            compileTime,
-                            symbolsTime,
-                            0,
-                            Date.now() - start
-                        )
+                        {
+                            compile : compileTime,
+                            symbols : symbolsTime,
+                            rules   : 0,
+                            total   : Date.now() - start
+                        }
                     );
                 } else {
                     var rulesStart = Date.now();
                     var result = self.parseRules( symbols, input, parseInput );
                     var rulesTime = Date.now() - rulesStart;
 
-                    var preUtil = Date.now();
                     util.future.run( function () {
-                        callback(
-                            result.result,
-                            result.errors,
-                            newTimeResult(
-                                compileTime,
-                                symbolsTime,
-                                rulesTime,
-                                Date.now() - start
-                            )
+                        callback( result.result, result.errors,
+                            {
+                                compile : compileTime,
+                                symbols : symbolsTime,
+                                rules   : rulesTime,
+                                total   : Date.now() - start
+                            }
                         );
                     });
                 }
@@ -2608,7 +2565,7 @@ module parse {
         }
 
         private symbolizeInner(input: string, parseInput: string, callback: ISymbolizeCallback): void {
-            this.parseSymbols(input, parseInput, null, function (symbols, _compileTime:number, _symbolsTime:number) {
+            this.parseSymbols(input, parseInput, null, function (symbols:SymbolResult, _compileTime:number, _symbolsTime:number) {
                 callback(symbols.getTerminals(), symbols.getErrors());
             });
         }
@@ -2636,15 +2593,11 @@ module parse {
                 this.hasBeenUsed = false;
             }
 
-            var _this = this;
+            var symbolsTime = Date.now();
+            var symbols = this.parseSymbolsInner(input, parseInput, name);
+            symbolsTime = Date.now() - symbolsTime;
 
-            util.future.run(function () {
-                var symbolsTime = Date.now();
-                var symbols = _this.parseSymbolsInner(input, parseInput, name);
-                symbolsTime = Date.now() - symbolsTime;
-
-                callback(symbols, compileTime, symbolsTime);
-            });
+            callback(symbols, compileTime, symbolsTime);
         }
 
         /**
@@ -2705,10 +2658,10 @@ module parse {
                             errors: errors
                         };
                     } else {
-                        errors.push( new TerminalError( symbols.maxSymbol(), symbols.expected() ) );
+                        errors.push( newRuleError( symbols.maxSymbol(), symbols.expected() ) );
                     }
                 } else {
-                    errors.push(new TerminalError(symbols.maxSymbol(), symbols.expected()));
+                    errors.push(newRuleError(symbols.maxSymbol(), symbols.expected()));
                 }
             }
 
@@ -3181,7 +3134,7 @@ module parse {
          *  strings: a substrings for each symbol, where the terminal stated to return a string
          */
         private parseSymbolsInner( inputSrc: string, src: string, name: string ) {
-            var sourceLines = new SourceLines(inputSrc, name);
+            var source = new SourceLines(inputSrc, name);
 
             var symbolI: number = 0,
 
@@ -3195,26 +3148,26 @@ module parse {
                 singleIgnore: boolean = ( ignores.length === 1 ),
                 multipleIgnores: boolean = ( ignores.length > 1 ),
                 ignoreTest: ITerminalFunction = ( ignores.length === 1 ? ignores[0].typeTestFunction : null ),
-                postIgnoreMatchEvent : ITerminalFunction = ( ignores.length === 1 ? ignores[0].postMatch : null ),
+                postIgnoreMatchEvent: ITerminalFunction = ( ignores.length === 1 ? ignores[0].postMatch : null ),
 
                 literals: Term[] = this.compiled.literals,
                 terminals: Term[] = this.compiled.terminals,
 
                 allTerms: Term[] = ignores.concat( literals, terminals ),
 
-                ignoresLen:number = ignores.length,
-                literalsLen:number = ignoresLen + literals.length,
-                termsLen:number = literalsLen + terminals.length,
+                ignoresLen: number = ignores.length,
+                literalsLen: number = ignoresLen + literals.length,
+                termsLen: number = literalsLen + terminals.length,
 
                 literalsCharArrays: number[][] = [],
                 literalsType: number[] = [],
 
                 symbolIDToTerms = this.compiled.idToTerms,
 
-                postMatches: ITerminalFunction[] = new Array(termsLen),
+                postMatches: ITerminalFunction[] = new Array( termsLen ),
 
                 termTests: ITerminalFunction[] = [],
-                termIDs: number[] = new Array(termsLen),
+                termIDs: number[] = new Array( termsLen ),
 
                 /**
                  * An invalid index in the string, used to denote
@@ -3223,9 +3176,22 @@ module parse {
                  * @const
                  * @private
                  */
-                NO_ERROR = -1,
-                errorStart = NO_ERROR,
-                errors = [];
+                NO_ERROR:number = -1,
+                errorStart:number = NO_ERROR,
+                errors: IParseError[] = [],
+
+                logError: ILogErrorFunction = function ( msg: string, endI: number ) {
+                    if ( endI <= i ) {
+                        endI = i + 1;
+                    }
+                    var match = source.substring( i, endI );
+
+                    errors.push( {
+                        match: match,
+                        line: source.getLine( i ),
+                        message: msg
+                    });
+                };
 
             var literalsLookup: number[][] = [];
 
@@ -3316,13 +3282,13 @@ module parse {
                      */
 
                     if ( singleIgnore ) {
-                        r = ignoreTest( src, i, code, len );
+                        r = ignoreTest( src, i, code, len, logError );
 
                         if ( r > i ) {
                             code = src.charCodeAt( r );
 
                             if ( postIgnoreMatchEvent !== null ) {
-                                var r2 = postIgnoreMatchEvent( src, r, code, len );
+                                var r2 = postIgnoreMatchEvent( src, r, code, len, logError );
 
                                 if ( r2 > r ) {
                                     code = src.charCodeAt( i = r2 );
@@ -3336,14 +3302,14 @@ module parse {
 
                     } else if ( multipleIgnores ) {
                         while ( j < ignoresLen ) {
-                            r = termTests[j]( src, i, code, len );
+                            r = termTests[j]( src, i, code, len, logError );
 
                             if ( r > i ) {
                                 code = src.charCodeAt( r );
 
                                 var postMatchEvent = postMatches[j];
                                 if ( postMatchEvent !== null ) {
-                                    var r2 = postMatchEvent( src, r, code, len );
+                                    var r2 = postMatchEvent( src, r, code, len, logError );
 
                                     if ( r2 > r ) {
                                         code = src.charCodeAt( i = r2 );
@@ -3426,8 +3392,8 @@ module parse {
                                 // This is from the last terminal,
                                 // to this one, but ignores whitespace.
                                 if ( errorStart !== NO_ERROR ) {
-                                    errors.push( new SymbolError(
-                                            sourceLines,
+                                    errors.push( newParseError(
+                                            source,
                                             errorStart,
                                             i
                                     ));
@@ -3439,16 +3405,16 @@ module parse {
                                 if (postMatchEvent !== null) {
                                     code = src.charCodeAt(r);
 
-                                    var r2 = postMatchEvent(src, r, code, len);
+                                    var r2 = postMatchEvent(src, r, code, len, logError);
 
-                                    if (r2 !== undefined && r2 > r) {
+                                    if (r2 > r) {
                                         r = r2;
                                     }
                                 }
 
                                 symbols[symbolI++] = new Symbol(
                                         allTerms[termI],
-                                        sourceLines,
+                                        source,
                                         i,
                                         r
                                 );
@@ -3467,7 +3433,7 @@ module parse {
                      */
 
                     while (j < termsLen) {
-                        r = termTests[j](src, i, code, len);
+                        r = termTests[j]( src, i, code, len, logError );
 
                         if ( r > i ) {
                             symbolIDs[symbolI] = termIDs[j];
@@ -3478,8 +3444,8 @@ module parse {
                             // This is from the last terminal,
                             // to this one, but ignores whitespace.
                             if (errorStart !== NO_ERROR) {
-                                errors.push(new SymbolError(
-                                        sourceLines,
+                                errors.push(newParseError(
+                                        source,
                                         errorStart,
                                         i
                                 ));
@@ -3491,7 +3457,7 @@ module parse {
                             if (postMatchEvent !== null) {
                                 code = src.charCodeAt(r);
 
-                                var r2: number = postMatchEvent( src, r, code, len );
+                                var r2: number = postMatchEvent( src, r, code, len, logError );
 
                                 if (r2 !== 0 && r2 > r) {
                                     r = r2;
@@ -3500,7 +3466,7 @@ module parse {
 
                             symbols[symbolI++] = new Symbol(
                                     allTerms[j],
-                                    sourceLines,
+                                    source,
                                     i,
                                     r
                             );
@@ -3522,8 +3488,8 @@ module parse {
                 }
 
                 if (errorStart !== NO_ERROR && errorStart < len) {
-                    errors.push(new SymbolError(
-                            sourceLines,
+                    errors.push(newParseError(
+                            source,
                             errorStart,
                             i
                     ));

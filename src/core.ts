@@ -87,7 +87,7 @@ module quby.core {
                 instance.getSource(),
                 instance.getName(),
 
-            function ( program: quby.ast.ISyntax, errors: parse.ParseError[], parserTime: parse.ITimeResult ) {
+            function ( program: quby.ast.ISyntax, errors: parse.IParseError[], parserTime: parse.ITimeResult ) {
                     var validateStart = Date.now();
 
                     validator.errorHandler( errHandler );
@@ -127,40 +127,6 @@ module quby.core {
      * @param error The error to parse.
      * @return Info on the error, for display purposes.
      */
-    var formatError = function(error:parse.ParseError): { line: number; msg: string; } {
-        var errLine:number = error.getLine(),
-            strErr:string;
-
-        if ( error.isSymbol ) {
-            strErr = "error parsing '" + error.getMatch() + "'";
-        } else if (error.isTerminal) {
-            var termError = <parse.TerminalError> error;
-
-            if (termError.isLiteral || util.str.trim(termError.getMatch()) === '') {
-                strErr = "syntax error near '" + termError.terminalName + "'";
-            } else {
-                strErr = "syntax error near " + termError.terminalName + " '" + error.getMatch() + "'";
-            }
-
-            var expected = termError.expected;
-            if (expected.length > 0) {
-                strErr += ', expected ';
-
-                if (expected.length > 1) {
-                    strErr += expected.slice(0, expected.length - 1).join(', ') + ' or ' + expected[expected.length - 1];
-                } else {
-                    strErr += expected.join(' or ');
-                }
-            }
-        } else {
-            throw new Error("Unknown parse.js error given to format");
-        }
-
-        return {
-                line: errLine,
-                msg : strErr
-        };
-    }
 
     export interface IErrorInfo {
         name: string;
@@ -596,7 +562,7 @@ module quby.core {
 
         parseError(sym:parse.Symbol, msg:string) {
             if (sym) {
-                this.parseErrorLine(sym.getLine(), msg, sym.getSourceName());
+                this.parseErrorLine(sym.getLine(), msg, sym.getSource().getName());
             } else {
                 this.parseErrorLine(-1, msg);
             }
@@ -685,13 +651,13 @@ module quby.core {
          * or at best, you will receive an incomplete program with random
          * bits missing (which shouldn't be used).
          */
-        finaliseProgram( times: { finalise: number; print: number; }):string {
+        finalizeProgram( times: { finalize: number; print: number; }):string {
             var start = Date.now();
             this.endValidate();
             var end = Date.now();
 
-            var finaliseTime = end - start;
-            times.finalise = finaliseTime;
+            var finalizeTime = end - start;
+            times.finalize = finalizeTime;
 
             if (this.hasErrors()) {
                 return '';
@@ -704,7 +670,7 @@ module quby.core {
         }
 
         // adds a program to be validated by this Validator
-        validate(program:quby.ast.ISyntax, errors:parse.ParseError[]) {
+        validate(program:quby.ast.ISyntax, errors:parse.IParseError[]) {
             // clear this, so errors don't seap across multiple validations
             this.lastErrorName = null;
 
@@ -735,8 +701,8 @@ module quby.core {
                 }
             } else {
                 for (var i = 0; i < errors.length; i++) {
-                    var error = formatError(errors[i]);
-                    this.parseErrorLine(error.line, error.msg);
+                    var error = errors[i];
+                    this.parseErrorLine( error.line, error.message );
                 }
             }
         }
@@ -804,7 +770,7 @@ module quby.core {
                 }
             }
 
-            /* finalise all classes */
+            /* finalize all classes */
             var classes = this.classes;
             var classesKeys = Object.keys( classes );
             var classesKeysLength = classesKeys.length;

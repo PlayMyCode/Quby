@@ -3,6 +3,9 @@
 "use strict";
 
 module quby.parser {
+    // for recording how long it takes to build the parser
+    var startTime = Date.now();
+
     /**
      * quby.parse
      *
@@ -149,262 +152,87 @@ module quby.parser {
     /* Terminals */
 
     /**
-     * Makes minor changes to the source code to get it ready for parsing.
-     *
-     * This is primarily a cheap fix to a number of parser bugs where it expects an
-     * end of line character. This method is for wrapping all of these cheap fixes
-     * into one place.
-     *
-     * It is intended that this method only makes minor changes which results in
-     * source code which is still entirely valid. It should make any major changes.
-     *
-     * @param source The source code to prep.
+     * This chomps up a single line comment and multi-line comments.
+     * 
+     * If a multi-line comment is found which doesn't close then this will log and error. 
      */
-    var preParse = ( function () {
-        var pushWhitespace = function ( newSrc: string[], size: number ) {
-            var diff5 = ( size / 5 ) | 0;
+    var commentsTerminal = function ( src: string, i: number, code: number, len: number, logError:parse.ILogErrorFunction ): number {
+        if ( code === SLASH ) {
+            var nextCode = src.charCodeAt( i + 1 );
+            
+            // single line comments
+            if ( nextCode === SLASH ) {
+                i++;
 
-            // push the whitespace on in clumps of 5 characters
-            for ( var i = 0; i < diff5; i++ ) {
-                newSrc.push( '     ' );
-            }
+                do {
+                    code = src.charCodeAt( ++i );
+                } while ( code !== SLASH_N && code !== SLASH_R && i < len );
 
-            // then push on the remainder
-            var remainder = size % 5;
-            if ( remainder === 1 ) {
-                newSrc.push( ' ' );
-            } else if ( remainder === 2 ) {
-                newSrc.push( '  ' );
-            } else if ( remainder === 3 ) {
-                newSrc.push( '   ' );
-            } else if ( remainder === 4 ) {
-                newSrc.push( '    ' );
-            }
-        };
+            // multi-line comments
+            } else if ( nextCode === STAR ) {
+                var commentI = i;
+                var commentCount = 1;
+                i += 2;
 
-        var getLeft = function ( src: string, i: number ): number {
-            if ( i > 0 ) {
-                return src.charCodeAt( i - 1 );
-            } else {
-                return -1;
-            }
-        };
+                // we move along 1 char code at a time
+                // but we keep 2 in memory
+                code = src.charCodeAt( i );
+                nextCode = src.charCodeAt( ++i );
 
-        var getRight = function ( src: string, i: number ): number {
-            return getR( src, i + 1 );
-        };
+                do {
+                    // closing a multi-line comment
+                    if ( code === STAR && nextCode === SLASH ) {
+                        commentCount--;
 
-        var getR = function ( src: string, i: number ) {
-            if ( i < src.length ) {
-                return src.charCodeAt( i );
-            } else {
-                return -1;
-            }
-        };
-
-        /**
-         * alterations:
-         *  : removes comments
-         *      // single line comments
-         *      / * * / multi-line comments
-         */
-        var stripComments = function ( src: string ): string {
-            var inAdmin = false;
-            var inPreAdmin = false;
-            var inSingleComment = false;
-            var inDoubleString = false;
-            var inSingleString = false;
-
-            /**
-             * This is a count so we can track nested comments.
-             *
-             * When it is 0, there is no comment. When it is greater than 0, we
-             * are in a comment.
-             */
-            var multiCommentCount = 0,
-                newSrc: string[] = [],
-                startI = 0;
-
-            // note that i is incremented within the code as well as within the for.
-            for (
-                var i = 0, len = src.length;
-                i < len;
-                i++
-                ) {
-                var c = src.charCodeAt( i );
-
-                // these are in order of precedence
-                if ( inAdmin ) {
-                    if (
-                        c === HASH &&
-                        getR( src, i + 1 ) === GREATER_THAN &&
-                        getR( src, i + 2 ) === HASH
-                        ) {
-                        inAdmin = false;
-                        i += 2;
-                    }
-                } else if ( inPreAdmin ) {
-                    if (
-                        c === HASH &&
-                        getR( src, i + 1 ) === GREATER_THAN &&
-                        getR( src, i + 2 ) === HASH
-                        ) {
-                        inPreAdmin = false;
-                        i += 2;
-                    }
-                } else if ( inDoubleString ) {
-                    if (
-                        c === DOUBLE_QUOTE &&
-                        getLeft( src, i ) !== BACKSLASH
-                        ) {
-                        inDoubleString = false;
-                    }
-                } else if ( inSingleString ) {
-                    if (
-                        c === SINGLE_QUOTE &&
-                        getLeft( src, i ) !== BACKSLASH
-                        ) {
-                        inSingleString = false;
-                    }
-                } else if ( inSingleComment ) {
-                    if ( c === SLASH_N ) {
-                        inSingleComment = false;
-                        pushWhitespace( newSrc, i - startI );
-                        startI = i;
-                    }
-                } else if ( multiCommentCount > 0 ) {
-                    if (
-                        c === SLASH &&
-                        getRight( src, i ) === STAR
-                        ) {
-                        multiCommentCount++;
-                    } else if (
-                        c === STAR &&
-                        getRight( src, i ) === SLASH
-                        ) {
-                        multiCommentCount--;
-
-                        // +1 so we include this character too
-
-                        i++;
-
-                        if ( multiCommentCount === 0 ) {
-                            pushWhitespace( newSrc, ( i - startI ) + 1 );
-                            startI = i + 1;
+                        if ( commentCount === 0 ) {
+                            code = src.charCodeAt( ++i );
+                            break;
+                        } else {
+                            code = src.charCodeAt( ++i );
+                            nextCode = src.charCodeAt( ++i );
                         }
+
+                        // opening a new mult-line comment
+                    } else if ( code === SLASH && nextCode === STAR ) {
+                        commentCount++;
+
+                        code = src.charCodeAt( ++i );
+                        nextCode = src.charCodeAt( ++i );
+
+                    } else {
+                        code = nextCode;
+                        nextCode = src.charCodeAt( ++i );
+
                     }
-                } else {
-                    /*
-                     * Look to enter a new type of block,
-                     * such as comments, strings, inlined-JS code.
-                     */
+                } while ( i < len )
 
-                    // multi-line comment
-                    if (
-                        c === SLASH &&
-                        getRight( src, i ) === STAR
-                        ) {
-                        newSrc.push( src.substring( startI, i ) );
-
-                        startI = i;
-                        i++;
-
-                        multiCommentCount++;
-                    } else if (
-                        c === SLASH &&
-                        getRight( src, i ) === SLASH
-                        ) {
-                        newSrc.push( src.substring( startI, i ) );
-
-                        startI = i;
-                        inSingleComment = true;
-
-                        i++;
-                        // look for strings
-                    } else if ( c === DOUBLE_QUOTE ) {
-                        inDoubleString = true;
-                    } else if ( c === SINGLE_QUOTE ) {
-                        inSingleString = true;
-                    } else if ( c === HASH ) {
-                        if (
-                            getR( src, i + 1 ) === LESS_THAN &&
-                            getR( src, i + 2 ) === HASH
-                            ) {
-                            inAdmin = true;
-
-                            i += 2;
-                        } else if (
-                            getR( src, i + 1 ) === LESS_THAN &&
-                            getR( src, i + 2 ) === LOWER_P &&
-                            getR( src, i + 3 ) === LOWER_R &&
-                            getR( src, i + 4 ) === LOWER_E &&
-                            getR( src, i + 5 ) === HASH
-                            ) {
-                            inPreAdmin = true;
-
-                            i += 5;
-                        }
-                    }
+                if ( commentCount > 0 ) {
+                    logError( "multi-line comment opened but never closed", commentI );
                 }
             }
+        }
 
-            if ( multiCommentCount > 0 || inSingleComment ) {
-                pushWhitespace( newSrc, src.length - startI );
-            } else {
-                newSrc.push( src.substring( startI ) );
+        return i;
+    }
+
+    parse.ignore( function ( src: string, i: number, code: number, len: number, logError:parse.ILogErrorFunction ): number {
+        while ( true ) {
+            // check for white space
+            while ( code === SPACE || code === TAB ) {
+                code = src.charCodeAt( ++i );
             }
 
-            // this should always be the case, but just incase it isn't ...
-            if ( newSrc.length > 0 ) {
-                return newSrc.join( '' );
-            } else {
-                return src;
-            }
-        };
-
-        /**
-         * Alterations:
-         *  : makes the source code lower case
-         *  : removes white space from the start of the source code
-         *  : changes \t to ' '
-         *  : replaces all '\r's with '\n's
-         *  : ensures all closing braces have an end of line before them
-         *  : ensures all 'end' keywords have an end of line before them
-         */
-        var preScanParse = function ( source: string ): string {
-            source = source.
-                toLowerCase().
-                replace( /\t/g, ' ' ).
-                replace( /\r/g, '\n' );
-
-            return source;
-
-            var i = 0;
-            for ( var i = 0; i < source.length; i++ ) {
-                var c = source.charCodeAt( i );
-
-                if ( c !== SLASH_N && c !== SPACE ) {
-                    break;
-                }
+            var newI = commentsTerminal( src, i, code, len, logError );
+            if ( i === newI ) {
+                break;
             }
 
-            if ( i > 0 ) {
-                var newStr = [];
-                pushWhitespace( newStr, i );
-                newStr.push( source );
+            i = newI;
+            code = src.charCodeAt( i );
+        }
 
-                return newStr.join( '' );
-            } else {
-                return source;
-            }
-        };
-
-        return function ( src: string ): string {
-            return stripComments( preScanParse( src ) );
-        };
-    })();
-
-    parse.ignore( parse.terminal.WHITESPACE );
+        return i;
+    });
 
     /**
      * WARNING! The terminal names used here are also used for display purposes.
@@ -412,23 +240,32 @@ module quby.parser {
      */
     var terminals: any = parse.terminals( <any> {
         /**
-         * Matches an end of line,
-         * and also chomps on whitespace.
+         * Matches an end of line and also chomps on whitespace.
          * 
-         * If it contains a semi-colon however,
-         * this will fail.
+         * If it contains a semi-colon however then this will fail.
          */
-        endOfLine: function ( src:string, origI:number, code:number, len:number ) {
+        endOfLine: function ( src:string, origI:number, code:number, len:number, logError:parse.ILogErrorFunction ) {
             var i = origI;
 
-            if ( code === SLASH_N ) {
+            if ( code === SLASH_N || code === SLASH_R ) {
                 do {
-                    code = src.charCodeAt( ++i );
-                } while (
-                    code === SLASH_N ||
-                    code === SPACE ||
-                    code === TAB
-                );
+                    do {
+                        code = src.charCodeAt( ++i );
+                    } while (
+                            code === SLASH_N ||
+                            code === SLASH_R ||
+                            code === SPACE   ||
+                            code === TAB
+                    );
+
+                    var newI = commentsTerminal( src, i, code, len, logError );
+                    if ( i === newI ) {
+                        break;
+                    }
+
+                    // -1 because above code is retrieved from '++i'
+                    i = newI-1;
+                } while ( i < len );
 
                 if ( src.charCodeAt( i ) !== SEMI_COLON ) {
                     return i;
@@ -439,27 +276,37 @@ module quby.parser {
         },
 
         /**
-         * Matches the semi-colon, or end of line.
+         * Matches the semi-colon or end of line.
          * 
-         * Due to the order of terminals, the end
-         * of line always has precedence.
+         * Due to the order of terminals the 'end of line' terminal always has precedence.
          * 
-         * Also chomps on whitespace and end of lines,
-         * both before and after the semi-colon.
+         * Also chomps on whitespace and end of lines both before and after the semi-colon.
          */
-        endOfStatement: function ( src, i, code, len ) {
+        endOfStatement: function ( src, i, code, len, logError:parse.ILogErrorFunction ) {
             if (
                     code === SEMI_COLON ||
-                    code === SLASH_N
+                    code === SLASH_N ||
+                    code === SLASH_R
             ) {
                 do {
-                    code = src.charCodeAt( ++i );
-                } while (
-                    code === SLASH_N ||
-                    code === SEMI_COLON ||
-                    code === SPACE ||
-                    code === TAB
-                );
+                    do {
+                        code = src.charCodeAt( ++i );
+                    } while (
+                        code === SLASH_N ||
+                        code === SLASH_R ||
+                        code === SEMI_COLON ||
+                        code === SPACE ||
+                        code === TAB
+                    );
+
+                    var newI = commentsTerminal( src, i, code, len, logError );
+                    if ( i === newI ) {
+                        break;
+                    }
+
+                    // -1 because above code is retrieved from '++i'
+                    i = newI-1;
+                } while ( i < len );
             }
 
             return i;
@@ -561,7 +408,7 @@ module quby.parser {
                         code === UNDERSCORE ||
                         ( ZERO <= code && code <= NINE ) ||
                         ( LOWER_A <= code && code <= LOWER_Z )
-                    )
+                        )
 
                     // look for a decimal
                     if ( src.charCodeAt( i ) === FULL_STOP ) {
@@ -576,14 +423,14 @@ module quby.parser {
                                 code === UNDERSCORE ||
                                 ( ZERO <= code && code <= NINE ) ||
                                 ( LOWER_A <= code && code <= LOWER_Z )
-                            )
+                                )
                         }
                     }
 
                     return i;
-                } else {
-                    return 0;
                 }
+
+                return 0;
             },
 
             string: parse.terminal.STRING
@@ -722,14 +569,26 @@ module quby.parser {
                 terminals.symbols.leftBrace,
                 terminals.symbols.leftSquare
             ],
-            function ( src:string, i:number, code:number, len:number ) {
-                while (
+            function ( src:string, i:number, code:number, len:number, logError:parse.ILogErrorFunction ) {
+                do {
+                    while (
                         code === SPACE ||
                         code === SLASH_N ||
+                        code === SLASH_R ||
                         code === TAB
-                ) {
-                    code = src.charCodeAt( ++i );
-                }
+                    ) {
+                        code = src.charCodeAt( ++i );
+                    }
+
+                    var newI = commentsTerminal( src, i, code, len, logError );
+
+                    if ( newI === i ) {
+                        break;
+                    } else {
+                        i = newI;
+                        code = src.charCodeAt( i );
+                    }
+                } while ( i < len );
 
                 return i;
             }
@@ -828,15 +687,12 @@ module quby.parser {
 
     /* Parser Rules */
 
-    var statementSeperator = parse.
-        name( 'end of statement' ).
-        either(
-        terminals.endOfLine,
-        terminals.endOfStatement
-        );
-
     var statement = parse.rule(),
         expr = parse.rule();
+
+    var statementSeperator = parse.
+        name( "statement seperator" ).
+        either( terminals.endOfLine, terminals.endOfStatement );
 
     var repeatStatement = parse.repeatSeperator(
         statement,
@@ -860,11 +716,7 @@ module quby.parser {
         name( 'expressions' ).
         repeatSeperator( expr, terminals.symbols.comma ).
         onMatch( function ( exprs ) {
-            if ( exprs !== null ) {
-                return new quby.ast.Parameters( exprs );
-            } else {
-                return null;
-            }
+            return new quby.ast.Parameters( exprs );
         });
 
     var variable = parse.
@@ -1093,18 +945,18 @@ module quby.parser {
      *  ( "john", lastName() )  - a string and a function call
      */
     var parameterExprs = parse.
-            name( 'expressions' ).
-            a( terminals.symbols.leftBracket ).
-            optional( exprs ).
-            optional( terminals.endOfLine ).
-            then( terminals.symbols.rightBracket ).
-            onMatch( function( lParen, exprs, end, rParen ) {
-                if ( exprs !== null ) {
-                    return exprs;
-                } else {
-                    return null;
-                }
-            } );
+        name( 'expressions' ).
+        a( terminals.symbols.leftBracket ).
+        optional( exprs ).
+        optional( terminals.endOfLine ).
+        then( terminals.symbols.rightBracket ).
+        onMatch( function ( lParen, exprs, end, rParen ) {
+            if ( exprs !== null ) {
+                return exprs;
+            } else {
+                return null;
+            }
+        });
 
     var blockParamVariables = parse.repeatSeperator(
             variable,
@@ -1176,8 +1028,8 @@ module quby.parser {
             optional( terminals.ops.hash ).
             then(terminals.identifiers.variableName).
             then(parameterExprs).
-            optional(block).
-            onMatch(function (hash, name, exprs, block): quby.ast.ISyntax {
+            optional( block ).
+            onMatch( function ( hash, name: parse.Symbol, exprs, block ): quby.ast.ISyntax {
                 if (hash !== null) {
                     return new quby.ast.JSFunctionCall(name, exprs, block);
                 } else {
@@ -1601,6 +1453,9 @@ module quby.parser {
                 terminals.admin.preInline
         );
 
+    var constructionTime = Date.now() - startTime;
+    console.log( 'construction time ' + constructionTime );
+
     /**
      * The entry point for the parser, and the only way to interact.
      *
@@ -1619,19 +1474,25 @@ module quby.parser {
     export function parseSource(
             src: string,
             name: string,
-            onFinish: ( program: quby.ast.ISyntax, errors: parse.ParseError[], time: parse.ITimeResult ) => void
+            onFinish: ( program: quby.ast.ISyntax, errors: parse.IParseError[], time: parse.ITimeResult ) => void
     ) {
-        // print out how long it took to pre-parse the code
-        var start = Date.now();
-        var codeSrc = preParse( src );
-        console.log( '.ast.quby.parser', 'pre parse code time: ' + ( Date.now() - start ) );
+        statements.parse({
+                name    : name,
+                src     : src,
+                inputSrc: src.toLowerCase(),
+                onFinish: onFinish
+        });
+    }
 
-        statements.parse( {
-            name: name,
-            src: src,
-            inputSrc: codeSrc,
-
-            onFinish: onFinish
+    /**
+     * This is used for debugging.
+     */
+    export function symbolize(
+            src: string,
+            onFinish: (terminals: parse.Term[], errors: parse.IParseError[]) => void
+    ) {
+        statements.symbolize( src.toLowerCase(), ( terminals: parse.Term[], errors: parse.IParseError[] ) : void => {
+            onFinish( terminals, errors );
         });
     }
 }
