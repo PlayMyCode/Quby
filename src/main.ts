@@ -209,7 +209,7 @@ module quby.main {
          * has finished being parsed.
          *
          * Note that this will happen before you call
-         * 'finalise'.
+         * 'finalize'.
          */
         onFinish(fun:() => void) {
             this.ensureCanParse();
@@ -388,7 +388,7 @@ module quby.main {
          * Call when you are done parsing files.
          * 
          * This finishes the process, and
-         * finalises the program.
+         * finalizes the program.
          * 
          * The callback given is then called
          * with the resulting program, or errors.
@@ -396,15 +396,15 @@ module quby.main {
          * As a UK citizen, spelling this 'finalize',
          * makes me feel dirty : ( .
          */
-        finalize( callback: ( result: Result, times?: { finalise: number; print: number; }) => void ): void {
+        finalize( callback: ( result: Result, times?: { finalize: number; print: number; }) => void ): void {
             util.future.run(
                     () => {
                         var times = {
-                            finalise: 0,
+                            finalize: 0,
                             print: 0
                         };
 
-                        var output = this.validator.finaliseProgram(times);
+                        var output = this.validator.finalizeProgram(times);
                         var result = new Result(
                                 output,
                                 this.validator.getErrors()
