@@ -1,17 +1,6 @@
 "use strict";
 
-console.log( '-- cookies ' + document.cookie );
-
-var cookie = getSaveSettings();
-var includeCore = ( cookie.includeCore !== undefined ? cookie.includeCore : false );
-var isAdmin     = ( cookie.isAdmin     !== undefined ? cookie.isAdmin     : true  );
-var debugMode   = ( cookie.debugMode   !== undefined ? cookie.debugMode   : true  );
-
-updateSaveSettings(function(obj) {
-    obj.includeCore = includeCore;
-    obj.isAdmin     = isAdmin;
-    obj.debugMode   = debugMode;
-});
+var includeCore = false, isAdmin = false, debugMode = false, isSymbolizeOn = false;
 
 var scriptsLoading = 0,
     scriptsLoadFuns = [],
@@ -120,6 +109,11 @@ function switchDebugMode() {
     setSaveSetting( 'debugMode', debugMode );
 }
 
+function switchIsSymbolizeOn() {
+    isSymbolizeOn = !isSymbolizeOn;
+    setSaveSetting( 'isSymbolizeOn', isSymbolizeOn );
+}
+
 function switchIncludeCore() {
     includeCore = !includeCore;
     setSaveSetting( 'includeCore', includeCore );
@@ -130,8 +124,12 @@ function switchIsAdmin() {
     setSaveSetting( 'isAdmin', isAdmin );
 }
     
-function setCheckbox( id, checked ) {
-    document.getElementById( id ).checked = !! checked ;
+function setCheckboxes( obj ) {
+    for ( var id in obj ) {
+        if ( obj.hasOwnProperty(id) ) {
+            document.getElementById( id ).checked = !! obj[id] ;
+        }
+    }
 }
 
 /// 
@@ -264,14 +262,14 @@ function padStr( time, padLen ) {
     return time;
 }
 
-function parseCode( callback ) {
+function parseCode() {
     setTimeout(function() {
         try {
-            parseCodeInner( callback );
+            parseCodeInner();
         } catch ( err ) {
             handleError( err );
         }
-    });
+    }, 0);
 }
 
 function parseCodeInner( callback ) {
@@ -287,61 +285,107 @@ function parseCodeInner( callback ) {
     var compileTime     = -1,
         symbolsTime     = -1,
         rulesTime       = -1,
-        parseTotal      = -1,
+        parseRealTotal      = -1,
         validateTime    = -1,
-        printTime       = -1,
         finalizeTime    = -1,
+        printTime       = -1,
+
+        parseTotalTime  = -1,
+        totalTime       = -1,
+
         pageTime = Date.now();
 
+    var updateTimeValue = function( currentVal, newVal ) {
+        // no change
+        if ( (typeof newVal) !== "number" ) {
+            return currentVal;
+        } else if ( currentVal === -1 ) {
+            return newVal;
+        } else {
+            return currentVal + newVal;
+        }
+    }
+
     var updateControlsTime = function( times ) {
-        console.log(' -- times');
-        console.log( times );
-        console.log('');
+        console.log(' -- times', times);
+        console.log();
 
-        compileTime += ( times.parseCompile !== undefined ) ? times.parseCompile : 0;
-        symbolsTime += ( times.parseSymbols !== undefined ) ? times.parseSymbols : 0;
-        rulesTime   += ( times.parseRules   !== undefined ) ? times.parseRules   : 0;
-        parseTotal  += ( times.parseTotal   !== undefined ) ? times.parseTotal   : 0;
+        // update the indevidual values
+        compileTime     = updateTimeValue( compileTime   , times.parseCompile     );
+        symbolsTime     = updateTimeValue( symbolsTime   , times.parseSymbols     );
+        rulesTime       = updateTimeValue( rulesTime     , times.parseRules       );
+        parseRealTotal  = updateTimeValue( parseRealTotal, times.parseTotal       );
+        validateTime    = updateTimeValue( validateTime  , times.validatorTotal   );
+        finalizeTime    = updateTimeValue( finalizeTime  , times.finalize         );
+        printTime       = updateTimeValue( printTime     , times.print            );
 
-        if (times.validatorTime !== undefined) {
-            validateTime = times.validatorTime;
-        }
-        if (times.print !== undefined) {
-            printTime = times.print;
-        }
-        if (times.finalise !== undefined) {
-            finalizeTime = times.finalise;
-        }
+        parseTotalTime  = updateTimeValue( parseTotalTime, times.parseCompile   );
+        parseTotalTime  = updateTimeValue( parseTotalTime, times.parseSymbols   );
+        parseTotalTime  = updateTimeValue( parseTotalTime, times.parseRules     );
 
-        var strCompileTime     = compileTime    !== -1 ? compileTime  : '?',
-            strSymbolsTime     = symbolsTime    !== -1 ? symbolsTime  : '?',
-            strRulesTime       = rulesTime      !== -1 ? rulesTime    : '?',
-            strParseTotal      = parseTotal     !== -1 ? parseTotal   : '?',
-            strValidateTime    = validateTime   !== -1 ? validateTime : '?',
-            strPrintTime       = printTime      !== -1 ? printTime    : '?',
-            strFinalizeTime    = finalizeTime   !== -1 ? finalizeTime : '?'
+        // now add it all to the total time
+        totalTime       = updateTimeValue( totalTime     , times.parseCompile     );
+        totalTime       = updateTimeValue( totalTime     , times.parseSymbols     );
+        totalTime       = updateTimeValue( totalTime     , times.parseRules       );
+        totalTime       = updateTimeValue( totalTime     , times.validatorTotal   );
+        totalTime       = updateTimeValue( totalTime     , times.finalize         );
+        totalTime       = updateTimeValue( totalTime     , times.print            );
 
-        var timeLen = Math.max(
+        // now convert from number to "number" or a "?" if no value
+        var strCompileTime     = compileTime    !== -1 ? compileTime    : '?',
+            strSymbolsTime     = symbolsTime    !== -1 ? symbolsTime    : '?',
+            strRulesTime       = rulesTime      !== -1 ? rulesTime      : '?',
+            strParseRealTime   = parseRealTotal !== -1 ? parseRealTotal : '?',
+            strParseTotalTime  = parseTotalTime !== -1 ? parseTotalTime : '?',
+            strValidateTime    = validateTime   !== -1 ? validateTime   : '?',
+            strFinalizeTime    = finalizeTime   !== -1 ? finalizeTime   : '?',
+            strPrintTime       = printTime      !== -1 ? printTime      : '?',
+            strTotalTime       = totalTime      !== -1 ? totalTime      : '?';
+
+        // work out any padding
+        
+        var timeLen1 = Math.max(
                 numDigitsInInt( strCompileTime  ),
                 numDigitsInInt( strSymbolsTime  ),
                 numDigitsInInt( strRulesTime    ),
-                numDigitsInInt( strParseTotal   ),
-                numDigitsInInt( strValidateTime ),
-                numDigitsInInt( strPrintTime    ),
-                numDigitsInInt( strFinalizeTime )
+                numDigitsInInt( strParseTotalTime),
+                numDigitsInInt( strParseRealTime)
         ) + 1;
 
-        document.getElementsByClassName('controls-time-info')[0].innerHTML =
-                "compile " + padStr(strCompileTime  , timeLen)      + "ms<br/>" +
-                "symbols " + padStr(strSymbolsTime  , timeLen)      + "ms<br/>" +
-                  "rules " + padStr(strRulesTime    , timeLen)      + "ms<br/>" +
-            "parse total " + padStr(strParseTotal   , timeLen)      + "ms<br/>" +
-                                                                        "<br/>" +
-             "validation " + padStr(strValidateTime , timeLen)      + "ms<br/>" +
-                  "print " + padStr(strPrintTime    , timeLen)      + "ms<br/>" +
-               "finalize " + padStr(strFinalizeTime , timeLen)      + "ms<br/>" +
-                                                                        "<br/>" +
-             "page total " + padStr(Date.now() - pageTime, timeLen) + "ms"      ;
+        var timeLen2 = Math.max(
+                numDigitsInInt( strValidateTime ),
+                numDigitsInInt( strFinalizeTime ),
+                numDigitsInInt( strPrintTime    )
+        ) + 1;
+
+        var realTotalTime = Date.now() - pageTime;
+        var timeLen3 = Math.max(
+                numDigitsInInt( strTotalTime    ),
+                numDigitsInInt( realTotalTime   )
+        ) + 1;
+
+        // build the HTML
+        document.querySelector('.controls-time-info').innerHTML =
+                "<div class='controls-time-info-inner'>" +
+                            "compile " + padStr(strCompileTime  , timeLen1)      + "ms<br>" +
+                            "symbols " + padStr(strSymbolsTime  , timeLen1)      + "ms<br>" +
+                              "rules " + padStr(strRulesTime    , timeLen1)      + "ms<br>" +
+                        "parse total " + padStr(strParseTotalTime, timeLen1)      + "ms<br>" +
+                   "real parse total " + padStr(strParseRealTime, timeLen1)      + "ms" +
+                "</div>" +
+
+                "<div class='controls-time-info-inner'>" +
+                         "validation " + padStr(strValidateTime , timeLen2)      + "ms<br>" +
+                           "finalize " + padStr(strFinalizeTime , timeLen2)      + "ms<br>" +
+                              "print " + padStr(strPrintTime    , timeLen2)      + "ms" +
+                "</div>" +
+
+                "<div class='controls-time-info-inner'>" +
+                        // how long did it take when ignoring setTimeouts and pauses
+                         "total time " + padStr(strTotalTime    , timeLen3)      + "ms<br>" +
+                        // how long did it really take for the users (this includes pauses)
+                    "real total time " + padStr(realTotalTime   , timeLen3) + "ms"      +
+                "</div>" ;
     };
 
     if ( includeCore ) {
@@ -378,8 +422,10 @@ function parseCodeInner( callback ) {
 
                 _result = result;
 
-                if (callback) {
-                    callback();
+                if ( isSymbolizeOn ) {
+                    quby.parser.symbolize( sourceCode, function(symbols) {
+                        outputSymbols.value = symbols.join("\n");
+                    });
                 }
             });
 }
@@ -420,9 +466,27 @@ function addQubyFiles( name, src ) {
 }
 
 window.addEventListener( 'load', function() {
-    setCheckbox( 'checkbox_include' , includeCore );
-    setCheckbox( 'checkbox_debug'   , debugMode   );
-    setCheckbox( 'checkbox_is_admin', isAdmin     );
+    var saveSettings = getSaveSettings();
+    console.log( '-- cookies ' + document.saveSettings );
+
+    includeCore     = ( saveSettings.includeCore   !== undefined ? saveSettings.includeCore   : false );
+    isAdmin         = ( saveSettings.isAdmin       !== undefined ? saveSettings.isAdmin       : true  );
+    debugMode       = ( saveSettings.debugMode     !== undefined ? saveSettings.debugMode     : true  );
+    isSymbolizeOn   = ( saveSettings.isSymbolizeOn !== undefined ? saveSettings.isSymbolizeOn : true  );
+
+    updateSaveSettings(function(obj) {
+        obj.includeCore     = includeCore;
+        obj.isAdmin         = isAdmin;
+        obj.debugMode       = debugMode;
+        obj.isSymbolizeOn   = isSymbolizeOn;
+    });
+
+    setCheckboxes({
+            'checkbox_include'          : includeCore,
+            'checkbox_debug'            : debugMode,
+            'checkbox_is_admin'         : isAdmin,
+            'checkbox_is_symbolize_on'  : isSymbolizeOn
+    });
 
     document.getElementById('js-output-code').value = '';
     document.getElementById('js-output-error').value = '';
@@ -477,9 +541,8 @@ window.addEventListener( 'load', function() {
 
     // if a selected file is saved then select it
     // or select the first item
-    var qbCookieFile = getSaveSettings().qbFile;
-    if ( qbCookieFile ) {
-        setQbSrc( qbCookieFile );
+    if ( saveSettings.qbFile ) {
+        setQbSrc( saveSettings.qbFile );
     } else if ( qubyFiles.length > 0 ) {
         setQbSrc( qubyFiles[0].src );
     }

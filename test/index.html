@@ -12,14 +12,19 @@
         <div class="controls-options">
             <label>include core.qb</label>
             <input id="checkbox_include" type="checkbox" value="include" onclick="switchIncludeCore();" />
+            <br>
 
-            <br />
             <label>debug mode</label>
             <input id="checkbox_debug" type="checkbox" value="include" onclick="switchDebugMode();" />
-            
-            <br />
+            <br>
+
             <label>parse as admin</label>
             <input id="checkbox_is_admin" type="checkbox" value="is_admin" onclick="switchIsAdmin();" />
+            <br>
+
+            <label>symbolize code</label>
+            <input id="checkbox_is_symbolize_on" type="checkbox" value="include" onclick="switchIsSymbolizeOn();" />
+            <br>
         </div>
     </form>
 
@@ -89,6 +94,7 @@
 
     addQubyFiles({
             'test.qb'           : 'qb/test.qb',
+            'empty.qb'          : 'qb/empty.qb',
             'space-snake.qb'    : 'qb/space-snake.qb',
             ' ... blank ... '   : ''
     });

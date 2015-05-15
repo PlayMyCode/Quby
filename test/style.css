@@ -86,7 +86,7 @@ h2 {
 
     box-shadow: 0 8px 12px rgba( 0, 0, 0, 0.3 );
 
-    padding: 18px 18px;
+    padding: 12px 18px;
     margin-left: -18px;
 
     position: relative;
@@ -123,19 +123,24 @@ h2 {
     }
     .button-parse {
     }
+    .controls-options, .controls-time-info {
+        font-size : 18px;
+        margin-top: -7px;
+    }
     .controls-options {
         padding: 0 0 0 9px;
+        text-align: right;
     }
-        .controls-options > label {
-            font-size: 21px;
-        }
     .controls-time-info {
         float: right; 
         clear: right;
-        text-align: right;
-        margin-top: -9px;
-        font-size : 16px;
     }
+        .controls-time-info-inner {
+            float: left;
+            clear: right;
+            text-align: right;
+            padding-left: 32px;
+        }
 
 .line-numbers {
     position: absolute;
